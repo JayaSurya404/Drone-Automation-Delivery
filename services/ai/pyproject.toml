@@ -1,0 +1,8 @@
+[project]
+name = "skynav-ai"
+version = "0.0.0"
+requires-python = ">=3.11"
+description = "Deterministic AI service interfaces for SkyNav"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

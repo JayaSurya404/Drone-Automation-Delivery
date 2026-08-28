@@ -1,55 +1,39 @@
-# SKY NAV PROJECT STATE
+# SkyNav Project State
 
 ## Current milestone
+
 Milestone 1 — Foundation
+
+## Foundation status
+
+Bootstrap implementation complete; verification pending dependency installation.
 
 ## Completed
 
-[ ] Repository bootstrap
-[ ] PNPM workspace
-[ ] Turbo
-[ ] Next.js web
-[ ] API
-[ ] PostgreSQL
-[ ] Redis
-[ ] Contracts
-[ ] Authentication
-[ ] RBAC
+- pnpm workspace and Turbo task graph
+- Next.js web shell with customer/admin/tracking feature boundaries
+- Fastify API health and module-discovery skeleton
+- runtime-safe shared contracts for mission state, telemetry, coordinates, and event envelopes
+- PostGIS migration foundation with tenant-owned core entities
+- Redis/PostGIS local Docker Compose stack
+- simulator, telemetry, notification, and Python AI service interfaces
+- repository, deployment, security, operations, test, ML, and edge directory foundations
 
-## In progress
+## Remaining
 
-Developer 1:
-Frontend shell
+- choose and implement the database migration runner/adapter
+- implement identity, RBAC, and server-side authorization middleware
+- implement the first order-to-simulated-delivery vertical slice
+- add module tests, integration tests, E2E tests, CI quality gates, and deployment configuration
+- choose realtime transport and telemetry time-series persistence strategy
 
-Developer 2:
-Auth/API
+## Recommended next step
 
-Developer 3:
-AI service skeleton
-
-Developer 4:
-Simulator skeleton
-
-## Next tasks
-
-1. Complete authentication
-2. Complete drone registry
-3. Complete order creation
-4. Complete mission creation
-5. Connect simulator
-
-## Current known issues
-
-None
-
-## Last integrated commit
-
-<commit SHA>
+Implement the identity and organization foundation in `apps/api`, including tenant-scoped request context, RBAC, audit logging, and integration tests before adding order or mission endpoints.
 
 ## Important decisions
 
-- Simulation-first
-- PostgreSQL/PostGIS
-- Redis
-- Shared contracts
-- AI never bypasses safety
+- simulation-first
+- PostgreSQL/PostGIS and Redis locally
+- contracts-first integration
+- AI is advisory; deterministic safety policy authorizes missions
