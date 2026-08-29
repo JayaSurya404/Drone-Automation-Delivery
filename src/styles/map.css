@@ -1,0 +1,234 @@
+/* ═══════════════════════════════════════════════════════════
+   MAP COMPONENT STYLES — Premium Light Theme
+═══════════════════════════════════════════════════════════ */
+
+/* ─── Map Wrapper ─── */
+.map-wrapper {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.map-container {
+  width: 100%;
+  background: #f0f4f8;
+}
+
+/* Leaflet overrides for premium look */
+.leaflet-container {
+  font-family: var(--font-sans) !important;
+  background: #f8fafc;
+}
+
+.leaflet-tile-pane {
+  filter: saturate(0.9) brightness(1.03);
+}
+
+/* ─── Drone Map Marker ─── */
+.drone-map-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.drone-icon-box {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+  border: 2.5px solid #0ea5e9;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 16px rgba(14, 165, 233, 0.35),
+    0 0 0 6px rgba(14, 165, 233, 0.1);
+  position: relative;
+  z-index: 2;
+  animation: droneHoverSlow 3.5s ease-in-out infinite;
+}
+
+.drone-pulse-radar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(14, 165, 233, 0.35);
+  animation: radarPulse 2s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes radarPulse {
+  0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
+
+/* ─── Destination Marker ─── */
+.destination-map-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+}
+
+.landing-pad-box {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2.5px solid #10b981;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #059669;
+  box-shadow:
+    0 4px 14px rgba(16, 185, 129, 0.3),
+    0 0 0 5px rgba(16, 185, 129, 0.1);
+  position: relative;
+  z-index: 2;
+}
+
+.landing-pad-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(16, 185, 129, 0.4);
+  animation: radarPulse 2.5s ease-out infinite;
+  z-index: 1;
+}
+
+/* ─── Hub Marker ─── */
+.hub-map-marker {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #f8faff 0%, #eef2ff 100%);
+  border: 2px solid rgba(99, 102, 241, 0.5);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-indigo);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+/* ─── Map Overlays ─── */
+.map-overlay-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-full);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  box-shadow: var(--shadow-md);
+}
+
+.map-controls-floating {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.map-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-fast);
+}
+
+.map-btn:hover {
+  background: #ffffff;
+  border-color: var(--border-active);
+  color: var(--accent-blue);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ─── Location Picker Map ─── */
+.location-picker-wrapper {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 1.5px solid var(--border-default);
+}
+
+.location-picker-hint {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-full);
+  padding: 0.45rem 1.1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+}
+
+/* ─── Geofence Status ─── */
+.geofence-available {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.geofence-unavailable {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #dc2626;
+}

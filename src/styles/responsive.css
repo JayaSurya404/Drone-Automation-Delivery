@@ -1,0 +1,191 @@
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE STYLES — Mobile-First E-Commerce Experience
+═══════════════════════════════════════════════════════════ */
+
+/* ─── E-Commerce Header Responsiveness ─── */
+@media (max-width: 1024px) {
+  .location-select-btn { display: none; }
+  .ecom-action-link { display: none; }
+  .air-delivery-badge-pill { display: none; }
+}
+
+@media (max-width: 768px) {
+  .navbar-main-row {
+    padding: 0.5rem 1rem;
+  }
+
+  .navbar-inner-ecom {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .ecom-brand {
+    order: 1;
+  }
+
+  .ecom-nav-actions {
+    order: 2;
+    margin-left: auto;
+    gap: 0.5rem;
+  }
+
+  .ecom-search-wrapper {
+    order: 3;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 0.25rem;
+  }
+
+  .search-category-select {
+    display: none;
+  }
+
+  .ecom-category-nav {
+    padding: 0.35rem 1rem;
+  }
+
+  .ecom-hero-banner {
+    grid-template-columns: 1fr !important;
+    text-align: center;
+    padding: 2rem 1.25rem !important;
+  }
+
+  .hero-text-content {
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .hero-cta-group {
+    justify-content: center;
+  }
+
+  .hero-drone-visual-wrap {
+    display: none;
+  }
+
+  .hero-arrow-btn {
+    display: none;
+  }
+
+  .product-details-main-grid {
+    grid-template-columns: 1fr !important;
+    gap: 2rem;
+  }
+
+  .gallery-layout-wrap {
+    flex-direction: column-reverse;
+  }
+
+  .gallery-thumbnails-strip {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .gallery-main-stage {
+    height: 320px;
+  }
+
+  .action-buttons-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ecom-cart-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cart-item-card {
+    flex-direction: column;
+  }
+
+  .cart-item-img-link {
+    width: 100%;
+    height: 180px;
+  }
+
+  .item-total-col {
+    text-align: left;
+    margin-top: 0.5rem;
+  }
+
+  .reviews-summary-row {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .flash-deals-header-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .category-tiles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
+  }
+
+  .product-image-box {
+    height: 150px;
+  }
+
+  .product-title-text {
+    font-size: 0.85rem;
+  }
+
+  .price-current {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .products-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .category-tiles-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Footer ─── */
+@media (max-width: 768px) {
+  .app-footer {
+    display: none; /* Hide on mobile, use bottom nav instead */
+  }
+}
+
+/* ─── Tracking on Mobile ─── */
+@media (max-width: 768px) {
+  .tracking-map-hero {
+    border-radius: var(--radius-lg);
+    height: 50vh;
+    min-height: 280px;
+  }
+
+  .tracking-eta-panel {
+    padding: 1rem;
+  }
+
+  .hud-metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .hud-metric-card {
+    padding: 0.8rem 0.5rem;
+  }
+
+  .hud-metric-value {
+    font-size: 1.2rem;
+  }
+}
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
