@@ -15,6 +15,13 @@ import { createAuditRoutes } from "./modules/audit/audit.routes.js";
 import { createOrderRepository, type OrderRepository } from "./modules/orders/order.repository.js";
 import { createOrderService, type OrderService } from "./modules/orders/order.service.js";
 import { createOrderRoutes } from "./modules/orders/order.routes.js";
+import { createFleetRepository, type FleetRepository } from "./modules/fleet/fleet.repository.js";
+import { createFleetService, type FleetService } from "./modules/fleet/fleet.service.js";
+import { createFleetRoutes } from "./modules/fleet/fleet.routes.js";
+import { createMissionRepository, type MissionRepository } from "./modules/missions/mission.repository.js";
+import { createMissionService, type MissionService } from "./modules/missions/mission.service.js";
+import { createMissionRoutes } from "./modules/missions/mission.routes.js";
+import { createSimulatorGateway, type SimulatorGateway } from "./modules/missions/simulator.adapter.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -24,6 +31,11 @@ export interface AppOptions {
   authService?: AuthService;
   orderRepo?: OrderRepository;
   orderService?: OrderService;
+  fleetRepo?: FleetRepository;
+  fleetService?: FleetService;
+  missionRepo?: MissionRepository;
+  missionService?: MissionService;
+  simulatorGateway?: SimulatorGateway;
   logger?: boolean;
 }
 
@@ -37,6 +49,9 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const auditService = options.auditService ?? createAuditService(db);
   const authRepo = options.authRepo ?? createAuthRepository(db);
   const orderRepo = options.orderRepo ?? createOrderRepository(db);
+  const fleetRepo = options.fleetRepo ?? createFleetRepository(db);
+  const missionRepo = options.missionRepo ?? createMissionRepository(db);
+  const simulatorGateway = options.simulatorGateway ?? createSimulatorGateway();
 
   // Error handling plugin
   app.setErrorHandler(errorHandler);
@@ -62,6 +77,10 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
   const authService = options.authService ?? createAuthService(authRepo, auditService, jwtSign);
   const orderService = options.orderService ?? createOrderService(orderRepo, auditService);
+  const fleetService = options.fleetService ?? createFleetService(fleetRepo, auditService);
+  const missionService =
+    options.missionService ??
+    createMissionService(missionRepo, orderRepo, fleetRepo, simulatorGateway, auditService);
 
   // Pre-handler hook to authenticate requests with Bearer tokens
   app.addHook("onRequest", async (request) => {
@@ -125,6 +144,8 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   app.register(createAuthRoutes(authService));
   app.register(createAuditRoutes(auditService));
   app.register(createOrderRoutes(orderService));
+  app.register(createFleetRoutes(fleetService));
+  app.register(createMissionRoutes(missionService));
 
   return app;
 }

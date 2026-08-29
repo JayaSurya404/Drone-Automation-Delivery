@@ -7,6 +7,19 @@ import {
   OrderCancellationProhibitedError
 } from "../modules/orders/order.service.js";
 import { InvalidOrderStateTransitionError } from "../modules/orders/order.state-machine.js";
+import {
+  DroneNotFoundError,
+  DuplicateDroneCallSignError,
+  DroneNotAvailableError,
+  FleetForbiddenError
+} from "../modules/fleet/fleet.service.js";
+import { InvalidDroneStateTransitionError } from "../modules/fleet/drone.state-machine.js";
+import {
+  DuplicateActiveMissionError,
+  MissionForbiddenError
+} from "../modules/missions/mission.service.js";
+import { MissionNotFoundError } from "../modules/missions/mission.repository.js";
+import { InvalidMissionStateTransitionError } from "../modules/missions/mission.state-machine.js";
 
 export function errorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
   const timestamp = new Date().toISOString();
@@ -96,6 +109,127 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
       instance,
       code: error.code,
       timestamp
+    });
+  }
+
+  // Handle domain DroneNotFoundError
+  if (error instanceof DroneNotFoundError) {
+    return reply.status(404).send({
+      type: "https://skynav.io/errors/drone-not-found",
+      title: "Drone Not Found",
+      status: 404,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain DuplicateDroneCallSignError
+  if (error instanceof DuplicateDroneCallSignError) {
+    return reply.status(409).send({
+      type: "https://skynav.io/errors/duplicate-call-sign",
+      title: "Duplicate Drone Call Sign",
+      status: 409,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain DroneNotAvailableError
+  if (error instanceof DroneNotAvailableError) {
+    return reply.status(422).send({
+      type: "https://skynav.io/errors/drone-not-available",
+      title: "Drone Not Available",
+      status: 422,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain FleetForbiddenError
+  if (error instanceof FleetForbiddenError) {
+    return reply.status(403).send({
+      type: "https://skynav.io/errors/forbidden",
+      title: "Fleet Operation Forbidden",
+      status: 403,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain InvalidDroneStateTransitionError
+  if (error instanceof InvalidDroneStateTransitionError) {
+    return reply.status(422).send({
+      type: "https://skynav.io/errors/invalid-drone-state-transition",
+      title: "Invalid Drone State Transition",
+      status: 422,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp,
+      currentStatus: error.currentStatus,
+      targetStatus: error.targetStatus
+    });
+  }
+
+  // Handle domain MissionNotFoundError
+  if (error instanceof MissionNotFoundError) {
+    return reply.status(404).send({
+      type: "https://skynav.io/errors/mission-not-found",
+      title: "Mission Not Found",
+      status: 404,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain DuplicateActiveMissionError
+  if (error instanceof DuplicateActiveMissionError) {
+    return reply.status(409).send({
+      type: "https://skynav.io/errors/duplicate-active-mission",
+      title: "Duplicate Active Mission",
+      status: 409,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain MissionForbiddenError
+  if (error instanceof MissionForbiddenError) {
+    return reply.status(403).send({
+      type: "https://skynav.io/errors/forbidden",
+      title: "Mission Operation Forbidden",
+      status: 403,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain InvalidMissionStateTransitionError
+  if (error instanceof InvalidMissionStateTransitionError) {
+    return reply.status(422).send({
+      type: "https://skynav.io/errors/invalid-mission-state-transition",
+      title: "Invalid Mission State Transition",
+      status: 422,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp,
+      currentStatus: error.currentStatus,
+      targetStatus: error.targetStatus
     });
   }
 
