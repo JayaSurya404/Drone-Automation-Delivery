@@ -204,9 +204,17 @@ export const auditActionSchema = z.enum([
   "ORDER_STATUS_UPDATED",
   "ORDER_CANCELLED",
   "ORDER_MODIFIED",
+  "DRONE_REGISTERED",
+  "DRONE_UPDATED",
+  "DRONE_STATUS_UPDATED",
   "MISSION_CREATED",
   "MISSION_AUTHORIZED",
   "MISSION_DISPATCHED",
+  "MISSION_ASSIGNED",
+  "MISSION_STATUS_UPDATED",
+  "MISSION_CANCELLED",
+  "MISSION_COMPLETED",
+  "MISSION_FAILED",
   "EMERGENCY_COMMAND_ISSUED",
   "RETURN_TO_HOME_TRIGGERED",
   "GEOFENCE_CREATED",
@@ -254,15 +262,21 @@ export type ProblemDetails = z.infer<typeof problemDetailsSchema>;
 // ============================================================================
 
 export const missionStatusSchema = z.enum([
+  "PENDING",
   "PLANNED",
   "VALIDATING",
   "READY",
   "AUTHORIZED",
+  "ASSIGNED",
+  "LAUNCHING",
   "DISPATCHED",
   "IN_PROGRESS",
-  "DELIVERED",
+  "DELIVERING",
   "RETURNING",
   "COMPLETED",
+  "CANCELLED",
+  "FAILED",
+  "EMERGENCY",
   "ABORTED"
 ]);
 export type MissionStatus = z.infer<typeof missionStatusSchema>;
@@ -288,18 +302,26 @@ export const orderPrioritySchema = z.enum([
 export type OrderPriority = z.infer<typeof orderPrioritySchema>;
 
 export const droneStatusSchema = z.enum([
+  "IDLE",
   "AVAILABLE",
   "ASSIGNED",
-  "IN_FLIGHT",
+  "TAKEOFF",
+  "EN_ROUTE",
+  "ARRIVED",
+  "DELIVERING",
+  "RETURNING",
+  "LANDED",
   "MAINTENANCE",
-  "OFFLINE"
+  "EMERGENCY",
+  "OFFLINE",
+  "IN_FLIGHT"
 ]);
 export type DroneStatus = z.infer<typeof droneStatusSchema>;
 
 export const coordinateSchema = z.object({
   latitude: z.number().gte(-90, "Latitude must be between -90 and 90").lte(90, "Latitude must be between -90 and 90"),
   longitude: z.number().gte(-180, "Longitude must be between -180 and 180").lte(180, "Longitude must be between -180 and 180"),
-  altitudeMeters: z.number().nonnegative("Altitude must be non-negative").optional()
+  altitudeMeters: z.number().nonnegative("Altitude must be non-negative").optional().default(0)
 });
 export type Coordinate = z.infer<typeof coordinateSchema>;
 
@@ -386,6 +408,144 @@ export const orderListResponseSchema = z.object({
   })
 });
 export type OrderListResponse = z.infer<typeof orderListResponseSchema>;
+
+// ============================================================================
+// Fleet & Drone Requests & Responses
+// ============================================================================
+
+export const createDroneRequestSchema = z.object({
+  callSign: z
+    .string()
+    .trim()
+    .min(2, "Call sign must be at least 2 characters")
+    .max(32, "Call sign cannot exceed 32 characters")
+    .regex(/^[A-Za-z0-9-_]+$/, "Call sign may only contain letters, numbers, hyphens, and underscores"),
+  model: z.string().trim().min(2).max(100).default("SkyNav Hexacopter Alpha"),
+  serialNumber: z.string().trim().max(100).optional(),
+  maxPayloadGrams: z.number().int().positive().max(50000).default(5000),
+  batteryPercent: z.number().gte(0).lte(100).default(100),
+  currentLocation: coordinateSchema.default({ latitude: 37.7749, longitude: -122.4194, altitudeMeters: 0 }),
+  homeLocation: coordinateSchema.default({ latitude: 37.7749, longitude: -122.4194, altitudeMeters: 0 })
+});
+export type CreateDroneRequest = z.infer<typeof createDroneRequestSchema>;
+
+export const updateDroneRequestSchema = z.object({
+  callSign: z
+    .string()
+    .trim()
+    .min(2)
+    .max(32)
+    .regex(/^[A-Za-z0-9-_]+$/)
+    .optional(),
+  model: z.string().trim().min(2).max(100).optional(),
+  serialNumber: z.string().trim().max(100).nullable().optional(),
+  maxPayloadGrams: z.number().int().positive().max(50000).optional(),
+  status: droneStatusSchema.optional(),
+  batteryPercent: z.number().gte(0).lte(100).optional(),
+  currentLocation: coordinateSchema.optional(),
+  homeLocation: coordinateSchema.optional(),
+  isActive: z.boolean().optional()
+});
+export type UpdateDroneRequest = z.infer<typeof updateDroneRequestSchema>;
+
+export const droneResponseSchema = z.object({
+  id: uuidSchema,
+  organizationId: uuidSchema,
+  callSign: z.string(),
+  model: z.string(),
+  serialNumber: z.string().nullable().optional(),
+  status: droneStatusSchema,
+  batteryPercent: z.number(),
+  maxPayloadGrams: z.number(),
+  currentLocation: coordinateSchema,
+  homeLocation: coordinateSchema,
+  isActive: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type DroneResponse = z.infer<typeof droneResponseSchema>;
+
+export const droneListQuerySchema = z.object({
+  status: droneStatusSchema.optional(),
+  isActive: z.coerce.boolean().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+export type DroneListQuery = z.infer<typeof droneListQuerySchema>;
+
+export const droneListResponseSchema = z.object({
+  data: z.array(droneResponseSchema),
+  pagination: z.object({
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative()
+  })
+});
+export type DroneListResponse = z.infer<typeof droneListResponseSchema>;
+
+// ============================================================================
+// Mission Requests & Responses
+// ============================================================================
+
+export const createMissionRequestSchema = z.object({
+  orderId: uuidSchema,
+  origin: orderLocationSchema.optional(),
+  destination: orderLocationSchema.optional()
+});
+export type CreateMissionRequest = z.infer<typeof createMissionRequestSchema>;
+
+export const assignMissionRequestSchema = z.object({
+  droneId: uuidSchema
+});
+export type AssignMissionRequest = z.infer<typeof assignMissionRequestSchema>;
+
+export const updateMissionStatusRequestSchema = z.object({
+  status: missionStatusSchema,
+  reason: z.string().trim().max(500).optional()
+});
+export type UpdateMissionStatusRequest = z.infer<typeof updateMissionStatusRequestSchema>;
+
+export const missionResponseSchema = z.object({
+  id: uuidSchema,
+  missionNumber: z.string(),
+  organizationId: uuidSchema,
+  orderId: uuidSchema,
+  droneId: uuidSchema.nullable().optional(),
+  status: missionStatusSchema,
+  origin: orderLocationSchema,
+  destination: orderLocationSchema,
+  assignedAt: z.string().datetime().nullable().optional(),
+  launchedAt: z.string().datetime().nullable().optional(),
+  completedAt: z.string().datetime().nullable().optional(),
+  cancelledAt: z.string().datetime().nullable().optional(),
+  cancellationReason: z.string().nullable().optional(),
+  failedAt: z.string().datetime().nullable().optional(),
+  failureReason: z.string().nullable().optional(),
+  emergencyAt: z.string().datetime().nullable().optional(),
+  emergencyReason: z.string().nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type MissionResponse = z.infer<typeof missionResponseSchema>;
+
+export const missionListQuerySchema = z.object({
+  status: missionStatusSchema.optional(),
+  orderId: uuidSchema.optional(),
+  droneId: uuidSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+export type MissionListQuery = z.infer<typeof missionListQuerySchema>;
+
+export const missionListResponseSchema = z.object({
+  data: z.array(missionResponseSchema),
+  pagination: z.object({
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative()
+  })
+});
+export type MissionListResponse = z.infer<typeof missionListResponseSchema>;
 
 // ============================================================================
 // Telemetry & Event Contracts

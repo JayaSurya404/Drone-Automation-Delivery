@@ -54,8 +54,21 @@ export interface DroneTable {
   id: string;
   organization_id: string;
   model_id: string | null;
+  call_sign: string;
+  model: string;
+  serial_number: string | null;
   status: string;
-  created_at: ColumnType<Date, string | undefined, never>;
+  battery_percent: number;
+  max_payload_grams: number;
+  current_latitude: number;
+  current_longitude: number;
+  current_altitude_meters: number;
+  home_latitude: number;
+  home_longitude: number;
+  home_altitude_meters: number;
+  is_active: boolean;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string | undefined>;
 }
 
 export interface BatteryTable {
@@ -107,11 +120,30 @@ export interface PackageTable {
 
 export interface MissionTable {
   id: string;
+  mission_number: string;
   organization_id: string;
   drone_id: string | null;
-  order_id: string | null;
+  order_id: string;
   status: string;
-  created_at: ColumnType<Date, string | undefined, never>;
+  origin_latitude: number;
+  origin_longitude: number;
+  origin_altitude_meters: number | null;
+  origin_address: string | null;
+  destination_latitude: number;
+  destination_longitude: number;
+  destination_altitude_meters: number | null;
+  destination_address: string | null;
+  assigned_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  launched_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  completed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  cancelled_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  cancellation_reason: string | null;
+  failed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  failure_reason: string | null;
+  emergency_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  emergency_reason: string | null;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string | undefined>;
 }
 
 export interface MissionWaypointTable {

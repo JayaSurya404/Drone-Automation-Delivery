@@ -10,7 +10,12 @@ import {
   createOrderRequestSchema,
   updateOrderStatusRequestSchema,
   cancelOrderRequestSchema,
-  orderResponseSchema
+  orderResponseSchema,
+  createDroneRequestSchema,
+  updateDroneRequestSchema,
+  createMissionRequestSchema,
+  assignMissionRequestSchema,
+  updateMissionStatusRequestSchema
 } from "./index.js";
 
 describe("Contracts / Authentication & RBAC Schemas", () => {
@@ -157,5 +162,57 @@ describe("Contracts / Order Domain Schemas", () => {
     const parsed = orderResponseSchema.parse(response);
     assert.equal(parsed.id, response.id);
     assert.equal(parsed.status, "CREATED");
+  });
+});
+
+describe("Contracts / Fleet & Mission Schemas", () => {
+  it("validates drone creation and update schemas", () => {
+    const validDrone = {
+      callSign: "SKY-001",
+      model: "SkyNav Hexacopter Alpha",
+      maxPayloadGrams: 5000,
+      batteryPercent: 100,
+      currentLocation: { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 0 },
+      homeLocation: { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 0 }
+    };
+    const parsed = createDroneRequestSchema.parse(validDrone);
+    assert.equal(parsed.callSign, "SKY-001");
+
+    const validUpdate = updateDroneRequestSchema.parse({
+      status: "ASSIGNED",
+      batteryPercent: 95
+    });
+    assert.equal(validUpdate.status, "ASSIGNED");
+    assert.equal(validUpdate.batteryPercent, 95);
+  });
+
+  it("rejects invalid drone call sign format", () => {
+    assert.throws(() => {
+      createDroneRequestSchema.parse({
+        callSign: "SKY!@#", // invalid characters
+        maxPayloadGrams: 5000
+      });
+    });
+  });
+
+  it("validates mission creation, assignment, and status update schemas", () => {
+    const validMission = {
+      orderId: "11111111-1111-1111-1111-111111111111",
+      origin: { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 0 },
+      destination: { latitude: 37.7833, longitude: -122.4167, altitudeMeters: 15 }
+    };
+    const parsed = createMissionRequestSchema.parse(validMission);
+    assert.equal(parsed.orderId, validMission.orderId);
+
+    const assign = assignMissionRequestSchema.parse({
+      droneId: "22222222-2222-2222-2222-222222222222"
+    });
+    assert.equal(assign.droneId, "22222222-2222-2222-2222-222222222222");
+
+    const statusUpdate = updateMissionStatusRequestSchema.parse({
+      status: "IN_PROGRESS",
+      reason: "Takeoff completed"
+    });
+    assert.equal(statusUpdate.status, "IN_PROGRESS");
   });
 });
