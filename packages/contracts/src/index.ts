@@ -39,6 +39,8 @@ export const permissionSchema = z.enum([
   "geofences:modify",
   "telemetry:read",
   "telemetry:ingest",
+  "notifications:read",
+  "notifications:manage",
   "audit:read",
   "users:manage",
   "org:manage"
@@ -65,6 +67,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "geofences:modify",
     "telemetry:read",
     "telemetry:ingest",
+    "notifications:read",
+    "notifications:manage",
     "audit:read",
     "users:manage",
     "org:manage"
@@ -84,6 +88,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "geofences:modify",
     "telemetry:read",
     "telemetry:ingest",
+    "notifications:read",
+    "notifications:manage",
     "audit:read"
   ],
   FLEET_MANAGER: [
@@ -93,6 +99,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "fleet:read",
     "fleet:manage",
     "telemetry:read",
+    "notifications:read",
     "audit:read"
   ],
   DISPATCHER: [
@@ -104,13 +111,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "missions:create",
     "drones:read",
     "fleet:read",
-    "telemetry:read"
+    "telemetry:read",
+    "notifications:read"
   ],
   CUSTOMER: [
     "orders:read",
     "orders:create",
     "orders:cancel",
-    "telemetry:read"
+    "telemetry:read",
+    "notifications:read"
   ]
 } as const;
 
@@ -583,13 +592,136 @@ export const eventEnvelopeSchema = z.object({
 export type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
 
 // ============================================================================
+// Domain Events & Outbox Contracts
+// ============================================================================
+
+export const domainEventTypeSchema = z.enum([
+  // Orders
+  "ORDER_CREATED",
+  "ORDER_CONFIRMED",
+  "ORDER_ASSIGNED",
+  "ORDER_IN_TRANSIT",
+  "ORDER_DELIVERED",
+  "ORDER_CANCELLED",
+  "ORDER_FAILED",
+  // Missions
+  "MISSION_CREATED",
+  "MISSION_ASSIGNED",
+  "MISSION_LAUNCHED",
+  "MISSION_IN_PROGRESS",
+  "MISSION_DELIVERING",
+  "MISSION_RETURNING",
+  "MISSION_COMPLETED",
+  "MISSION_CANCELLED",
+  "MISSION_FAILED",
+  "MISSION_EMERGENCY",
+  // Drones
+  "DRONE_REGISTERED",
+  "DRONE_ASSIGNED",
+  "DRONE_TAKEOFF",
+  "DRONE_EN_ROUTE",
+  "DRONE_ARRIVED",
+  "DRONE_DELIVERING",
+  "DRONE_RETURNING",
+  "DRONE_LANDED",
+  "DRONE_LOW_BATTERY",
+  "DRONE_CRITICAL_BATTERY",
+  "DRONE_EMERGENCY",
+  "DRONE_MAINTENANCE",
+  // System & Alerts
+  "ALERT_TRIGGERED",
+  "EMERGENCY_TRIGGERED",
+  "EMERGENCY_CLEARED"
+]);
+export type DomainEventType = z.infer<typeof domainEventTypeSchema>;
+
+export const domainEventEnvelopeSchema = z.object({
+  id: uuidSchema,
+  version: z.literal("v1").default("v1"),
+  eventType: domainEventTypeSchema,
+  occurredAt: z.string().datetime(),
+  organizationId: organizationIdSchema,
+  aggregateType: z.enum(["ORDER", "MISSION", "DRONE", "DELIVERY", "ALERT", "SYSTEM"]),
+  aggregateId: uuidSchema,
+  actorId: uuidSchema.nullable().optional(),
+  payload: z.record(z.unknown()).default({})
+});
+export type DomainEventEnvelope = z.infer<typeof domainEventEnvelopeSchema>;
+
+// ============================================================================
+// Notification Contracts
+// ============================================================================
+
+export const notificationTypeSchema = z.enum([
+  "ORDER_UPDATE",
+  "MISSION_UPDATE",
+  "DRONE_UPDATE",
+  "DELIVERY_UPDATE",
+  "EMERGENCY",
+  "SYSTEM"
+]);
+export type NotificationType = z.infer<typeof notificationTypeSchema>;
+
+export const notificationSeveritySchema = z.enum([
+  "INFO",
+  "SUCCESS",
+  "WARNING",
+  "CRITICAL"
+]);
+export type NotificationSeverity = z.infer<typeof notificationSeveritySchema>;
+
+export const notificationResponseSchema = z.object({
+  id: uuidSchema,
+  organizationId: uuidSchema,
+  userId: uuidSchema.nullable().optional(),
+  type: notificationTypeSchema,
+  severity: notificationSeveritySchema,
+  title: z.string(),
+  message: z.string(),
+  isRead: z.boolean(),
+  readAt: z.string().datetime().nullable().optional(),
+  aggregateType: z.string().nullable().optional(),
+  aggregateId: uuidSchema.nullable().optional(),
+  eventId: uuidSchema.nullable().optional(),
+  metadata: z.record(z.unknown()).nullable().optional(),
+  createdAt: z.string().datetime()
+});
+export type NotificationResponse = z.infer<typeof notificationResponseSchema>;
+
+export const notificationListQuerySchema = z.object({
+  isRead: z.preprocess((val) => {
+    if (val === "true" || val === true) return true;
+    if (val === "false" || val === false) return false;
+    return val;
+  }, z.boolean().optional()),
+  type: notificationTypeSchema.optional(),
+  severity: notificationSeveritySchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
+
+export const notificationListResponseSchema = z.object({
+  data: z.array(notificationResponseSchema),
+  unreadCount: z.number().int().nonnegative(),
+  pagination: z.object({
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative()
+  })
+});
+export type NotificationListResponse = z.infer<typeof notificationListResponseSchema>;
+
+// ============================================================================
 // Realtime WebSocket Protocol Contracts
 // ============================================================================
 
 export const wsSubscriptionChannelSchema = z.enum([
   "telemetry:organization",
   "telemetry:drone",
-  "telemetry:mission"
+  "telemetry:mission",
+  "notifications:organization",
+  "notifications:user"
 ]);
 export type WsSubscriptionChannel = z.infer<typeof wsSubscriptionChannelSchema>;
 
@@ -660,6 +792,13 @@ export const wsServerTelemetryMessageSchema = z.object({
   timestamp: z.string().datetime()
 });
 
+export const wsServerNotificationMessageSchema = z.object({
+  type: z.literal("NOTIFICATION"),
+  channel: z.string(),
+  notification: notificationResponseSchema,
+  timestamp: z.string().datetime()
+});
+
 export const wsServerErrorMessageSchema = z.object({
   type: z.literal("ERROR"),
   code: z.string(),
@@ -677,6 +816,7 @@ export const wsServerMessageSchema = z.discriminatedUnion("type", [
   wsServerSubscribedMessageSchema,
   wsServerUnsubscribedMessageSchema,
   wsServerTelemetryMessageSchema,
+  wsServerNotificationMessageSchema,
   wsServerErrorMessageSchema,
   wsServerPongMessageSchema
 ]);

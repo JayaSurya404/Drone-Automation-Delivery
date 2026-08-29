@@ -12,7 +12,7 @@ const adminUser: AuthenticatedUser = {
   organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   organizationName: "Alpha Logistics",
   role: "ADMIN",
-  permissions: ["telemetry:read", "fleet:read"]
+  permissions: ["telemetry:read", "fleet:read", "notifications:read"]
 };
 
 const customerUser: AuthenticatedUser = {
@@ -22,7 +22,7 @@ const customerUser: AuthenticatedUser = {
   organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   organizationName: "Alpha Logistics",
   role: "CUSTOMER",
-  permissions: ["orders:read"]
+  permissions: ["orders:read", "notifications:read"]
 };
 
 const tenant2Admin: AuthenticatedUser = {
@@ -189,5 +189,55 @@ describe("Realtime / Service Subscription & Tenant Isolation", () => {
     });
 
     assert.equal(socket.sentMessages.length, 0); // Dropped due to backpressure
+  });
+
+  it("handles notification subscriptions and broadcasts with tenant & customer isolation (29, 30, 31, 32)", async () => {
+    const service = new RealtimeService();
+    const adminSocket = createMockSocket();
+    const customerSocket = createMockSocket();
+    const alienCustomerSocket = createMockSocket();
+
+    const adminClient = service.registerClient("admin-1", adminSocket as any, adminUser);
+    const customerClient = service.registerClient("cust-1", customerSocket as any, customerUser);
+    const alienClient = service.registerClient("alien-1", alienCustomerSocket as any, {
+      ...customerUser,
+      id: "99999999-9999-9999-9999-999999999999"
+    });
+
+    // Subscriptions
+    await service.handleSubscription(adminClient, "notifications:organization");
+    await service.handleSubscription(customerClient, "notifications:user");
+    await service.handleSubscription(alienClient, "notifications:user");
+
+    adminSocket.sentMessages.length = 0;
+    customerSocket.sentMessages.length = 0;
+    alienCustomerSocket.sentMessages.length = 0;
+
+    // 1. Broadcast customer-targeted notification
+    const customerNotif = {
+      id: "55555555-5555-5555-5555-555555555555",
+      organizationId: customerUser.organizationId,
+      userId: customerUser.id,
+      type: "ORDER_UPDATE" as const,
+      severity: "INFO" as const,
+      title: "Order Dispatched",
+      message: "Your delivery is en route.",
+      isRead: false,
+      createdAt: new Date().toISOString()
+    };
+
+    service.broadcastNotification(customerNotif);
+
+    // Customer receives it
+    assert.equal(customerSocket.sentMessages.length, 1);
+    const custMsg = JSON.parse(customerSocket.sentMessages[0]);
+    assert.equal(custMsg.type, "NOTIFICATION");
+    assert.equal(custMsg.notification.title, "Order Dispatched");
+
+    // Alien customer does NOT receive it
+    assert.equal(alienCustomerSocket.sentMessages.length, 0);
+
+    // Admin receives it (via org stream)
+    assert.equal(adminSocket.sentMessages.length, 1);
   });
 });

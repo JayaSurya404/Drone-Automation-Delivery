@@ -2,8 +2,10 @@ import { Redis } from "ioredis";
 import type { WebSocket } from "ws";
 import {
   telemetrySchema,
+  notificationResponseSchema,
   wsClientMessageSchema,
   type Telemetry,
+  type NotificationResponse,
   type AuthenticatedUser,
   type WsClientMessage,
   type WsServerMessage,
@@ -69,9 +71,11 @@ export class RealtimeService {
       });
     }
     if (this.redis) {
-      await this.redis.psubscribe("telemetry:org:*", "telemetry:drone:*").catch((err) => {
-        if (this.onError) this.onError(err);
-      });
+      await this.redis
+        .psubscribe("telemetry:org:*", "telemetry:drone:*", "notifications:org:*", "notifications:user:*")
+        .catch((err) => {
+          if (this.onError) this.onError(err);
+        });
     }
     this.isRunning = true;
   }
@@ -247,6 +251,37 @@ export class RealtimeService {
       });
       return;
     }
+
+    if (channelType === "notifications:organization") {
+      if (user.role === "CUSTOMER" || !user.permissions.includes("notifications:read")) {
+        this.sendError(
+          client,
+          "INSUFFICIENT_PERMISSIONS",
+          "Customers cannot subscribe to organization-wide notification streams."
+        );
+        return;
+      }
+
+      const internalChannel = `notifications:org:${user.organizationId}`;
+      this.addSubscription(client, internalChannel);
+      this.sendToClient(client, {
+        type: "SUBSCRIBED",
+        channel: "notifications:organization",
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    if (channelType === "notifications:user") {
+      const internalChannel = `notifications:user:${user.id}`;
+      this.addSubscription(client, internalChannel);
+      this.sendToClient(client, {
+        type: "SUBSCRIBED",
+        channel: "notifications:user",
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
   }
 
   handleUnsubscription(client: ConnectedClient, channelType: WsSubscriptionChannel, targetId?: string): void {
@@ -261,6 +296,12 @@ export class RealtimeService {
     } else if (channelType === "telemetry:drone" && targetId) {
       internalChannel = `telemetry:drone:${client.user.organizationId}:${targetId}`;
       publicChannel = `telemetry:drone:${targetId}`;
+    } else if (channelType === "notifications:organization") {
+      internalChannel = `notifications:org:${client.user.organizationId}`;
+      publicChannel = "notifications:organization";
+    } else if (channelType === "notifications:user") {
+      internalChannel = `notifications:user:${client.user.id}`;
+      publicChannel = "notifications:user";
     }
 
     if (internalChannel) {
@@ -347,11 +388,71 @@ export class RealtimeService {
     }
   }
 
+  /**
+   * Broadcasts a notification to authorized organization operators or target user.
+   */
+  broadcastNotification(notification: NotificationResponse): void {
+    const validated = notificationResponseSchema.parse(notification);
+
+    const recipientClientIds = new Set<string>();
+
+    // 1. Organization-wide subscribers (operators/admins)
+    const orgChannel = `notifications:org:${validated.organizationId}`;
+    const orgSubscribers = this.channelSubscriptions.get(orgChannel);
+    if (orgSubscribers) {
+      for (const id of orgSubscribers) recipientClientIds.add(id);
+    }
+
+    // 2. Specific user subscribers (customers or target users)
+    if (validated.userId) {
+      const userChannel = `notifications:user:${validated.userId}`;
+      const userSubscribers = this.channelSubscriptions.get(userChannel);
+      if (userSubscribers) {
+        for (const id of userSubscribers) recipientClientIds.add(id);
+      }
+    }
+
+    const message: WsServerMessage = {
+      type: "NOTIFICATION",
+      channel: validated.userId ? `notifications:user:${validated.userId}` : "notifications:organization",
+      notification: validated,
+      timestamp: new Date().toISOString()
+    };
+
+    for (const clientId of recipientClientIds) {
+      const client = this.clients.get(clientId);
+      if (!client || client.socket.readyState !== 1) continue;
+
+      // Tenant match check
+      if (!client.user || client.user.organizationId !== validated.organizationId) {
+        continue;
+      }
+
+      // Customer recipient privacy check: if notification is addressed to a user, customer must match that user id
+      if (client.user.role === "CUSTOMER" && validated.userId && client.user.id !== validated.userId) {
+        continue;
+      }
+
+      // Backpressure check
+      if (client.socket.bufferedAmount > 64 * 1024) {
+        continue;
+      }
+
+      this.sendToClient(client, message);
+    }
+  }
+
   private dispatchRedisMessage(channel: string, rawMessage: string): void {
     try {
       const parsed = JSON.parse(rawMessage);
-      const telemetry = telemetrySchema.parse(parsed);
-      this.broadcastTelemetry(telemetry);
+
+      if (channel.startsWith("telemetry:")) {
+        const telemetry = telemetrySchema.parse(parsed);
+        this.broadcastTelemetry(telemetry);
+      } else if (channel.startsWith("notifications:")) {
+        const notification = notificationResponseSchema.parse(parsed);
+        this.broadcastNotification(notification);
+      }
     } catch (err) {
       if (this.onError) this.onError(err as Error);
     }
@@ -385,7 +486,9 @@ export class RealtimeService {
     this.channelSubscriptions.clear();
 
     if (this.redis) {
-      await this.redis.punsubscribe("telemetry:org:*", "telemetry:drone:*").catch(() => {});
+      await this.redis
+        .punsubscribe("telemetry:org:*", "telemetry:drone:*", "notifications:org:*", "notifications:user:*")
+        .catch(() => {});
     }
   }
 }

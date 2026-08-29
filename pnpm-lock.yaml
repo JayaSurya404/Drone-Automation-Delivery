@@ -167,6 +167,19 @@ importers:
         version: 5.9.3
 
   services/notification-worker:
+    dependencies:
+      '@skynav/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@skynav/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      ioredis:
+        specifier: ^6.0.0
+        version: 6.0.0
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
     devDependencies:
       tsx:
         specifier: ^4.19.0

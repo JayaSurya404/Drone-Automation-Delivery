@@ -97,7 +97,13 @@ function generateOrderNumber(): string {
   return `ORD-${timestamp}-${randomSuffix}`;
 }
 
-export function createOrderService(repo: OrderRepository, auditService: AuditService): OrderService {
+import type { OutboxRepository } from "../events/outbox.repository.js";
+
+export function createOrderService(
+  repo: OrderRepository,
+  auditService: AuditService,
+  outboxRepo?: OutboxRepository
+): OrderService {
   return {
     async createOrder(user: AuthenticatedUser, input: CreateOrderRequest): Promise<OrderResponse> {
       const orderId = crypto.randomUUID();
@@ -133,6 +139,25 @@ export function createOrderService(repo: OrderRepository, auditService: AuditSer
         assigned_at: null,
         delivered_at: null
       });
+
+      if (outboxRepo) {
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType: "ORDER_CREATED",
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "ORDER",
+          aggregateId: newOrder.id,
+          actorId: user.id,
+          payload: {
+            orderNumber: newOrder.order_number,
+            customerId: user.id,
+            priority: newOrder.priority,
+            packageWeightGrams: newOrder.package_weight_grams
+          }
+        });
+      }
 
       await auditService.log({
         organizationId: user.organizationId,
@@ -207,6 +232,36 @@ export function createOrderService(repo: OrderRepository, auditService: AuditSer
         throw new OrderNotFoundError(orderId);
       }
 
+      if (outboxRepo) {
+        const eventTypeMap: Record<string, string> = {
+          CONFIRMED: "ORDER_CONFIRMED",
+          ASSIGNED: "ORDER_ASSIGNED",
+          IN_TRANSIT: "ORDER_IN_TRANSIT",
+          DELIVERED: "ORDER_DELIVERED",
+          FAILED: "ORDER_FAILED",
+          CANCELLED: "ORDER_CANCELLED"
+        };
+        const eventType = (eventTypeMap[input.status] ?? "ORDER_UPDATED") as any;
+
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType,
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "ORDER",
+          aggregateId: orderId,
+          actorId: user.id,
+          payload: {
+            orderNumber: updated.order_number,
+            customerId: updated.customer_id,
+            previousStatus: order.status,
+            status: input.status,
+            reason: input.reason ?? null
+          }
+        });
+      }
+
       await auditService.log({
         organizationId: user.organizationId,
         actorUserId: user.id,
@@ -256,6 +311,24 @@ export function createOrderService(repo: OrderRepository, auditService: AuditSer
 
       if (!updated) {
         throw new OrderNotFoundError(orderId);
+      }
+
+      if (outboxRepo) {
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType: "ORDER_CANCELLED",
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "ORDER",
+          aggregateId: orderId,
+          actorId: user.id,
+          payload: {
+            orderNumber: updated.order_number,
+            customerId: updated.customer_id,
+            reason: input.reason ?? (user.role === "CUSTOMER" ? "Cancelled by customer" : "Cancelled by operator")
+          }
+        });
       }
 
       await auditService.log({
