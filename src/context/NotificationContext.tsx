@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { CustomerNotification, NotificationCategory } from '../types/notification';
+import { CustomerNotification } from '../types/notification';
 import { api } from '../services/api';
-import { storage } from '../services/storage';
 import { realtimeDeliveryService } from '../services/realtimeDeliveryService';
-import { INITIAL_NOTIFICATIONS } from '../services/mockData';
+import { useAuth } from './AuthContext';
 
 export interface ToastMessage {
   id: string;
@@ -28,16 +27,27 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<CustomerNotification[]>(() => {
-    return storage.get<CustomerNotification[]>(storage.keys.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-  });
+  const { isAuthenticated } = useAuth();
+  const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const processedEventKeys = useRef<Set<string>>(new Set());
 
   const fetchNotifications = useCallback(async () => {
-    const data = await api.notifications.getAll();
-    setNotifications(data);
-  }, []);
+    if (!isAuthenticated) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const data = await api.notifications.getAll();
+      setNotifications(data);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const showToast = (
     title: string,
@@ -60,7 +70,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Smart Real-Time Events Subscriber (Zero spam, only meaningful milestones)
   useEffect(() => {
     const unsubscribe = realtimeDeliveryService.subscribe((event) => {
-      // 1. Silent events: GPS location, ETA ticks, and reconnect updates MUST NOT generate notifications
       if (
         event.type === 'DRONE_LOCATION_UPDATED' ||
         event.type === 'DELIVERY_ETA_UPDATED'
@@ -68,54 +77,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return; // Silent update to live tracking UI only
       }
 
-      // 2. Deduplication check: prevent duplicate notifications for same order & milestone
       const eventKey = `${event.orderId}_${event.type}`;
       if (processedEventKeys.current.has(eventKey)) {
         return;
       }
       processedEventKeys.current.add(eventKey);
 
-      // 3. Create single meaningful customer notification
-      const newNotif: CustomerNotification = {
-        id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        customerId: 'cust_984210',
-        orderId: event.orderId,
-        title:
-          event.type === 'DELIVERY_COMPLETED'
-            ? 'Package Delivered 🎉'
-            : event.type === 'DELIVERY_APPROACHING'
-            ? 'Drone Arriving Soon 🚁'
-            : event.type === 'DRONE_LAUNCHED'
-            ? 'Drone In Flight 🚀'
-            : event.type === 'DELIVERY_DELAYED'
-            ? 'Flight Delayed'
-            : 'Delivery Update',
-        message: event.message,
-        category: event.type === 'DELIVERY_COMPLETED' || event.type === 'DELIVERY_APPROACHING' ? 'drone' : 'order',
-        read: false,
-        createdAt: new Date().toISOString(),
-        actionUrl: `/tracking/${event.orderId}`,
-      };
+      fetchNotifications();
 
-      setNotifications((prev) => {
-        const updated = [newNotif, ...prev];
-        storage.set(storage.keys.NOTIFICATIONS, updated);
-        return updated;
-      });
-
-      // Show high priority toast for milestone
       showToast(
-        newNotif.title,
-        newNotif.message,
-        event.type === 'DELIVERY_COMPLETED' ? 'success' : event.type === 'DELIVERY_DELAYED' ? 'warning' : 'info',
-        newNotif.actionUrl
+        event.type === 'DELIVERY_COMPLETED' ? 'Package Delivered 🎉' : 'Delivery Update',
+        event.message,
+        event.type === 'DELIVERY_COMPLETED' ? 'success' : 'info',
+        `/tracking/${event.orderId}`
       );
     });
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [fetchNotifications]);
 
   const markAsRead = async (id: string) => {
     await api.notifications.markAsRead(id);
@@ -128,7 +109,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const clearAll = async () => {
-    await api.notifications.clearAll();
+    for (const n of notifications) {
+      await api.notifications.clear(n.id);
+    }
     setNotifications([]);
   };
 

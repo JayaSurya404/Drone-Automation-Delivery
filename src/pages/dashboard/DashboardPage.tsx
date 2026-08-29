@@ -6,9 +6,9 @@ import { ProductCard } from '../../components/products/ProductCard';
 import { FeaturedProductsCarousel } from '../../components/products/FeaturedProductsCarousel';
 import { Button } from '../../components/common/Button';
 import { RealisticDroneHero } from '../../components/common/RealisticDroneHero';
-import { INITIAL_PRODUCTS } from '../../services/mockData';
 import { Product } from '../../types/product';
 import { storage } from '../../services/storage';
+import { api } from '../../services/api';
 import {
   ShoppingBag,
   Zap,
@@ -128,6 +128,7 @@ export const DashboardPage: React.FC = () => {
   const { activeOrder } = useOrders();
   const navigate = useNavigate();
 
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
   const [selectedSpeed, setSelectedSpeed] = useState<number>(15);
 
@@ -146,20 +147,29 @@ export const DashboardPage: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Load Recently Viewed from storage
+  // Fetch live products from backend database
   useEffect(() => {
-    const viewedIds = storage.get<string[]>(RECENTLY_VIEWED_KEY, []);
-    if (viewedIds.length > 0) {
-      const prods = INITIAL_PRODUCTS.filter(p => viewedIds.includes(p.id));
-      setRecentlyViewed(prods.slice(0, 4));
-    }
+    let isMounted = true;
+    api.products.getAll().then((data) => {
+      if (!isMounted) return;
+      setAllProducts(data);
+      const viewedIds = storage.get<string[]>(RECENTLY_VIEWED_KEY, []);
+      if (viewedIds.length > 0) {
+        const prods = data.filter(p => viewedIds.includes(p.id));
+        setRecentlyViewed(prods.slice(0, 4));
+      }
+    }).catch(err => console.error('Failed to load dashboard products:', err));
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Products subsets based on actual data
-  const newArrivals = INITIAL_PRODUCTS.slice(0, 4);
-  const bestSellers = INITIAL_PRODUCTS.slice(2, 6);
-  const dealsProducts = INITIAL_PRODUCTS.filter(p => p.discountPercent && p.discountPercent >= 25).slice(0, 4);
-  const speedFilteredProducts = INITIAL_PRODUCTS.filter(p =>
+  // Products subsets based on actual live database data
+  const newArrivals = allProducts.slice(0, 4);
+  const bestSellers = allProducts.slice(2, 6);
+  const dealsProducts = allProducts.filter(p => p.discountPercent && p.discountPercent >= 20).slice(0, 4);
+  const speedFilteredProducts = allProducts.filter(p =>
     selectedSpeed === 0 ? true : p.estimatedDeliveryMins <= selectedSpeed
   ).slice(0, 4);
 
@@ -354,7 +364,7 @@ export const DashboardPage: React.FC = () => {
       {/* ══════════════════════════════════════════
           5. FEATURED PRODUCTS 3D CAROUSEL (EXACT SCREENSHOT 1)
       ══════════════════════════════════════════ */}
-      <FeaturedProductsCarousel products={INITIAL_PRODUCTS} />
+      <FeaturedProductsCarousel products={allProducts} />
 
       {/* ══════════════════════════════════════════
           6. NEW ARRIVALS CAROUSEL / GRID (SCREENSHOTS 2 & 3)

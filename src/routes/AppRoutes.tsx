@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
-import { useAuth } from '../context/AuthContext';
 
 // Auth Pages
 import { LoginPage } from '../pages/auth/LoginPage';
@@ -9,6 +8,7 @@ import { RegisterPage } from '../pages/auth/RegisterPage';
 import { VerifyAccountPage } from '../pages/auth/VerifyAccountPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
+import { AuthCallbackPage } from '../pages/auth/AuthCallbackPage';
 
 // Customer Panel Pages
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
@@ -26,48 +26,23 @@ import { ProfilePage } from '../pages/profile/ProfilePage';
 import { SupportPage } from '../pages/support/SupportPage';
 
 export const AppRoutes: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-
   return (
     <Routes>
-      {/* Root redirect */}
-      <Route
-        path="/"
-        element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />}
-      />
+      {/* ── PUBLIC SHOPPING / STORE ROUTES (GUESTS CAN BROWSE FREELY) ── */}
+      <Route path="/" element={<DashboardPage />} />
+      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/products" element={<ProductsPage />} />
+      <Route path="/products/:id" element={<ProductDetailsPage />} />
 
-      {/* Public Auth Routes */}
+      {/* ── PUBLIC AUTHENTICATION ROUTES ── */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-account" element={<VerifyAccountPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      {/* Protected Customer Routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/products"
-        element={
-          <ProtectedRoute>
-            <ProductsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/products/:id"
-        element={
-          <ProtectedRoute>
-            <ProductDetailsPage />
-          </ProtectedRoute>
-        }
-      />
+      {/* ── PROTECTED CUSTOMER ACCOUNT & ORDER ROUTES ── */}
       <Route
         path="/cart"
         element={
@@ -149,8 +124,8 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Fallback to Home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

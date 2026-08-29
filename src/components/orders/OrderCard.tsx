@@ -121,7 +121,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onRate }) => {
               {order.status}
             </Badge>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
-              ${order.total.toFixed(2)}
+              ₹{order.total.toLocaleString('en-IN')}
             </div>
           </div>
         </div>

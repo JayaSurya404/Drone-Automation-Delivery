@@ -58,15 +58,15 @@ export const CartPage: React.FC = () => {
   const [promoInput, setPromoInput] = useState<string>('');
   const [promoMessage, setPromoMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
-  // Free delivery threshold ($35)
-  const FREE_DELIVERY_THRESHOLD = 35;
+  // Free delivery threshold (₹500)
+  const FREE_DELIVERY_THRESHOLD = 500;
   const amountNeededForFree = Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal);
   const freeDeliveryProgress = Math.min(100, Math.round((subtotal / FREE_DELIVERY_THRESHOLD) * 100));
 
-  const handleApplyPromo = (e: React.FormEvent) => {
+  const handleApplyPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!promoInput.trim()) return;
-    const res = applyPromoCode(promoInput.trim());
+    const res = await applyPromoCode(promoInput.trim());
     setPromoMessage({ text: res.message, isError: !res.success });
     if (res.success) {
       setPromoInput('');
@@ -164,7 +164,7 @@ export const CartPage: React.FC = () => {
             <div className="progress-header">
               {amountNeededForFree > 0 ? (
                 <span>
-                  Add <strong style={{ color: 'var(--accent-blue)' }}>${amountNeededForFree.toFixed(2)}</strong> more for <strong>FREE Drone Express Delivery</strong>!
+                  Add <strong style={{ color: 'var(--accent-blue)' }}>₹{amountNeededForFree.toLocaleString('en-IN')}</strong> more for <strong>FREE Drone Express Delivery</strong>!
                 </span>
               ) : (
                 <span style={{ color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -201,9 +201,9 @@ export const CartPage: React.FC = () => {
                     </Link>
 
                     <div className="item-price-row">
-                      <span className="item-unit-price">${product.price.toFixed(2)}</span>
+                      <span className="item-unit-price">₹{product.price.toLocaleString('en-IN')}</span>
                       {product.originalPrice && (
-                        <span className="item-mrp">${product.originalPrice.toFixed(2)}</span>
+                        <span className="item-mrp">₹{product.originalPrice.toLocaleString('en-IN')}</span>
                       )}
                       <span className="item-weight-tag">{product.weightGrams * quantity}g payload</span>
                     </div>
@@ -253,7 +253,7 @@ export const CartPage: React.FC = () => {
 
                   {/* Item Subtotal Right */}
                   <div className="item-total-col">
-                    <span className="item-subtotal-price">${(product.price * quantity).toFixed(2)}</span>
+                    <span className="item-subtotal-price">₹{(product.price * quantity).toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               ))}
@@ -281,7 +281,7 @@ export const CartPage: React.FC = () => {
                     <img src={product.image} alt={product.name} className="saved-img" />
                     <div className="saved-info">
                       <div className="saved-name">{product.name}</div>
-                      <div className="saved-price">${product.price.toFixed(2)}</div>
+                      <div className="saved-price">₹{product.price.toLocaleString('en-IN')}</div>
                       <div className="saved-actions">
                         <Button
                           variant="primary"
@@ -341,13 +341,13 @@ export const CartPage: React.FC = () => {
             <div className="summary-breakdown">
               <div className="breakdown-row">
                 <span className="row-label">Items Subtotal ({items.reduce((sum, i) => sum + i.quantity, 0)} items)</span>
-                <span className="row-val">${subtotal.toFixed(2)}</span>
+                <span className="row-val">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
 
               {discount > 0 && (
                 <div className="breakdown-row discount-row">
                   <span className="row-label">Instant Coupon Savings</span>
-                  <span className="row-val">-${discount.toFixed(2)}</span>
+                  <span className="row-val">-₹{discount.toLocaleString('en-IN')}</span>
                 </div>
               )}
 
@@ -357,20 +357,20 @@ export const CartPage: React.FC = () => {
                   {deliveryFee === 0 && <span className="free-tag">FREE</span>}
                 </span>
                 <span className="row-val">
-                  {deliveryFee === 0 ? '$0.00' : `$${deliveryFee.toFixed(2)}`}
+                  {deliveryFee === 0 ? '₹0' : `₹${deliveryFee.toLocaleString('en-IN')}`}
                 </span>
               </div>
 
               <div className="breakdown-row">
-                <span className="row-label">Estimated Taxes & Airport Fees</span>
-                <span className="row-val">${tax.toFixed(2)}</span>
+                <span className="row-label">Estimated Taxes & Airport Fees (5% GST)</span>
+                <span className="row-val">₹{tax.toLocaleString('en-IN')}</span>
               </div>
 
               <div className="summary-divider" />
 
               <div className="breakdown-row total-row">
                 <span className="total-label">Total Amount</span>
-                <span className="total-val">${total.toFixed(2)}</span>
+                <span className="total-val">₹{total.toLocaleString('en-IN')}</span>
               </div>
             </div>
 

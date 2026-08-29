@@ -33,7 +33,7 @@ import { useOrders } from '../../context/OrderContext';
 import { useAddress } from '../../context/AddressContext';
 import { LocationModal } from './LocationModal';
 import { Button } from './Button';
-import { INITIAL_PRODUCTS } from '../../services/mockData';
+import { api } from '../../services/api';
 import { Product } from '../../types/product';
 
 const POPULAR_SEARCHES = [
@@ -58,7 +58,7 @@ const SIDE_CATEGORIES = [
 ];
 
 export const Navbar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { itemCount, subtotal } = useCart();
   const { wishlistCount } = useWishlist();
   const { notifications, unreadCount, markAsRead } = useNotifications();
@@ -112,15 +112,16 @@ export const Navbar: React.FC = () => {
       setSearchSuggestions([]);
       return;
     }
-    const q = searchQuery.toLowerCase().trim();
-    const filtered = INITIAL_PRODUCTS.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q) ||
-      p.brand?.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q)
-    ).slice(0, 5);
+    let isMounted = true;
+    api.products.getAll({ search: searchQuery.trim() })
+      .then((data) => {
+        if (isMounted) setSearchSuggestions(data.slice(0, 5));
+      })
+      .catch(() => {});
 
-    setSearchSuggestions(filtered);
+    return () => {
+      isMounted = false;
+    };
   }, [searchQuery]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -163,7 +164,7 @@ export const Navbar: React.FC = () => {
               <span className="menu-btn-label">Menu</span>
             </button>
 
-            <Link to="/dashboard" className="clean-brand-logo">
+            <Link to="/" className="clean-brand-logo">
               <div className="clean-logo-icon">
                 <Plane size={20} className="plane-icon" />
               </div>
@@ -231,7 +232,7 @@ export const Navbar: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="result-price">${prod.price.toFixed(2)}</div>
+                        <div className="result-price">₹{prod.price.toLocaleString('en-IN')}</div>
                       </div>
                     ))}
                     <div className="search-see-all-row" onClick={handleSearchSubmit}>
@@ -286,88 +287,112 @@ export const Navbar: React.FC = () => {
               </div>
               <div className="cart-text-container">
                 <span className="cart-title">Cart</span>
-                <span className="cart-total-amt">${subtotal.toFixed(2)}</span>
+                <span className="cart-total-amt">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
             </Link>
 
-            {/* Profile / Account Dropdown */}
-            <div className="navbar-profile-wrapper" ref={userMenuRef}>
-              <button
-                type="button"
-                className="navbar-profile-btn"
-                onClick={() => setIsUserMenuOpen(prev => !prev)}
-                aria-label="User Account Menu"
-              >
-                <img
-                  src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'}
-                  alt={user?.name || 'Profile'}
-                  className="profile-avatar-img"
-                />
-                <div className="profile-btn-info">
-                  <span className="profile-name">{user?.name?.split(' ')[0] || 'Account'}</span>
-                  <ChevronDown size={12} className="chevron" />
-                </div>
-              </button>
+            {/* Profile / Account Dropdown or Guest Sign In */}
+            {isAuthenticated ? (
+              <div className="navbar-profile-wrapper" ref={userMenuRef}>
+                <button
+                  type="button"
+                  className="navbar-profile-btn"
+                  onClick={() => setIsUserMenuOpen(prev => !prev)}
+                  aria-label="User Account Menu"
+                >
+                  <img
+                    src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'}
+                    alt={user?.name || 'Profile'}
+                    className="profile-avatar-img"
+                  />
+                  <div className="profile-btn-info">
+                    <span className="profile-name">{user?.name?.split(' ')[0] || 'Account'}</span>
+                    <ChevronDown size={12} className="chevron" />
+                  </div>
+                </button>
 
-              {/* Profile Dropdown Menu */}
-              {isUserMenuOpen && (
-                <div className="navbar-user-dropdown">
-                  <div className="user-dropdown-header">
-                    <div className="user-dropdown-name">{user?.name || 'Customer Account'}</div>
-                    <div className="user-dropdown-email">{user?.email || 'alex.mercer@skylink.io'}</div>
+                {/* Profile Dropdown Menu */}
+                {isUserMenuOpen && (
+                  <div className="navbar-user-dropdown">
+                    <div className="user-dropdown-header">
+                      <div className="user-dropdown-name">{user?.name || 'Customer Account'}</div>
+                      <div className="user-dropdown-email">{user?.email}</div>
+                    </div>
+                    <div className="user-dropdown-nav">
+                      <Link
+                        to="/profile"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="dropdown-nav-item"
+                      >
+                        <UserIcon size={16} /> My Profile & Preferences
+                      </Link>
+                      <Link
+                        to="/orders"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="dropdown-nav-item"
+                      >
+                        <Package size={16} /> My Orders
+                      </Link>
+                      <Link
+                        to="/addresses"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="dropdown-nav-item"
+                      >
+                        <MapPin size={16} /> Saved Drop Zones & Addresses
+                      </Link>
+                      <Link
+                        to="/wishlist"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="dropdown-nav-item"
+                      >
+                        <Heart size={16} /> My Wishlist ({wishlistCount})
+                      </Link>
+                      <Link
+                        to="/notifications"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="dropdown-nav-item"
+                      >
+                        <Bell size={16} /> Notifications {unreadCount > 0 && `(${unreadCount})`}
+                      </Link>
+                      <div className="dropdown-divider" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          logout();
+                          navigate('/');
+                        }}
+                        className="dropdown-logout-item"
+                      >
+                        <LogOut size={16} /> Sign Out
+                      </button>
+                    </div>
                   </div>
-                  <div className="user-dropdown-nav">
-                    <Link
-                      to="/profile"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="dropdown-nav-item"
-                    >
-                      <UserIcon size={16} /> My Profile & Preferences
-                    </Link>
-                    <Link
-                      to="/orders"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="dropdown-nav-item"
-                    >
-                      <Package size={16} /> My Orders
-                    </Link>
-                    <Link
-                      to="/addresses"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="dropdown-nav-item"
-                    >
-                      <MapPin size={16} /> Saved Drop Zones & Addresses
-                    </Link>
-                    <Link
-                      to="/wishlist"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="dropdown-nav-item"
-                    >
-                      <Heart size={16} /> My Wishlist ({wishlistCount})
-                    </Link>
-                    <Link
-                      to="/notifications"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="dropdown-nav-item"
-                    >
-                      <Bell size={16} /> Notifications {unreadCount > 0 && `(${unreadCount})`}
-                    </Link>
-                    <div className="dropdown-divider" />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        logout();
-                        navigate('/login');
-                      }}
-                      className="dropdown-logout-item"
-                    >
-                      <LogOut size={16} /> Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Link
+                  to="/login"
+                  className="navbar-action-btn"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--accent-cyan)',
+                    color: '#000',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <UserIcon size={16} />
+                  <span>Sign In</span>
+                </Link>
+              </div>
+            )}
 
           </div>
 
@@ -573,31 +598,70 @@ export const Navbar: React.FC = () => {
 
             </div>
 
-            {/* Drawer Footer: User Profile & Sign Out */}
+            {/* Drawer Footer: User Profile & Sign Out or Sign In */}
             <div className="side-drawer-footer">
-              <div className="drawer-user-row">
-                <img
-                  src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'}
-                  alt={user?.name || 'Customer'}
-                  className="drawer-avatar"
-                />
-                <div className="drawer-user-info">
-                  <div className="drawer-user-name">{user?.name || 'Customer Account'}</div>
-                  <div className="drawer-user-email">{user?.email || 'alex.mercer@skylink.io'}</div>
+              {isAuthenticated ? (
+                <div className="drawer-user-row">
+                  <img
+                    src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'}
+                    alt={user?.name || 'Customer'}
+                    className="drawer-avatar"
+                  />
+                  <div className="drawer-user-info">
+                    <div className="drawer-user-name">{user?.name || 'Customer Account'}</div>
+                    <div className="drawer-user-email">{user?.email}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSidebarOpen(false);
+                      logout();
+                      navigate('/');
+                    }}
+                    className="drawer-logout-btn"
+                    title="Sign Out"
+                  >
+                    <LogOut size={17} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSidebarOpen(false);
-                    logout();
-                    navigate('/login');
-                  }}
-                  className="drawer-logout-btn"
-                  title="Sign Out"
-                >
-                  <LogOut size={17} />
-                </button>
-              </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                  <Link
+                    to="/login"
+                    onClick={() => setIsSidebarOpen(false)}
+                    style={{
+                      flex: 1,
+                      textAlign: 'center',
+                      padding: '0.6rem',
+                      background: 'var(--accent-cyan)',
+                      color: '#000',
+                      borderRadius: 'var(--radius-md)',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/register"
+                    onClick={() => setIsSidebarOpen(false)}
+                    style={{
+                      flex: 1,
+                      textAlign: 'center',
+                      padding: '0.6rem',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'var(--text-primary)',
+                      borderRadius: 'var(--radius-md)',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Register
+                  </Link>
+                </div>
+              )}
             </div>
 
           </aside>

@@ -30,6 +30,16 @@ id_ed25519
 secrets/
 credentials.json
 
+# Databases & SQLite data files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.db.lock
+server/data/
+data/*.db
+
 # Production & Build outputs
 dist/
 dist-ssr/
@@ -91,10 +101,14 @@ Thumbs.db
 *.sw?
 *~
 
-# Archives and dumps
+# Archives and raw dumps
 *.zip
 *.tar.gz
 *.rar
 *.7z
 *.dump
-*.sql
+
+# Track repository migrations & schemas, ignore standalone sql dumps
+*.sql.dump
+*.sql.bak
+!supabase/*.sql

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -8,9 +9,11 @@ import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/common/Button';
 import { StarRating } from '../../components/common/StarRating';
 import { Skeleton } from '../../components/common/Skeleton';
-import { INITIAL_PRODUCTS } from '../../services/mockData';
+import { AuthRequiredModal } from '../../components/common/AuthRequiredModal';
 import { Product } from '../../types/product';
+import { PendingAction } from '../../types/auth';
 import { storage } from '../../services/storage';
+import { api } from '../../services/api';
 import {
   ShoppingBag,
   Zap,
@@ -38,31 +41,52 @@ const RECENTLY_VIEWED_KEY = 'skylink_recently_viewed';
 export const ProductDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, setPendingAction } = useAuth();
   const { addToCart, items } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const { showToast } = useNotifications();
   const { defaultAddress } = useAddress();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'desc' | 'specs' | 'reviews' | 'safety'>('desc');
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [modalAction, setModalAction] = useState<PendingAction | undefined>(undefined);
 
   useEffect(() => {
     if (!id) return;
-    const found = INITIAL_PRODUCTS.find(p => p.id === id);
-    if (found) {
-      setProduct(found);
-      setSelectedImageIndex(0);
-      setQuantity(1);
+    let isMounted = true;
 
-      // Record to recently viewed
-      const prevIds = storage.get<string[]>(RECENTLY_VIEWED_KEY, []);
-      const updated = [found.id, ...prevIds.filter(i => i !== found.id)].slice(0, 8);
-      storage.set(RECENTLY_VIEWED_KEY, updated);
-    }
+    api.products.getById(id)
+      .then((found) => {
+        if (!isMounted || !found) return;
+        setProduct(found);
+        setSelectedImageIndex(0);
+        setQuantity(1);
+
+        // Record to recently viewed
+        const prevIds = storage.get<string[]>(RECENTLY_VIEWED_KEY, []);
+        const updated = [found.id, ...prevIds.filter(i => i !== found.id)].slice(0, 8);
+        storage.set(RECENTLY_VIEWED_KEY, updated);
+
+        // Fetch related products
+        api.products.getAll({ category: found.category }).then((related) => {
+          if (isMounted) {
+            setRelatedProducts(related.filter(p => p.id !== found.id).slice(0, 4));
+          }
+        }).catch(() => {});
+      })
+      .catch((err) => {
+        console.error('Failed to load product details:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   if (!product) {
@@ -88,7 +112,6 @@ export const ProductDetailsPage: React.FC = () => {
   const activeImage = images[selectedImageIndex] || product.image;
 
   const savings = product.originalPrice ? product.originalPrice - product.price : 0;
-  const relatedProducts = INITIAL_PRODUCTS.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
@@ -98,16 +121,54 @@ export const ProductDetailsPage: React.FC = () => {
   };
 
   const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      const action: PendingAction = {
+        type: 'add_to_cart',
+        productId: product.id,
+        quantity,
+        productName: product.name,
+        returnTo: window.location.pathname + window.location.search,
+      };
+      setModalAction(action);
+      setPendingAction(action);
+      setAuthModalOpen(true);
+      return;
+    }
     addToCart(product, quantity);
     showToast('Added to Basket', `${quantity}x ${product.name} added to your drone basket.`, 'success');
   };
 
   const handleBuyNow = () => {
+    if (!isAuthenticated) {
+      const action: PendingAction = {
+        type: 'buy_now',
+        productId: product.id,
+        quantity,
+        productName: product.name,
+        returnTo: '/checkout',
+      };
+      setModalAction(action);
+      setPendingAction(action);
+      setAuthModalOpen(true);
+      return;
+    }
     addToCart(product, quantity);
     navigate('/checkout');
   };
 
   const handleWishlistToggle = () => {
+    if (!isAuthenticated) {
+      const action: PendingAction = {
+        type: 'wishlist',
+        productId: product.id,
+        productName: product.name,
+        returnTo: window.location.pathname + window.location.search,
+      };
+      setModalAction(action);
+      setPendingAction(action);
+      setAuthModalOpen(true);
+      return;
+    }
     const added = toggleWishlist(product);
     showToast(
       added ? 'Added to Wishlist' : 'Removed from Wishlist',
@@ -236,17 +297,17 @@ export const ProductDetailsPage: React.FC = () => {
           {/* ── Price Block ── */}
           <div className="product-price-block">
             <div className="price-primary-row">
-              <span className="price-large">${product.price.toFixed(2)}</span>
+              <span className="price-large">₹{product.price.toLocaleString('en-IN')}</span>
               {product.originalPrice && product.originalPrice > product.price && (
                 <>
-                  <span className="mrp-strikethrough">${product.originalPrice.toFixed(2)}</span>
+                  <span className="mrp-strikethrough">₹{product.originalPrice.toLocaleString('en-IN')}</span>
                   <span className="discount-chip">{product.discountPercent}% OFF</span>
                 </>
               )}
             </div>
             {savings > 0 && (
               <div className="savings-highlight">
-                You save: <strong>${savings.toFixed(2)}</strong> ({product.discountPercent}% off MRP)
+                You save: <strong>₹{savings.toLocaleString('en-IN')}</strong> ({product.discountPercent}% off MRP)
               </div>
             )}
             <div className="tax-inclusive-subtext">Inclusive of all taxes • Zero flight congestion surcharge</div>
@@ -282,7 +343,7 @@ export const ProductDetailsPage: React.FC = () => {
               </div>
               <div className="meta-item">
                 <span className="meta-label">Flight Guarantee:</span>
-                <span className="meta-val" style={{ color: '#059669', fontWeight: 800 }}>Free over $35</span>
+                <span className="meta-val" style={{ color: '#059669', fontWeight: 800 }}>Free over ₹500</span>
               </div>
             </div>
           </div>
@@ -312,9 +373,9 @@ export const ProductDetailsPage: React.FC = () => {
                   <Plus size={15} />
                 </button>
               </div>
-              <span className="subtotal-indicator">
-                Subtotal: <strong>${(product.price * quantity).toFixed(2)}</strong>
-              </span>
+              <div className="subtotal-calc-display">
+                Subtotal: <strong>₹{(product.price * quantity).toLocaleString('en-IN')}</strong>
+              </div>
             </div>
 
             <div className="action-buttons-row">
@@ -568,6 +629,12 @@ export const ProductDetailsPage: React.FC = () => {
         </section>
       )}
 
+      {/* Auth Modal for Guests */}
+      <AuthRequiredModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        action={modalAction}
+      />
     </div>
   );
 };

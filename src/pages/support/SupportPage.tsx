@@ -251,7 +251,7 @@ export const SupportPage: React.FC = () => {
               <option value="">-- General / Non-Order Inquiry --</option>
               {orders.map((o) => (
                 <option key={o.id} value={o.id}>
-                  Order #{o.id} ({o.status} - ${o.total.toFixed(2)})
+                  Order #{o.id} ({o.status} - ₹{o.total.toLocaleString('en-IN')})
                 </option>
               ))}
             </select>

@@ -171,7 +171,7 @@ export const CheckoutPage: React.FC = () => {
             <div>
               <span style={{ color: 'var(--text-tertiary)', display: 'block' }}>Total Paid</span>
               <strong style={{ fontSize: '1.1rem' }}>
-                ${confirmedOrder.total.toFixed(2)} ({confirmedOrder.paymentMethod})
+                ₹{confirmedOrder.total.toLocaleString('en-IN')} ({confirmedOrder.paymentMethod})
               </strong>
             </div>
           </div>

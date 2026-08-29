@@ -6,6 +6,7 @@ import { useNotifications } from '../../context/NotificationContext';
 import { CustomerOrder } from '../../types/order';
 import { LiveTrackingState } from '../../types/tracking';
 import { realtimeDeliveryService } from '../../services/realtimeDeliveryService';
+import { api } from '../../services/api';
 import { DroneLiveMap } from '../../components/map/DroneLiveMap';
 import { DeliveryOtpCard } from '../../components/orders/DeliveryOtpCard';
 import { OrderTimeline } from '../../components/orders/OrderTimeline';
@@ -93,17 +94,17 @@ export const TrackingPage: React.FC = () => {
           return;
         }
         setOrder(ord);
-        const snapshot = realtimeDeliveryService.getLiveTrackingSnapshot(ord);
-        setTrackingState(snapshot);
-        setIsLoading(false);
+        api.tracking.getSnapshot(ord.id)
+          .then((snapshot: LiveTrackingState) => setTrackingState(snapshot))
+          .catch(() => {
+            const fallback = realtimeDeliveryService.getLiveTrackingSnapshot(ord);
+            setTrackingState(fallback);
+          })
+          .finally(() => setIsLoading(false));
 
         if (ord.status !== 'Delivered' && ord.status !== 'Cancelled' && !isSimulatingRef.current) {
           isSimulatingRef.current = true;
-          realtimeDeliveryService.startTrackingSimulation(ord, newStatus => {
-            if (isMounted) {
-              setOrder(prev => (prev ? { ...prev, status: newStatus } : null));
-            }
-          });
+          realtimeDeliveryService.connectToOrderStream(ord.id, ord.deliveryAddress?.latitude, ord.deliveryAddress?.longitude);
         }
       })
       .catch(err => {
@@ -130,11 +131,30 @@ export const TrackingPage: React.FC = () => {
         setLastUpdatedSeconds(0);
         setOrder(prev => {
           if (!prev) return null;
-          const updated = { ...prev, status: event.status || prev.status };
-          const snapshot = realtimeDeliveryService.getLiveTrackingSnapshot(updated);
-          setTrackingState(snapshot);
-          return updated;
+          return { ...prev, status: (event.status as any) || prev.status };
         });
+
+        if (event.location) {
+          setTrackingState(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              orderStatus: event.status || prev.orderStatus,
+              currentDroneLocation: {
+                latitude: event.location!.latitude,
+                longitude: event.location!.longitude,
+                altitudeMeters: event.location!.altitudeMeters,
+                speedKmh: event.location!.speedKmh,
+                bearing: event.location!.bearing,
+              },
+              remainingDistanceKm: event.remainingDistanceKm ?? prev.remainingDistanceKm,
+              estimatedArrivalMins: event.estimatedArrivalMins ?? prev.estimatedArrivalMins,
+              estimatedArrivalFormatted: `${event.estimatedArrivalMins ?? prev.estimatedArrivalMins} mins`,
+              lastUpdated: new Date().toISOString(),
+              isCompleted: event.status === 'Delivered',
+            };
+          });
+        }
 
         if ((event.type === 'DELIVERY_COMPLETED' || event.status === 'Delivered') && !hasCelebrated) {
           setHasCelebrated(true);

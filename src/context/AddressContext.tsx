@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { CustomerAddress } from '../types/address';
 import { api } from '../services/api';
-import { storage } from '../services/storage';
-import { INITIAL_ADDRESSES } from '../services/mockData';
+import { useAuth } from './AuthContext';
 
 interface AddressContextType {
   addresses: CustomerAddress[];
@@ -19,28 +18,37 @@ interface AddressContextType {
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
 
 export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [addresses, setAddresses] = useState<CustomerAddress[]>(() => {
-    return storage.get<CustomerAddress[]>(storage.keys.ADDRESSES, INITIAL_ADDRESSES);
-  });
-  const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(() => {
-    const list = storage.get<CustomerAddress[]>(storage.keys.ADDRESSES, INITIAL_ADDRESSES);
-    return list.find((a) => a.isDefault) || list[0] || null;
-  });
+  const { isAuthenticated } = useAuth();
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const fetchAddresses = useCallback(async () => {
+    if (!isAuthenticated) {
+      setAddresses([]);
+      setSelectedAddress(null);
+      return;
+    }
     setIsLoading(true);
     try {
       const data = await api.customer.getAddresses();
       setAddresses(data);
-      if (!selectedAddress && data.length > 0) {
-        const def = data.find((a) => a.isDefault) || data[0];
-        setSelectedAddress(def);
+      if (data.length > 0) {
+        setSelectedAddress((prev) => {
+          if (prev && data.some((a) => a.id === prev.id)) return prev;
+          return data.find((a) => a.isDefault) || data[0];
+        });
       }
+    } catch (err) {
+      console.error('Failed to fetch addresses from backend:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedAddress]);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchAddresses();
+  }, [fetchAddresses]);
 
   const saveAddress = async (
     addressData: Omit<CustomerAddress, 'id' | 'customerId'> & { id?: string }
@@ -73,9 +81,8 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const setDefaultAddress = async (id: string): Promise<void> => {
-    const target = addresses.find((a) => a.id === id);
-    if (!target) return;
-    await saveAddress({ ...target, isDefault: true });
+    await api.customer.setDefaultAddress(id);
+    await fetchAddresses();
   };
 
   const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0] || null;

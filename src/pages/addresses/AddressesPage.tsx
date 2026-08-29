@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useAddresses } from '../../context/AddressContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CustomerAddress } from '../../types/address';
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 
 export const AddressesPage: React.FC = () => {
+  const { user } = useAuth();
   const { addresses, saveAddress, deleteAddress, setDefaultAddress } = useAddresses();
   const { showToast } = useNotifications();
 
@@ -31,8 +33,8 @@ export const AddressesPage: React.FC = () => {
   const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null);
 
   const [formData, setFormData] = useState({
-    name: 'Alex Mercer',
-    phone: '+1 (555) 248-7790',
+    name: user?.name || '',
+    phone: user?.phone || '',
     label: 'Home' as 'Home' | 'Office' | 'Other',
     building: '',
     street: '',
@@ -52,8 +54,8 @@ export const AddressesPage: React.FC = () => {
   const handleOpenAdd = () => {
     setEditingAddress(null);
     setFormData({
-      name: 'Alex Mercer',
-      phone: '+1 (555) 248-7790',
+      name: user?.name || '',
+      phone: user?.phone || '',
       label: 'Home',
       building: '',
       street: '',

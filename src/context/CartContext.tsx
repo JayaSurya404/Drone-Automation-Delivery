@@ -1,14 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { CartItem, Product } from '../types/product';
 import { DeliverySpeedOption } from '../types/order';
-import { storage } from '../services/storage';
+import { api } from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: Product, quantity?: number) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
-  removeFromCart: (productId: string) => void;
-  clearCart: () => void;
+  addToCart: (product: Product, quantity?: number) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  removeFromCart: (productId: string) => Promise<void>;
+  clearCart: () => Promise<void>;
   itemCount: number;
   totalWeightGrams: number;
   subtotal: number;
@@ -17,106 +18,117 @@ interface CartContextType {
   discount: number;
   total: number;
   appliedPromo: string | null;
-  applyPromoCode: (code: string) => { success: boolean; message: string };
+  applyPromoCode: (code: string) => Promise<{ success: boolean; message: string }>;
   removePromoCode: () => void;
   deliverySpeed: DeliverySpeedOption;
   setDeliverySpeed: (speed: DeliverySpeedOption) => void;
+  isLoading: boolean;
+  refreshCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    return storage.get<CartItem[]>(storage.keys.CART, []);
-  });
+  const { isAuthenticated } = useAuth();
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [itemCount, setItemCount] = useState<number>(0);
+  const [totalWeightGrams, setTotalWeightGrams] = useState<number>(0);
+  const [subtotal, setSubtotal] = useState<number>(0);
+  const [deliveryFee, setDeliveryFee] = useState<number>(0);
+  const [tax, setTax] = useState<number>(0);
+  const [discount, setDiscount] = useState<number>(0);
+  const [total, setTotal] = useState<number>(0);
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
-  const [promoDiscountPct, setPromoDiscountPct] = useState<number>(0);
   const [deliverySpeed, setDeliverySpeed] = useState<DeliverySpeedOption>('standard');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  useEffect(() => {
-    storage.set(storage.keys.CART, items);
-  }, [items]);
-
-  const addToCart = (product: Product, quantity: number = 1) => {
-    setItems((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      }
-      return [...prev, { product, quantity }];
-    });
+  const applyCartResponse = (data: any) => {
+    if (!data) return;
+    setItems(data.items || []);
+    setItemCount(data.itemCount || 0);
+    setTotalWeightGrams(data.totalWeightGrams || 0);
+    setSubtotal(data.subtotal || 0);
+    setDeliveryFee(data.deliveryFee || 0);
+    setTax(data.tax || 0);
+    setDiscount(data.discount || 0);
+    setTotal(data.total || 0);
+    setAppliedPromo(data.appliedPromo || null);
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
+  const refreshCart = useCallback(async () => {
+    if (!isAuthenticated) {
+      setItems([]);
+      setItemCount(0);
+      setTotal(0);
       return;
     }
-    setItems((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
-    );
+    try {
+      setIsLoading(true);
+      const data = await api.cart.get(appliedPromo, deliverySpeed);
+      applyCartResponse(data);
+    } catch (err) {
+      console.error('Failed to load cart from backend:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, appliedPromo, deliverySpeed]);
+
+  useEffect(() => {
+    refreshCart();
+  }, [refreshCart]);
+
+  const addToCart = async (product: Product, quantity: number = 1) => {
+    try {
+      const data = await api.cart.addItem(product.id, quantity);
+      applyCartResponse(data);
+    } catch (err: any) {
+      console.error('Failed to add item to cart:', err);
+      throw err;
+    }
   };
 
-  const removeFromCart = (productId: string) => {
-    setItems((prev) => prev.filter((item) => item.product.id !== productId));
+  const updateQuantity = async (productId: string, quantity: number) => {
+    try {
+      const data = await api.cart.updateQuantity(productId, quantity);
+      applyCartResponse(data);
+    } catch (err) {
+      console.error('Failed to update quantity:', err);
+    }
   };
 
-  const clearCart = () => {
-    setItems([]);
-    setAppliedPromo(null);
-    setPromoDiscountPct(0);
+  const removeFromCart = async (productId: string) => {
+    try {
+      const data = await api.cart.removeItem(productId);
+      applyCartResponse(data);
+    } catch (err) {
+      console.error('Failed to remove item from cart:', err);
+    }
   };
 
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-
-  const totalWeightGrams = items.reduce(
-    (sum, item) => sum + (item.product.weightGrams || 200) * item.quantity,
-    0
-  );
-
-  const subtotal = items.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
-  );
-
-  // Dynamic drone delivery fee calculation
-  let baseDeliveryFee = items.length > 0 ? 3.99 : 0;
-  if (deliverySpeed === 'express') baseDeliveryFee += 3.5;
-  if (totalWeightGrams > 1500) baseDeliveryFee += 2.0; // Payload surcharge
-
-  const deliveryFee = parseFloat(baseDeliveryFee.toFixed(2));
-  const discount = parseFloat(((subtotal * promoDiscountPct) / 100).toFixed(2));
-  const taxableAmount = Math.max(0, subtotal - discount);
-  const tax = items.length > 0 ? parseFloat((taxableAmount * 0.085).toFixed(2)) : 0;
-  const total = items.length > 0 ? parseFloat((taxableAmount + deliveryFee + tax).toFixed(2)) : 0;
-
-  const applyPromoCode = (code: string): { success: boolean; message: string } => {
-    const clean = code.trim().toUpperCase();
-    if (clean === 'DRONE10' || clean === 'SKYFIRST') {
-      setAppliedPromo(clean);
-      setPromoDiscountPct(10);
-      return { success: true, message: '10% discount applied to your order!' };
+  const clearCart = async () => {
+    try {
+      const data = await api.cart.clear();
+      applyCartResponse(data);
+    } catch (err) {
+      console.error('Failed to clear cart:', err);
     }
-    if (clean === 'AERO20' && subtotal >= 50) {
-      setAppliedPromo(clean);
-      setPromoDiscountPct(20);
-      return { success: true, message: '20% VIP drone discount applied!' };
+  };
+
+  const applyPromoCode = async (code: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await api.cart.applyPromo(code);
+      if (res.success) {
+        applyCartResponse(res.cart);
+        return { success: true, message: res.message };
+      }
+      return { success: false, message: 'Invalid promo code.' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Invalid promo code.' };
     }
-    if (clean === 'AERO20' && subtotal < 50) {
-      return { success: false, message: 'AERO20 requires a minimum subtotal of $50.' };
-    }
-    return { success: false, message: 'Invalid promo code. Try "DRONE10" or "SKYFIRST".' };
   };
 
   const removePromoCode = () => {
     setAppliedPromo(null);
-    setPromoDiscountPct(0);
   };
 
   return (
@@ -139,6 +151,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         removePromoCode,
         deliverySpeed,
         setDeliverySpeed,
+        isLoading,
+        refreshCart,
       }}
     >
       {children}

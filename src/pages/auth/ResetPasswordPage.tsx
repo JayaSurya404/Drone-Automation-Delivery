@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Lock, Eye, EyeOff, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 export const ResetPasswordPage: React.FC = () => {
   const { resetPassword } = useAuth();
   const { showToast } = useNotifications();
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const email = (location.state as any)?.email || 'your email';
-
-  const [code, setCode] = useState('482910');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +25,7 @@ export const ResetPasswordPage: React.FC = () => {
       setError('Password must be at least 8 characters long.');
       return;
     }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -37,8 +34,11 @@ export const ResetPasswordPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await resetPassword(password, confirmPassword);
-      showToast('Password Updated Successfully', 'You can now sign in with your new credentials.', 'success');
+      const msg = await resetPassword({
+        newPassword: password,
+        confirmPassword,
+      });
+      showToast('Password Updated! 🔒', msg || 'You can now sign in with your new password.', 'success');
       navigate('/login');
     } catch (err: any) {
       setError(err.message || 'Password update failed.');
@@ -78,7 +78,7 @@ export const ResetPasswordPage: React.FC = () => {
 
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>Create New Password</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.35rem', marginBottom: '1.5rem' }}>
-          Enter the recovery code sent to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong> and choose a secure new password.
+          Enter a secure new password for your SkyLink customer account.
         </p>
 
         {error && (
@@ -100,14 +100,6 @@ export const ResetPasswordPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
           <Input
-            label="Verification Code (Demo: 482910)"
-            placeholder="6-digit code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            required
-          />
-
-          <Input
             label="New Password"
             type={showPassword ? 'text' : 'password'}
             placeholder="Min. 8 characters"
@@ -117,6 +109,8 @@ export const ResetPasswordPage: React.FC = () => {
             rightIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             onRightIconClick={() => setShowPassword(!showPassword)}
             required
+            autoComplete="new-password"
+            autoFocus
           />
 
           <Input
@@ -127,6 +121,7 @@ export const ResetPasswordPage: React.FC = () => {
             onChange={(e) => setConfirmPassword(e.target.value)}
             leftIcon={<Lock size={18} />}
             required
+            autoComplete="new-password"
           />
 
           <Button
@@ -141,6 +136,12 @@ export const ResetPasswordPage: React.FC = () => {
             Update Password & Sign In
           </Button>
         </form>
+
+        <div style={{ marginTop: '1.5rem' }}>
+          <Link to="/login" style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            Remember your password? <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>Sign In</span>
+          </Link>
+        </div>
       </div>
     </div>
   );

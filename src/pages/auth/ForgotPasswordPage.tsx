@@ -11,21 +11,28 @@ export const ForgotPasswordPage: React.FC = () => {
   const { showToast } = useNotifications();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('alex.mercer@skylink.io');
+  // Initialized EMPTY — NO hardcoded demo email!
+  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please provide a valid email address.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await forgotPassword(email);
-      showToast('Reset Link Sent', 'Check your inbox for password recovery instructions.', 'info');
-      navigate('/reset-password', { state: { email } });
+      const msg = await forgotPassword(email.trim());
+      showToast('Reset Instructions Dispatched', msg || 'Check your inbox for password recovery instructions.', 'info');
+      navigate('/reset-password', { state: { email: email.trim() } });
     } catch (err: any) {
-      setError(err.message || 'Password reset request failed.');
+      setError(err.message || 'Password recovery request failed.');
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +69,7 @@ export const ForgotPasswordPage: React.FC = () => {
 
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>Recover Password</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.35rem', marginBottom: '1.5rem' }}>
-          Enter your registered email address and we'll send you a password reset code.
+          Enter your registered email address and we'll send you a 6-digit recovery code.
         </p>
 
         {error && (
@@ -85,11 +92,13 @@ export const ForgotPasswordPage: React.FC = () => {
           <Input
             label="Customer Email Address"
             type="email"
-            placeholder="alex.mercer@skylink.io"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail size={18} />}
             required
+            autoComplete="email"
+            autoFocus
           />
 
           <Button

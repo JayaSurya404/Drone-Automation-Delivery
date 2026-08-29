@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ProductCategory, Product } from '../../types/product';
 import { api } from '../../services/api';
@@ -6,7 +6,7 @@ import { ProductCard } from '../../components/products/ProductCard';
 import { CategoryNav } from '../../components/products/CategoryNav';
 import { EmptyState } from '../../components/common/EmptyState';
 import { Skeleton } from '../../components/common/Skeleton';
-import { ShoppingBag, Search, Sparkles, SlidersHorizontal, Zap, ArrowUpDown, X } from 'lucide-react';
+import { Search, Sparkles, Zap, ArrowUpDown, X, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export const ProductsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,6 +20,7 @@ export const ProductsPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc' | 'rating' | 'speed'>('popular');
   const [maxSpeedFilter, setMaxSpeedFilter] = useState<number>(0); // 0 means any
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Sync state with URL params
   useEffect(() => {
@@ -29,40 +30,44 @@ export const ProductsPage: React.FC = () => {
     setSearchQuery(s);
   }, [searchParams]);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadProducts = useCallback(async () => {
     setIsLoading(true);
-
-    api.products
-      .getAll({
+    setError(null);
+    try {
+      const data = await api.products.getAll({
         category: selectedCategory,
         search: searchQuery,
-        sortBy: sortBy === 'speed' ? 'popular' : sortBy,
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        let filtered = [...data];
-
-        if (dealsOnly) {
-          filtered = filtered.filter(p => p.discountPercent && p.discountPercent >= 20);
-        }
-
-        if (maxSpeedFilter > 0) {
-          filtered = filtered.filter(p => p.estimatedDeliveryMins <= maxSpeedFilter);
-        }
-
-        if (sortBy === 'speed') {
-          filtered.sort((a, b) => a.estimatedDeliveryMins - b.estimatedDeliveryMins);
-        }
-
-        setProducts(filtered);
-        setIsLoading(false);
+        sort: sortBy,
+        maxSpeed: maxSpeedFilter > 0 ? maxSpeedFilter : undefined,
+        deals: dealsOnly,
       });
 
-    return () => {
-      isMounted = false;
-    };
+      let filtered = [...data];
+
+      if (dealsOnly) {
+        filtered = filtered.filter(p => p.discountPercent && p.discountPercent >= 20);
+      }
+
+      if (maxSpeedFilter > 0) {
+        filtered = filtered.filter(p => p.estimatedDeliveryMins <= maxSpeedFilter);
+      }
+
+      if (sortBy === 'speed') {
+        filtered.sort((a, b) => a.estimatedDeliveryMins - b.estimatedDeliveryMins);
+      }
+
+      setProducts(filtered);
+    } catch (err: any) {
+      console.error('Failed to load products:', err);
+      setError(err?.message || 'Unable to load products from catalog database.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [selectedCategory, searchQuery, sortBy, dealsOnly, maxSpeedFilter]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const handleCategorySelect = (cat: ProductCategory | 'All') => {
     setSelectedCategory(cat);
@@ -88,13 +93,15 @@ export const ProductsPage: React.FC = () => {
       {/* ── Header ── */}
       <div className="section-header" style={{ marginBottom: '1.5rem' }}>
         <div className="section-label">
-          <Sparkles size={14} color="#0ea5e9" /> Instant Aerial Marketplace
+          <Sparkles size={14} color="#0ea5e9" /> Autonomous Aero Marketplace
         </div>
         <h1 style={{ margin: '0.2rem 0 0.35rem', letterSpacing: '-0.03em' }}>
           {selectedCategory === 'All' ? 'All Marketplace Products' : `${selectedCategory} Collection`}
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
-          {products.length} products available for immediate autonomous dispatch.
+          {isLoading
+            ? 'Scanning autonomous drone dispatch centers...'
+            : `${products.length} product${products.length === 1 ? '' : 's'} available for immediate aerial delivery.`}
         </p>
       </div>
 
@@ -110,16 +117,21 @@ export const ProductsPage: React.FC = () => {
         <div className="filter-status-left">
           <span className="results-count-text">
             Showing <strong>{products.length}</strong> items
+            {selectedCategory !== 'All' && <span> in <em>{selectedCategory}</em></span>}
           </span>
           {searchQuery && (
             <div className="active-filter-chip">
               <span>Keyword: "{searchQuery}"</span>
-              <button type="button" onClick={() => {
-                setSearchQuery('');
-                const np = new URLSearchParams(searchParams);
-                np.delete('search');
-                setSearchParams(np);
-              }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  const np = new URLSearchParams(searchParams);
+                  np.delete('search');
+                  setSearchParams(np);
+                }}
+                aria-label="Clear search"
+              >
                 <X size={13} />
               </button>
             </div>
@@ -127,11 +139,15 @@ export const ProductsPage: React.FC = () => {
           {dealsOnly && (
             <div className="active-filter-chip highlight">
               <span>⚡ Flash Air Deals</span>
-              <button type="button" onClick={() => {
-                const np = new URLSearchParams(searchParams);
-                np.delete('deals');
-                setSearchParams(np);
-              }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const np = new URLSearchParams(searchParams);
+                  np.delete('deals');
+                  setSearchParams(np);
+                }}
+                aria-label="Clear deals filter"
+              >
                 <X size={13} />
               </button>
             </div>
@@ -180,7 +196,7 @@ export const ProductsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Product Grid ── */}
+      {/* ── Product Grid & States ── */}
       {isLoading ? (
         <div className="products-grid">
           {Array.from({ length: 8 }).map((_, idx) => (
@@ -198,12 +214,26 @@ export const ProductsPage: React.FC = () => {
             </div>
           ))}
         </div>
+      ) : error ? (
+        <div style={{ padding: '2rem 1rem', maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+          <EmptyState
+            icon={<AlertTriangle size={40} color="#ef4444" />}
+            title="Unable to load products"
+            description={error}
+            actionText="Try Again"
+            onAction={loadProducts}
+          />
+        </div>
       ) : products.length === 0 ? (
         <EmptyState
           icon={<Search size={36} color="var(--accent-blue)" />}
-          title="No Matching Products"
-          description={`We couldn't find any products matching your filters. Try clearing your search keyword or selected speed.`}
-          actionText="Reset All Filters"
+          title={selectedCategory !== 'All' ? 'No products in this category yet' : 'No Matching Products'}
+          description={
+            selectedCategory !== 'All'
+              ? `We currently do not have active inventory in ${selectedCategory}. Check back soon or browse all categories.`
+              : `We couldn't find any products matching your filters. Try clearing your search keyword or selected speed.`
+          }
+          actionText={selectedCategory !== 'All' ? 'View All Products' : 'Reset All Filters'}
           onAction={handleClearFilters}
         />
       ) : (

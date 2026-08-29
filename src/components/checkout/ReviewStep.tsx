@@ -137,13 +137,13 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.product.name}</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
-                    Qty: {item.quantity} × ${item.product.price.toFixed(2)}
+                    Qty: {item.quantity} × ₹{item.product.price.toLocaleString('en-IN')}
                   </div>
                 </div>
               </div>
 
               <div style={{ fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-display)' }}>
-                ${(item.product.price * item.quantity).toFixed(2)}
+                ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
               </div>
             </div>
           ))}
@@ -163,7 +163,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
           onClick={onPlaceOrder}
           leftIcon={<Zap size={18} />}
         >
-          Authorize & Place Order (${total.toFixed(2)})
+          Authorize & Place Order (₹{total.toLocaleString('en-IN')})
         </Button>
       </div>
     </div>

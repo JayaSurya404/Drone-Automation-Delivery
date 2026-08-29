@@ -37,3 +37,26 @@ export interface LoginPayload {
   password: string;
   rememberMe?: boolean;
 }
+
+export interface VerifyAccountPayload {
+  code: string;
+  email?: string;
+}
+
+export interface ResetPasswordPayload {
+  email?: string;
+  code?: string;
+  password?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+export type PendingActionType = 'add_to_cart' | 'wishlist' | 'buy_now' | 'navigate';
+
+export interface PendingAction {
+  type: PendingActionType;
+  productId?: string;
+  quantity?: number;
+  returnTo?: string;
+  productName?: string;
+}

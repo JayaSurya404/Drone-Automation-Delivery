@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Navigation, Mail, Lock, Eye, EyeOff, ShieldCheck, Zap, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Navigation, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { api } from '../../services/api';
 
 export const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, pendingAction, clearPendingAction } = useAuth();
+  const { refreshCart } = useCart();
+  const { refreshWishlist } = useWishlist();
   const { showToast } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
-  const [email, setEmail] = useState('alex.mercer@skylink.io');
-  const [password, setPassword] = useState('password123');
+  // Fields initialized empty — NO hardcoded credentials
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,29 +30,76 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsLoading(true);
 
-    try {
-      await login({ email, password, rememberMe });
-      showToast('Welcome back!', `Logged in successfully as ${email}`, 'success');
-      navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setIsLoading(false);
+    if (!email.trim() || !password) {
+      setError('Please enter both your email address and password.');
+      return;
     }
-  };
 
-  const handleQuickDemoLogin = async () => {
-    setEmail('alex.mercer@skylink.io');
-    setPassword('password123');
     setIsLoading(true);
+
     try {
-      await login({ email: 'alex.mercer@skylink.io', password: 'password123', rememberMe: true });
-      showToast('Demo Account Connected', 'Logged in as Alex Mercer', 'success');
+      const res = await login({ email: email.trim(), password, rememberMe });
+      showToast('Welcome back!', `Signed in successfully as ${res.user.name || res.user.email}`, 'success');
+
+      // Refresh customer carts and wishlists
+      await Promise.all([refreshCart(), refreshWishlist()]);
+
+      // Execute pending action if customer was trying to do something before signing in
+      if (pendingAction) {
+        if (pendingAction.type === 'add_to_cart' && pendingAction.productId) {
+          try {
+            await api.cart.addItem(pendingAction.productId, pendingAction.quantity || 1);
+            showToast('Added to Cart! 🛒', `${pendingAction.productName || 'Product'} has been added to your cart.`, 'success');
+            await refreshCart();
+          } catch (err) {
+            console.error('Failed to execute pending cart addition:', err);
+          }
+          clearPendingAction();
+          navigate(pendingAction.returnTo || '/cart', { replace: true });
+          return;
+        }
+
+        if (pendingAction.type === 'wishlist' && pendingAction.productId) {
+          try {
+            await api.wishlist.add(pendingAction.productId);
+            showToast('Added to Wishlist! ❤️', `${pendingAction.productName || 'Product'} saved to your wishlist.`, 'success');
+            await refreshWishlist();
+          } catch (err) {
+            console.error('Failed to execute pending wishlist addition:', err);
+          }
+          clearPendingAction();
+          navigate(pendingAction.returnTo || '/wishlist', { replace: true });
+          return;
+        }
+
+        if (pendingAction.type === 'buy_now' && pendingAction.productId) {
+          try {
+            await api.cart.addItem(pendingAction.productId, pendingAction.quantity || 1);
+            await refreshCart();
+          } catch (err) {
+            console.error('Failed to execute buy now:', err);
+          }
+          clearPendingAction();
+          navigate('/checkout', { replace: true });
+          return;
+        }
+
+        if (pendingAction.returnTo) {
+          const target = pendingAction.returnTo;
+          clearPendingAction();
+          navigate(target, { replace: true });
+          return;
+        }
+      }
+
       navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err.message);
+      if (err.requiresVerification) {
+        navigate('/verify-account', { state: { email: err.email || email.trim() } });
+      } else {
+        setError(err.message || 'Invalid email or password. Please check your credentials.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -84,30 +137,8 @@ export const LoginPage: React.FC = () => {
           </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Customer Portal Sign In</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.35rem' }}>
-            Track active drone flights and order instant essentials
+            Access active drone tracking, express orders, and saved addresses
           </p>
-        </div>
-
-        {/* Demo Fast Login Helper */}
-        <div
-          style={{
-            background: 'rgba(0, 229, 255, 0.08)',
-            border: '1px solid rgba(0, 229, 255, 0.25)',
-            borderRadius: 'var(--radius-md)',
-            padding: '0.75rem 1rem',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.5rem',
-          }}
-        >
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-            <strong>Demo Customer:</strong> Alex Mercer
-          </div>
-          <Button variant="outline" size="sm" onClick={handleQuickDemoLogin} type="button">
-            1-Click Demo Login
-          </Button>
         </div>
 
         {error && (
@@ -131,23 +162,25 @@ export const LoginPage: React.FC = () => {
           <Input
             label="Customer Email Address"
             type="email"
-            placeholder="alex.mercer@skylink.io"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail size={18} />}
             required
+            autoComplete="email"
           />
 
           <Input
             label="Password"
             type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••••••"
+            placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             leftIcon={<Lock size={18} />}
             rightIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             onRightIconClick={() => setShowPassword(!showPassword)}
             required
+            autoComplete="current-password"
           />
 
           <div
@@ -185,7 +218,7 @@ export const LoginPage: React.FC = () => {
             isLoading={isLoading}
             rightIcon={<ArrowRight size={18} />}
           >
-            Sign In to Customer Panel
+            Sign In to Customer Portal
           </Button>
         </form>
 

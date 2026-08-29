@@ -5,6 +5,7 @@ import { useNotifications } from '../../context/NotificationContext';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Modal } from '../../components/common/Modal';
+import { api } from '../../services/api';
 import {
   User,
   Mail,
@@ -95,7 +96,7 @@ export const ProfilePage: React.FC = () => {
     }
 
     try {
-      await resetPassword(newPass, confirmPass);
+      await api.customer.changePassword(currentPass, newPass, confirmPass);
       showToast('Password Changed', 'Your account password has been updated.', 'success');
       setIsPasswordModalOpen(false);
       setCurrentPass('');

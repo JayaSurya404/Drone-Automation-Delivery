@@ -71,7 +71,7 @@ export const DeliveryOptionStep: React.FC<DeliveryOptionStepProps> = ({
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>+$3.50</div>
+            <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>+₹49</div>
             {selectedSpeed === 'express' && <CheckCircle2 size={18} color="var(--accent-cyan)" style={{ marginTop: '0.25rem' }} />}
           </div>
         </div>
@@ -108,7 +108,7 @@ export const DeliveryOptionStep: React.FC<DeliveryOptionStepProps> = ({
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>Free / $3.99</div>
+            <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>Free / ₹49</div>
             {selectedSpeed === 'standard' && <CheckCircle2 size={18} color="var(--accent-cyan)" style={{ marginTop: '0.25rem' }} />}
           </div>
         </div>
@@ -145,7 +145,7 @@ export const DeliveryOptionStep: React.FC<DeliveryOptionStepProps> = ({
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>$4.99</div>
+            <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>₹49</div>
             {selectedSpeed === 'scheduled' && <CheckCircle2 size={18} color="var(--accent-cyan)" style={{ marginTop: '0.25rem' }} />}
           </div>
         </div>

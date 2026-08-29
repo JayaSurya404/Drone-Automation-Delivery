@@ -12,12 +12,14 @@ import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
 import { MobileNav } from './components/common/MobileNav';
 import { ToastContainer } from './components/common/Toast';
+import { ScrollManager } from './components/common/ScrollManager';
 import { AppRoutes } from './routes/AppRoutes';
 import './styles/index.css';
 
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
+      <ScrollManager />
       <ThemeProvider>
         <AuthProvider>
           <NotificationProvider>

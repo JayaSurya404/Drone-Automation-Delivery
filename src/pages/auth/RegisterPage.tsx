@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Navigation, User, Mail, Phone, Lock, Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Navigation, User, Mail, Phone, Lock, Eye, EyeOff, ArrowRight, CheckCircle2, Send } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
@@ -24,15 +24,17 @@ export const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) newErrors.name = 'Full name is required.';
-    if (!formData.email.trim() || !formData.email.includes('@')) newErrors.email = 'Valid email is required.';
+    if (!formData.email.trim() || !formData.email.includes('@')) newErrors.email = 'Please provide a valid email address.';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required for flight alerts.';
-    if (!formData.password || formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters.';
+    if (!formData.password || formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters long.';
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match.';
     if (!formData.acceptTerms) newErrors.acceptTerms = 'You must accept the Terms & Conditions.';
 
@@ -46,18 +48,87 @@ export const RegisterPage: React.FC = () => {
 
     try {
       const res = await register(formData);
-      showToast('Registration Initialized', 'Verification code sent to your email.', 'info');
       if (res.requiresVerification) {
-        navigate('/verify-account');
+        setRegisteredEmail(formData.email.trim());
+        setIsRegistered(true);
+        showToast('Confirmation Email Sent ✉️', `Check ${formData.email.trim()} to verify your account.`, 'info');
       } else {
+        showToast('Account Created 🎉', 'Welcome to SkyLink!', 'success');
         navigate('/dashboard');
       }
     } catch (err: any) {
-      setErrors({ form: err.message || 'Registration failed.' });
+      setErrors({ form: err.message || 'Registration failed. Please check your information.' });
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isRegistered) {
+    return (
+      <div style={{ minHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem 1rem' }}>
+        <div
+          className="card glass-panel"
+          style={{
+            width: '100%',
+            maxWidth: '480px',
+            padding: '3rem 2rem',
+            borderRadius: 'var(--radius-xl)',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              background: 'rgba(0, 229, 255, 0.12)',
+              border: '2px solid var(--accent-cyan)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-cyan)',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 0 25px var(--accent-cyan-glow)',
+            }}
+          >
+            <Send size={32} />
+          </div>
+
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Check Your Email</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: '0.75rem', lineHeight: 1.6 }}>
+            We've sent an account activation link to <br />
+            <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{registeredEmail}</strong>
+          </p>
+
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1.25rem',
+              margin: '1.75rem 0',
+              textAlign: 'left',
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.5,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.35rem' }}>
+              <CheckCircle2 size={16} style={{ color: 'var(--accent-cyan)' }} />
+              <span>Next Steps:</span>
+            </div>
+            1. Open the email from <strong>SkyLink Drone Store</strong>.<br />
+            2. Click the <strong>Confirm your email</strong> link.<br />
+            3. You'll be automatically redirected back to continue shopping!
+          </div>
+
+          <Button variant="outline" fullWidth onClick={() => navigate('/login')}>
+            Back to Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem 1rem' }}>
@@ -112,24 +183,26 @@ export const RegisterPage: React.FC = () => {
         <form onSubmit={handleSubmit}>
           <Input
             label="Full Name"
-            placeholder="Jane Doe"
+            placeholder="John Doe"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             leftIcon={<User size={18} />}
             error={errors.name}
             required
+            autoComplete="name"
           />
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <Input
               label="Email Address"
               type="email"
-              placeholder="jane@example.com"
+              placeholder="john@example.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               leftIcon={<Mail size={18} />}
               error={errors.email}
               required
+              autoComplete="email"
             />
             <Input
               label="Mobile Phone"
@@ -139,6 +212,7 @@ export const RegisterPage: React.FC = () => {
               leftIcon={<Phone size={18} />}
               error={errors.phone}
               required
+              autoComplete="tel"
             />
           </div>
 
@@ -154,6 +228,7 @@ export const RegisterPage: React.FC = () => {
               onRightIconClick={() => setShowPassword(!showPassword)}
               error={errors.password}
               required
+              autoComplete="new-password"
             />
             <Input
               label="Confirm Password"
@@ -164,6 +239,7 @@ export const RegisterPage: React.FC = () => {
               leftIcon={<Lock size={18} />}
               error={errors.confirmPassword}
               required
+              autoComplete="new-password"
             />
           </div>
 
@@ -177,7 +253,7 @@ export const RegisterPage: React.FC = () => {
                 style={{ marginTop: '0.2rem', accentColor: 'var(--accent-cyan)' }}
               />
               <span style={{ color: 'var(--text-secondary)' }}>
-                I agree to the <strong>Terms & Conditions</strong> for autonomous air deliveries and drop zone protocols.
+                I agree to the <strong>Terms & Conditions</strong> for autonomous air deliveries and drop zone safety.
               </span>
             </label>
             {errors.acceptTerms && <span className="form-error-msg">{errors.acceptTerms}</span>}
@@ -190,7 +266,7 @@ export const RegisterPage: React.FC = () => {
                 style={{ marginTop: '0.2rem', accentColor: 'var(--accent-cyan)' }}
               />
               <span style={{ color: 'var(--text-secondary)' }}>
-                I agree to the <strong>Privacy Policy</strong> and encrypted GPS telemetry storage for landing markers.
+                I agree to the <strong>Privacy Policy</strong> and GPS telemetry logging for precise drop markers.
               </span>
             </label>
           </div>

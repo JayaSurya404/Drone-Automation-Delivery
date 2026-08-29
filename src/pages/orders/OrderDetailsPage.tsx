@@ -221,13 +221,13 @@ export const OrderDetailsPage: React.FC = () => {
                         {item.product.name}
                       </Link>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '0.15rem' }}>
-                        Qty: {item.quantity} × ${item.product.price.toFixed(2)}
+                        Qty: {item.quantity} × ₹{item.product.price.toLocaleString('en-IN')}
                       </div>
                     </div>
                   </div>
 
                   <div style={{ fontWeight: 800, fontSize: '1.1rem', fontFamily: 'var(--font-display)' }}>
-                    ${(item.product.price * item.quantity).toFixed(2)}
+                    ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
                   </div>
                 </div>
               ))}
@@ -255,30 +255,30 @@ export const OrderDetailsPage: React.FC = () => {
 
             <div className="summary-row">
               <span>Subtotal</span>
-              <span>${order.subtotal.toFixed(2)}</span>
+              <span>₹{order.subtotal.toLocaleString('en-IN')}</span>
             </div>
 
             <div className="summary-row">
               <span>Drone Air Delivery Fee</span>
-              <span>${order.deliveryFee.toFixed(2)}</span>
+              <span>₹{order.deliveryFee.toLocaleString('en-IN')}</span>
             </div>
 
             <div className="summary-row">
               <span>Taxes & Surcharges</span>
-              <span>${order.tax.toFixed(2)}</span>
+              <span>₹{order.tax.toLocaleString('en-IN')}</span>
             </div>
 
             {order.discount > 0 && (
               <div className="summary-row" style={{ color: '#10b981' }}>
                 <span>Discount Applied</span>
-                <span>-${order.discount.toFixed(2)}</span>
+                <span>-₹{order.discount.toLocaleString('en-IN')}</span>
               </div>
             )}
 
             <div className="summary-row total">
               <span>Total Paid</span>
               <span className="text-gradient" style={{ fontSize: '1.4rem' }}>
-                ${order.total.toFixed(2)}
+                ₹{order.total.toLocaleString('en-IN')}
               </span>
             </div>
           </div>

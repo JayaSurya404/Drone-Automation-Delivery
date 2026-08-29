@@ -21,9 +21,9 @@ export const GeofenceChecker: React.FC<GeofenceCheckerProps> = ({
     let isMounted = true;
     setChecking(true);
 
-    api.delivery
-      .checkGeofence(latitude, longitude)
-      .then((res) => {
+    api.geofence
+      .checkEligibility(latitude, longitude)
+      .then((res: GeofenceCheckResult) => {
         if (isMounted) {
           setResult(res);
           setChecking(false);

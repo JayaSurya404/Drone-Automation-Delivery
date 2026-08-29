@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { CustomerOrder, CustomerOrderStatus } from '../types/order';
 import { api } from '../services/api';
-import { storage } from '../services/storage';
 import { realtimeDeliveryService } from '../services/realtimeDeliveryService';
-import { INITIAL_ORDERS } from '../services/mockData';
+import { useAuth } from './AuthContext';
 
 interface OrderContextType {
   orders: CustomerOrder[];
@@ -11,9 +10,9 @@ interface OrderContextType {
   isLoading: boolean;
   fetchOrders: () => Promise<void>;
   getOrderById: (id: string) => Promise<CustomerOrder>;
-  createOrder: (orderData: Omit<CustomerOrder, 'id' | 'createdAt' | 'updatedAt' | 'timeline' | 'deliveryOtp' | 'isCancellable' | 'status'>) => Promise<CustomerOrder>;
+  createOrder: (orderData: any) => Promise<CustomerOrder>;
   cancelOrder: (orderId: string, reason: string) => Promise<CustomerOrder>;
-  rateOrder: (orderId: string, stars: number, feedback?: string) => Promise<CustomerOrder>;
+  rateOrder: (orderId: string, stars: number, feedback?: string) => Promise<any>;
   stats: {
     total: number;
     active: number;
@@ -25,25 +24,33 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [orders, setOrders] = useState<CustomerOrder[]>(() => {
-    return storage.get<CustomerOrder[]>(storage.keys.ORDERS, INITIAL_ORDERS);
-  });
+  const { isAuthenticated } = useAuth();
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const fetchOrders = useCallback(async () => {
+    if (!isAuthenticated) {
+      setOrders([]);
+      return;
+    }
     setIsLoading(true);
     try {
       const data = await api.orders.getAll();
       setOrders(data);
+    } catch (err) {
+      console.error('Failed to fetch orders from backend:', err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
-  // Listen to milestone real-time events ONLY (never re-render orders on silent GPS coordinates)
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // Listen to milestone real-time events (deduplicated)
   useEffect(() => {
     const unsubscribe = realtimeDeliveryService.subscribe((event) => {
-      // Ignore silent GPS/telemetry ticks
       if (event.type === 'DRONE_LOCATION_UPDATED' || event.type === 'DELIVERY_ETA_UPDATED') {
         return;
       }
@@ -54,7 +61,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (index === -1) return prev;
 
           const currentOrder = prev[index];
-          // Only update if status actually changed
           if (currentOrder.status === event.status && event.type !== 'DELIVERY_COMPLETED') {
             return prev;
           }
@@ -65,7 +71,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           order.isCancellable = order.status === 'Order Placed' || order.status === 'Order Confirmed';
           order.updatedAt = new Date().toISOString();
 
-          // Update timeline entry
           const timelineIndex = order.timeline.findIndex((t) => t.status === event.status);
           if (timelineIndex !== -1) {
             order.timeline = order.timeline.map((entry, idx) => ({
@@ -80,7 +85,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
 
           updated[index] = order;
-          storage.set(storage.keys.ORDERS, updated);
           return updated;
         });
       }
@@ -95,9 +99,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return api.orders.getById(id);
   }, []);
 
-  const createOrder = useCallback(async (
-    orderData: Omit<CustomerOrder, 'id' | 'createdAt' | 'updatedAt' | 'timeline' | 'deliveryOtp' | 'isCancellable' | 'status'>
-  ): Promise<CustomerOrder> => {
+  const createOrder = useCallback(async (orderData: any): Promise<CustomerOrder> => {
     setIsLoading(true);
     try {
       const newOrder = await api.orders.create(orderData);
@@ -119,11 +121,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  const rateOrder = useCallback(async (orderId: string, stars: number, feedback?: string): Promise<CustomerOrder> => {
-    const updated = await api.orders.rate(orderId, stars, feedback);
-    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
-    return updated;
-  }, []);
+  const rateOrder = useCallback(async (orderId: string, stars: number, feedback?: string): Promise<any> => {
+    const res = await api.orders.rate(orderId, stars, feedback);
+    await fetchOrders();
+    return res;
+  }, [fetchOrders]);
 
   const activeOrder = useMemo(() => {
     return (

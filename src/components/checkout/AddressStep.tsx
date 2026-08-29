@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CustomerAddress } from '../../types/address';
+import { useAuth } from '../../context/AuthContext';
 import { useAddresses } from '../../context/AddressContext';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
@@ -16,11 +17,12 @@ export const AddressStep: React.FC<AddressStepProps> = ({
   onSelectAddress,
   onNext,
 }) => {
+  const { user } = useAuth();
   const { addresses, saveAddress } = useAddresses();
   const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
   const [formData, setFormData] = useState({
-    name: 'Alex Mercer',
-    phone: '+1 (555) 248-7790',
+    name: user?.name || '',
+    phone: user?.phone || '',
     label: 'Home' as const,
     building: '',
     street: '',

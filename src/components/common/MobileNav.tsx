@@ -9,7 +9,7 @@ export const MobileNav: React.FC = () => {
   const { wishlistCount } = useWishlist();
 
   const items = [
-    { to: '/dashboard', icon: <Home size={20} />, label: 'Home' },
+    { to: '/', icon: <Home size={20} />, label: 'Home' },
     { to: '/products', icon: <ShoppingBag size={20} />, label: 'Shop' },
     {
       to: activeOrder ? `/tracking/${activeOrder.id}` : '/wishlist',

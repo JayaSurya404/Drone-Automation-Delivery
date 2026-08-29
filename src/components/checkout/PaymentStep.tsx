@@ -25,12 +25,12 @@ export const PaymentStep: React.FC<PaymentStepProps> = ({
   const { total } = useCart();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('Credit Card');
   const [cardData, setCardData] = useState({
-    cardNumber: '•••• •••• •••• 4242',
-    cardHolder: 'Alex Mercer',
-    expiry: '12/28',
-    cvv: '•••',
+    cardNumber: '',
+    cardHolder: '',
+    expiry: '',
+    cvv: '',
   });
-  const [upiId, setUpiId] = useState<string>('alex.mercer@oksbi');
+  const [upiId, setUpiId] = useState<string>('');
 
   const handleNext = () => {
     onPaymentConfirmed(selectedMethod);
@@ -148,7 +148,7 @@ export const PaymentStep: React.FC<PaymentStepProps> = ({
         </Button>
 
         <Button variant="primary" size="lg" onClick={handleNext}>
-          Review Order (${total.toFixed(2)}) &rarr;
+          Review Order (₹{total.toLocaleString('en-IN')}) &rarr;
         </Button>
       </div>
     </div>
