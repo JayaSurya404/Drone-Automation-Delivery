@@ -12,6 +12,9 @@ import { createAuthService, type AuthService } from "./modules/auth/auth.service
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
 import { createAuditService, type AuditService } from "./modules/audit/audit.service.js";
 import { createAuditRoutes } from "./modules/audit/audit.routes.js";
+import { createOrderRepository, type OrderRepository } from "./modules/orders/order.repository.js";
+import { createOrderService, type OrderService } from "./modules/orders/order.service.js";
+import { createOrderRoutes } from "./modules/orders/order.routes.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -19,6 +22,8 @@ export interface AppOptions {
   authRepo?: AuthRepository;
   auditService?: AuditService;
   authService?: AuthService;
+  orderRepo?: OrderRepository;
+  orderService?: OrderService;
   logger?: boolean;
 }
 
@@ -31,6 +36,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const db = options.db ?? getDb();
   const auditService = options.auditService ?? createAuditService(db);
   const authRepo = options.authRepo ?? createAuthRepository(db);
+  const orderRepo = options.orderRepo ?? createOrderRepository(db);
 
   // Error handling plugin
   app.setErrorHandler(errorHandler);
@@ -55,6 +61,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   };
 
   const authService = options.authService ?? createAuthService(authRepo, auditService, jwtSign);
+  const orderService = options.orderService ?? createOrderService(orderRepo, auditService);
 
   // Pre-handler hook to authenticate requests with Bearer tokens
   app.addHook("onRequest", async (request) => {
@@ -117,6 +124,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   // Register domain routes
   app.register(createAuthRoutes(authService));
   app.register(createAuditRoutes(auditService));
+  app.register(createOrderRoutes(orderService));
 
   return app;
 }

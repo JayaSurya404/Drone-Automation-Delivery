@@ -24,6 +24,7 @@ export type UserRole = z.infer<typeof userRoleSchema>;
 export const permissionSchema = z.enum([
   "orders:read",
   "orders:create",
+  "orders:update",
   "orders:cancel",
   "missions:read",
   "missions:create",
@@ -49,6 +50,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   ADMIN: [
     "orders:read",
     "orders:create",
+    "orders:update",
     "orders:cancel",
     "missions:read",
     "missions:create",
@@ -69,6 +71,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   ],
   OPERATOR: [
     "orders:read",
+    "orders:update",
+    "orders:cancel",
     "missions:read",
     "missions:create",
     "missions:authorize",
@@ -94,6 +98,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   DISPATCHER: [
     "orders:read",
     "orders:create",
+    "orders:update",
     "orders:cancel",
     "missions:read",
     "missions:create",
@@ -196,7 +201,9 @@ export const auditActionSchema = z.enum([
   "ORGANIZATION_CREATED",
   "ORGANIZATION_UPDATED",
   "ORDER_CREATED",
+  "ORDER_STATUS_UPDATED",
   "ORDER_CANCELLED",
+  "ORDER_MODIFIED",
   "MISSION_CREATED",
   "MISSION_AUTHORIZED",
   "MISSION_DISPATCHED",
@@ -243,7 +250,7 @@ export const problemDetailsSchema = z.object({
 export type ProblemDetails = z.infer<typeof problemDetailsSchema>;
 
 // ============================================================================
-// Existing Domain Statuses & Models
+// Domain Enums & Value Objects
 // ============================================================================
 
 export const missionStatusSchema = z.enum([
@@ -258,14 +265,28 @@ export const missionStatusSchema = z.enum([
   "COMPLETED",
   "ABORTED"
 ]);
+export type MissionStatus = z.infer<typeof missionStatusSchema>;
+
 export const orderStatusSchema = z.enum([
-  "DRAFT",
-  "SUBMITTED",
+  "CREATED",
+  "CONFIRMED",
   "ASSIGNED",
   "IN_TRANSIT",
   "DELIVERED",
-  "CANCELLED"
+  "CANCELLED",
+  "FAILED",
+  "DRAFT",
+  "SUBMITTED"
 ]);
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
+
+export const orderPrioritySchema = z.enum([
+  "STANDARD",
+  "EXPRESS",
+  "URGENT"
+]);
+export type OrderPriority = z.infer<typeof orderPrioritySchema>;
+
 export const droneStatusSchema = z.enum([
   "AVAILABLE",
   "ASSIGNED",
@@ -273,11 +294,103 @@ export const droneStatusSchema = z.enum([
   "MAINTENANCE",
   "OFFLINE"
 ]);
+export type DroneStatus = z.infer<typeof droneStatusSchema>;
+
 export const coordinateSchema = z.object({
-  latitude: z.number().gte(-90).lte(90),
-  longitude: z.number().gte(-180).lte(180),
-  altitudeMeters: z.number().nonnegative().optional()
+  latitude: z.number().gte(-90, "Latitude must be between -90 and 90").lte(90, "Latitude must be between -90 and 90"),
+  longitude: z.number().gte(-180, "Longitude must be between -180 and 180").lte(180, "Longitude must be between -180 and 180"),
+  altitudeMeters: z.number().nonnegative("Altitude must be non-negative").optional()
 });
+export type Coordinate = z.infer<typeof coordinateSchema>;
+
+export const orderLocationSchema = coordinateSchema.extend({
+  address: z.string().trim().max(255).optional()
+});
+export type OrderLocation = z.infer<typeof orderLocationSchema>;
+
+export const packageDetailsSchema = z.object({
+  weightGrams: z
+    .number()
+    .int("Weight must be an integer in grams")
+    .positive("Package weight must be greater than 0 grams")
+    .max(50000, "Maximum package weight is 50,000 grams (50kg)"),
+  lengthCm: z.number().positive("Length must be greater than 0").max(200, "Maximum length is 200cm").optional(),
+  widthCm: z.number().positive("Width must be greater than 0").max(200, "Maximum width is 200cm").optional(),
+  heightCm: z.number().positive("Height must be greater than 0").max(200, "Maximum height is 200cm").optional(),
+  description: z.string().trim().max(500).optional()
+});
+export type PackageDetails = z.infer<typeof packageDetailsSchema>;
+
+// ============================================================================
+// Order Requests & Responses
+// ============================================================================
+
+export const createOrderRequestSchema = z.object({
+  pickup: orderLocationSchema,
+  delivery: orderLocationSchema,
+  package: packageDetailsSchema,
+  priority: orderPrioritySchema.default("STANDARD"),
+  deliveryNotes: z.string().trim().max(1000).optional()
+});
+export type CreateOrderRequest = z.infer<typeof createOrderRequestSchema>;
+
+export const updateOrderStatusRequestSchema = z.object({
+  status: orderStatusSchema,
+  reason: z.string().trim().max(500).optional()
+});
+export type UpdateOrderStatusRequest = z.infer<typeof updateOrderStatusRequestSchema>;
+
+export const cancelOrderRequestSchema = z.object({
+  reason: z.string().trim().max(500).optional()
+});
+export type CancelOrderRequest = z.infer<typeof cancelOrderRequestSchema>;
+
+export const orderResponseSchema = z.object({
+  id: uuidSchema,
+  orderNumber: z.string(),
+  organizationId: uuidSchema,
+  customerId: uuidSchema,
+  status: orderStatusSchema,
+  priority: orderPrioritySchema,
+  pickup: orderLocationSchema,
+  delivery: orderLocationSchema,
+  package: packageDetailsSchema,
+  deliveryNotes: z.string().nullable().optional(),
+  cancellationReason: z.string().nullable().optional(),
+  cancelledAt: z.string().datetime().nullable().optional(),
+  cancelledByUserId: uuidSchema.nullable().optional(),
+  failureReason: z.string().nullable().optional(),
+  failedAt: z.string().datetime().nullable().optional(),
+  confirmedAt: z.string().datetime().nullable().optional(),
+  assignedAt: z.string().datetime().nullable().optional(),
+  deliveredAt: z.string().datetime().nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type OrderResponse = z.infer<typeof orderResponseSchema>;
+
+export const orderListQuerySchema = z.object({
+  status: orderStatusSchema.optional(),
+  priority: orderPrioritySchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
+
+export const orderListResponseSchema = z.object({
+  data: z.array(orderResponseSchema),
+  pagination: z.object({
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative()
+  })
+});
+export type OrderListResponse = z.infer<typeof orderListResponseSchema>;
+
+// ============================================================================
+// Telemetry & Event Contracts
+// ============================================================================
+
 export const telemetrySchema = z.object({
   version: z.literal("v1"),
   organizationId: organizationIdSchema,
@@ -288,6 +401,8 @@ export const telemetrySchema = z.object({
   headingDegrees: z.number().gte(0).lt(360),
   batteryPercent: z.number().gte(0).lte(100)
 });
+export type Telemetry = z.infer<typeof telemetrySchema>;
+
 export const eventEnvelopeSchema = z.object({
   version: z.literal("v1"),
   id: uuidSchema,
@@ -297,10 +412,4 @@ export const eventEnvelopeSchema = z.object({
   type: z.string().min(1),
   payload: z.unknown()
 });
-
-export type MissionStatus = z.infer<typeof missionStatusSchema>;
-export type OrderStatus = z.infer<typeof orderStatusSchema>;
-export type DroneStatus = z.infer<typeof droneStatusSchema>;
-export type Coordinate = z.infer<typeof coordinateSchema>;
-export type Telemetry = z.infer<typeof telemetrySchema>;
 export type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;

@@ -67,9 +67,35 @@ export interface BatteryTable {
 
 export interface OrderTable {
   id: string;
+  order_number: string;
   organization_id: string;
+  customer_id: string;
   status: string;
-  created_at: ColumnType<Date, string | undefined, never>;
+  priority: string;
+  pickup_latitude: number;
+  pickup_longitude: number;
+  pickup_altitude_meters: number;
+  pickup_address: string | null;
+  delivery_latitude: number;
+  delivery_longitude: number;
+  delivery_altitude_meters: number;
+  delivery_address: string | null;
+  package_weight_grams: number;
+  package_length_cm: number | null;
+  package_width_cm: number | null;
+  package_height_cm: number | null;
+  package_description: string | null;
+  delivery_notes: string | null;
+  cancellation_reason: string | null;
+  cancelled_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  cancelled_by_user_id: string | null;
+  failure_reason: string | null;
+  failed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  confirmed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  assigned_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  delivered_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string | undefined>;
 }
 
 export interface PackageTable {
