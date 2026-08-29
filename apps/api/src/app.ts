@@ -31,6 +31,10 @@ import { OutboxService } from "./modules/events/outbox.service.js";
 import { createNotificationRepository, type NotificationRepository } from "./modules/notifications/notification.repository.js";
 import { createNotificationService, type NotificationService } from "./modules/notifications/notification.service.js";
 import { createNotificationRoutes } from "./modules/notifications/notification.routes.js";
+import { createDroneSelector, type DroneSelector } from "./modules/dispatch/drone-selector.js";
+import { SimulatorSyncService } from "./modules/dispatch/simulator-sync.service.js";
+import { createDeliveryOrchestrator, type DeliveryOrchestrator } from "./modules/dispatch/delivery-orchestrator.js";
+import { createDispatchRoutes } from "./modules/dispatch/dispatch.routes.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -45,6 +49,9 @@ export interface AppOptions {
   missionRepo?: MissionRepository;
   missionService?: MissionService;
   simulatorGateway?: SimulatorGateway;
+  simulatorSyncService?: SimulatorSyncService;
+  droneSelector?: DroneSelector;
+  deliveryOrchestrator?: DeliveryOrchestrator;
   realtimeService?: RealtimeService;
   outboxRepo?: OutboxRepository;
   eventPublisher?: EventPublisher;
@@ -74,7 +81,6 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const orderRepo = options.orderRepo ?? (db ? createOrderRepository(db) : undefined as any);
   const fleetRepo = options.fleetRepo ?? (db ? createFleetRepository(db) : undefined as any);
   const missionRepo = options.missionRepo ?? (db ? createMissionRepository(db) : undefined as any);
-  const simulatorGateway = options.simulatorGateway ?? createSimulatorGateway();
   const outboxRepo = options.outboxRepo ?? (db ? createOutboxRepository(db) : undefined);
   const notificationRepo = options.notificationRepo ?? (db ? createNotificationRepository(db) : undefined as any);
   const eventPublisher = options.eventPublisher ?? (process.env.REDIS_URL ? new RedisEventPublisher() : new InMemoryEventPublisher());
@@ -107,6 +113,31 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     return app.jwt.sign(payload as any, { expiresIn: opts?.expiresIn ?? env.JWT_ACCESS_TTL });
   };
 
+  const realtimeService =
+    options.realtimeService ??
+    new RealtimeService({
+      fleetRepo,
+      orderRepo,
+      missionRepo
+    });
+
+  const simulatorSyncService =
+    options.simulatorSyncService ??
+    new SimulatorSyncService({
+      orderRepo,
+      missionRepo,
+      fleetRepo,
+      outboxRepo,
+      telemetryPublisher: {
+        publish: async (telemetry) => {
+          realtimeService.broadcastTelemetry(telemetry);
+        }
+      }
+    });
+
+  const simulatorGateway = options.simulatorGateway ?? simulatorSyncService;
+  const droneSelector = options.droneSelector ?? (fleetRepo ? createDroneSelector(fleetRepo) : undefined as any);
+
   const authService = options.authService ?? (authRepo && auditService ? createAuthService(authRepo, auditService, jwtSign) : undefined as any);
   const orderService = options.orderService ?? (orderRepo && auditService ? createOrderService(orderRepo, auditService, outboxRepo) : undefined as any);
   const fleetService = options.fleetService ?? (fleetRepo && auditService ? createFleetService(fleetRepo, auditService, outboxRepo) : undefined as any);
@@ -126,13 +157,21 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
           eventPublisher
         })
       : undefined);
-  const realtimeService =
-    options.realtimeService ??
-    new RealtimeService({
-      fleetRepo,
-      orderRepo,
-      missionRepo
-    });
+  const deliveryOrchestrator =
+    options.deliveryOrchestrator ??
+    (orderRepo && missionRepo && fleetRepo && droneSelector && missionService && auditService
+      ? createDeliveryOrchestrator({
+          orderRepo,
+          missionRepo,
+          fleetRepo,
+          droneSelector,
+          missionService,
+          simulatorGateway,
+          simulatorSyncService,
+          auditService,
+          outboxRepo
+        })
+      : undefined as any);
 
   // Pre-handler hook to authenticate requests with Bearer tokens
   app.addHook("onRequest", async (request) => {
@@ -200,6 +239,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   if (missionService) app.register(createMissionRoutes(missionService));
   if (notificationService) app.register(createNotificationRoutes(notificationService));
   if (realtimeService) app.register(createRealtimeRoutes(realtimeService));
+  if (deliveryOrchestrator) app.register(createDispatchRoutes(deliveryOrchestrator, simulatorSyncService));
 
   return app;
 }

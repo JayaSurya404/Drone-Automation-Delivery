@@ -196,6 +196,8 @@ export function createMissionService(
         missionId: mission.id,
         organizationId: user.organizationId,
         droneId: drone.id,
+        orderId: order.id,
+        customerId: order.customer_id,
         origin: {
           latitude: mission.origin_latitude,
           longitude: mission.origin_longitude,

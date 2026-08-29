@@ -6,6 +6,8 @@ export interface MissionFlightPlan {
   droneId: string;
   origin: Coordinate;
   destination: Coordinate;
+  orderId?: string;
+  customerId?: string;
 }
 
 export interface SimulatorGatewayResponse {

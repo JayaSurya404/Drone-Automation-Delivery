@@ -18,17 +18,61 @@ import {
   TableHead,
   TableCell,
   Pagination,
+  Modal,
   PackageIcon,
   SearchIcon,
   PlusIcon
 } from "@skynav/ui";
-import { DEMO_ORDERS } from "@/lib/demo-data";
+import { DEMO_ORDERS, type DemoOrder } from "@/lib/demo-data";
 
 export default function CustomerOrdersPage() {
+  const [orders, setOrders] = useState<DemoOrder[]>(DEMO_ORDERS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const filteredOrders = DEMO_ORDERS.filter((order) => {
+  // New Order Form State
+  const [packageDescription, setPackageDescription] = useState("");
+  const [weightKg, setWeightKg] = useState("1.5");
+  const [deliveryAddress, setDeliveryAddress] = useState("500 Howard St, San Francisco, CA");
+  const [deliveryLat, setDeliveryLat] = useState("37.7892");
+  const [deliveryLon, setDeliveryLon] = useState("-122.3972");
+  const [recipientName, setRecipientName] = useState("John Customer");
+  const [recipientPhone, setRecipientPhone] = useState("+1 (555) 019-2834");
+  const [priority, setPriority] = useState<"STANDARD" | "HIGH" | "EXPRESS">("STANDARD");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCreateOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const orderNumber = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newOrder: DemoOrder = {
+      id: `ord-${Date.now()}`,
+      orderNumber,
+      recipientName: recipientName || "Active Customer",
+      recipientPhone: recipientPhone || "+1 (555) 000-0000",
+      deliveryAddress: deliveryAddress || "San Francisco Airspace Sector 4",
+      packageDescription: packageDescription || "Autonomous Parcel",
+      weightKg: parseFloat(weightKg) || 1.5,
+      status: "IN_TRANSIT",
+      assignedDroneId: "00000000-0000-0000-0000-000000000011",
+      assignedDroneCallsign: "SKY-001",
+      createdAt: new Date().toISOString(),
+      etaTime: "12 mins",
+      proofOfDeliveryCode: `${Math.floor(1000 + Math.random() * 9000)}`
+    };
+
+    setTimeout(() => {
+      setOrders([newOrder, ...orders]);
+      setIsSubmitting(false);
+      setIsCreateOpen(false);
+      // Reset form
+      setPackageDescription("");
+    }, 400);
+  };
+
+  const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
       order.packageDescription.toLowerCase().includes(search.toLowerCase()) ||
@@ -44,10 +88,15 @@ export default function CustomerOrdersPage() {
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">My Aerial Delivery Orders</h2>
           <p className="text-xs text-slate-400 mt-1">
-            Track, inspect manifests, and view proof-of-delivery receipts for your autonomous shipments.
+            Track, inspect manifests, and dispatch autonomous drone shipments in real time.
           </p>
         </div>
-        <Button variant="primary" size="md" leftIcon={<PlusIcon size={16} />}>
+        <Button
+          variant="primary"
+          size="md"
+          leftIcon={<PlusIcon size={16} />}
+          onClick={() => setIsCreateOpen(true)}
+        >
           New Drone Delivery
         </Button>
       </div>
@@ -71,7 +120,8 @@ export default function CustomerOrdersPage() {
                 { value: "ALL", label: "All Statuses" },
                 { value: "IN_TRANSIT", label: "In Flight (Active)" },
                 { value: "DELIVERED", label: "Delivered" },
-                { value: "SUBMITTED", label: "Submitted (Pending)" }
+                { value: "CONFIRMED", label: "Confirmed" },
+                { value: "CREATED", label: "Submitted (Pending)" }
               ]}
             />
           </div>
@@ -147,6 +197,106 @@ export default function CustomerOrdersPage() {
           onPageChange={() => {}}
         />
       </Card>
+
+      {/* New Drone Delivery Creation Modal */}
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title="Schedule Autonomous UAV Delivery"
+      >
+        <form onSubmit={handleCreateOrder} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Package Manifest & Contents
+            </label>
+            <Input
+              required
+              placeholder="e.g. Critical Medical Cooler, Emergency Diagnostic Kit"
+              value={packageDescription}
+              onChange={(e) => setPackageDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Payload Weight (kg)
+              </label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="10.0"
+                required
+                value={weightKg}
+                onChange={(e) => setWeightKg(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Flight Priority
+              </label>
+              <Select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as any)}
+                options={[
+                  { value: "STANDARD", label: "Standard (Scheduled)" },
+                  { value: "HIGH", label: "High Priority" },
+                  { value: "EXPRESS", label: "Express Tactical" }
+                ]}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Delivery Destination Dropzone Address
+            </label>
+            <Input
+              required
+              placeholder="Landing Pad Street Address"
+              value={deliveryAddress}
+              onChange={(e) => setDeliveryAddress(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Recipient Name
+              </label>
+              <Input
+                required
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Recipient Phone
+              </label>
+              <Input
+                required
+                value={recipientPhone}
+                onChange={(e) => setRecipientPhone(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-blue-950/40 border border-cyan-500/20 text-xs text-slate-300">
+            <span className="text-cyan-400 font-semibold">Autonomous Dispatch:</span> Upon creation, the optimal drone from Depot Alpha will be assigned, flight corridors validated against active geofences, and live takeoff initiated.
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" type="button" onClick={() => setIsCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Dispatching UAV..." : "Confirm & Launch Mission"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

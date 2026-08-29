@@ -21,7 +21,7 @@ export default function CustomerLiveTrackingPage() {
   const [selectedDroneId, setSelectedDroneId] = useState(DEMO_DRONES[0].id);
   const baseDrone = DEMO_DRONES.find((d) => d.id === selectedDroneId) || DEMO_DRONES[0];
 
-  const { telemetryMap } = useRealtimeTelemetry({
+  const { status: wsStatus, telemetryMap } = useRealtimeTelemetry({
     channel: "telemetry:drone",
     targetId: baseDrone.id,
     autoConnect: true
@@ -43,6 +43,23 @@ export default function CustomerLiveTrackingPage() {
 
   const linkedOrder = DEMO_ORDERS.find((o) => o.assignedDroneId === activeDrone.id) || DEMO_ORDERS[0];
 
+  // Dynamic distance and ETA estimation based on live kinematics
+  const destLat = 37.7952;
+  const destLon = -122.4028;
+  const latDiff = (destLat - activeDrone.latitude) * 111000;
+  const lonDiff = (destLon - activeDrone.longitude) * 88000;
+  const approxDistanceMeters = Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
+  const speed = activeDrone.speedMetersPerSecond > 1 ? activeDrone.speedMetersPerSecond : 15;
+  const dynamicEtaMinutes = Math.max(1, Math.round(approxDistanceMeters / speed / 60));
+  const etaDisplay =
+    activeDrone.status === "DELIVERING"
+      ? "Touchdown in progress"
+      : activeDrone.status === "RETURNING"
+      ? "Package Dropped • Returning"
+      : activeDrone.status === "LANDED"
+      ? "Completed"
+      : `${dynamicEtaMinutes} mins`;
+
   const mapMarkers = [
     {
       id: "depot",
@@ -54,9 +71,9 @@ export default function CustomerLiveTrackingPage() {
     {
       id: "dest",
       type: "destination" as const,
-      latitude: 37.7952,
-      longitude: -122.4028,
-      title: "Destination Pad"
+      latitude: destLat,
+      longitude: destLon,
+      title: "Delivery Landing Pad"
     },
     {
       id: activeDrone.id,
@@ -76,8 +93,8 @@ export default function CustomerLiveTrackingPage() {
       id: "live-corridor",
       coordinates: [
         { latitude: DEMO_WAREHOUSE.latitude, longitude: DEMO_WAREHOUSE.longitude },
-        { latitude: 37.785, longitude: -122.41 },
-        { latitude: 37.7952, longitude: -122.4028 }
+        { latitude: (DEMO_WAREHOUSE.latitude + destLat) / 2, longitude: (DEMO_WAREHOUSE.longitude + destLon) / 2 },
+        { latitude: destLat, longitude: destLon }
       ],
       color: "#00f0ff"
     }
@@ -95,7 +112,7 @@ export default function CustomerLiveTrackingPage() {
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono text-emerald-400 flex items-center gap-1.5 bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-500/30">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>LIVE TELEMETRY STREAM</span>
+            <span>{wsStatus === "CONNECTED" ? "LIVE TELEMETRY STREAM" : "TELEMETRY CONNECTED"}</span>
           </span>
         </div>
       </div>
@@ -141,11 +158,11 @@ export default function CustomerLiveTrackingPage() {
                 <span className="text-white font-sans">{linkedOrder.recipientName}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">ETA</span>
-                <span className="text-emerald-400 font-bold">{linkedOrder.etaTime}</span>
+                <span className="text-slate-400">Dynamic ETA</span>
+                <span className="text-emerald-400 font-bold">{etaDisplay}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-slate-400">Drop Code</span>
+                <span className="text-slate-400">Release Code</span>
                 <span className="text-cyan-400 font-bold tracking-widest text-sm">{linkedOrder.proofOfDeliveryCode}</span>
               </div>
             </CardContent>
