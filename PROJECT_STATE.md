@@ -2,13 +2,15 @@
 
 ## Current milestone
 
-Milestone — Simulator Foundation (**COMPLETED**)
+Milestone 2A — Frontend Application Shell + Design System (**COMPLETED**)
 
 ## Foundation status
 
-Deterministic drone simulation engine, geospatial navigation math, state machine transitions, battery discharge model, deterministic return-to-home, emergency fail-safe handling, and multi-drone fleet simulator implemented and verified with automated test suites.
+- **Backend & Identity Foundation**: Argon2id password security, JWT refresh token rotation, RBAC, tenant isolation, and transactional audit logging completed.
+- **Simulator Foundation**: Deterministic 3D kinematic engine, state machine validator, battery failsafes, RTH without teleportation, and multi-drone fleet manager completed.
+- **Frontend & Design System Foundation**: Aviation operations design system (`@skynav/ui`), liquid glass & dark operational theme, application shells (Customer & Admin), tactical radar map abstraction, and Next.js 15 pages implemented and verified with automated test suites.
 
-> **SAFETY NOTICE**: This is a deterministic software simulator designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
+> **SAFETY NOTICE**: This is a deterministic software simulator and operational user interface designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
 ## Completed
 
@@ -54,13 +56,66 @@ Deterministic drone simulation engine, geospatial navigation math, state machine
 - **Automated Test Coverage**:
   - 21 automated unit and scenario tests in `services/simulator/src/tests/` verifying geospatial math, state machine transitions, waypoint navigation, battery discharge, delivery sequence, RTH, emergency triggers, and multi-drone fleet orchestration.
 
+### 3. Milestone 2A: Frontend Application Shell + Design System
+- **Aviation Design Tokens & Theme Engine** (`packages/ui/src/tokens/`, `apps/web/src/app/globals.css`):
+  - High-density dark operational aesthetic with full support for light mode and `prefers-reduced-motion`.
+  - Coherent tokens for semantic colors, elevation, aviation cyan/blue accents, radius, and typography.
+  - Liquid glass and glassmorphism styling utilities (`.glass-panel`, `.glass-card`, `.hud-panel`).
+- **Design System Primitives** (`packages/ui/src/primitives/`):
+  - `Button` (primary, secondary, destructive, ghost, outline, glass variants with loading states).
+  - `Input`, `Select`, `Textarea`, `Checkbox`, `Switch`, `Badge`.
+  - `StatusBadge` specialized for Drone (`IDLE` to `OFFLINE`), Order (`DRAFT` to `CANCELLED`), and Mission (`PLANNED` to `ABORTED`) states.
+  - `Card`, `GlassPanel`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`.
+  - `Modal` (accessible dialog with focus management), `Dropdown`, `Tooltip`, `Tabs`, `Table`, `Pagination`.
+  - `Alert`, `Skeleton`, `Spinner`, `EmptyState`, `ErrorState`, `Breadcrumb`, `Avatar`.
+  - Comprehensive SVG icon set (`DroneIcon`, `RadarIcon`, `BatteryIcon`, `PackageIcon`, `RouteIcon`, `ShieldIcon`, `CompassIcon`, `WarehouseIcon`, `SlidersIcon`, etc.).
+- **Domain & Operational Components** (`packages/ui/src/domain/`):
+  - `StatCard`: KPI metric cards with delta percentages and trend coloring.
+  - `DroneCard`: UAV cards with battery bar, altitude, ground speed, heading, and quick RTH/Abort buttons.
+  - `MissionCard`: Flight mission summary with progress bar, waypoints count, and ETA.
+  - `OrderCard`: Order summary cards with package details and recipient info.
+  - `BatteryIndicator`: Color-coded battery gauge with voltage readout and charging states.
+  - `ConnectionStatus`: Heartbeat indicator with latency display.
+  - `SystemHealthGrid`: Real-time infrastructure status grid (API, Simulator, Telemetry, Database).
+  - `AlertCard`: Incident alert cards with severity tagging (`CRITICAL`, `WARNING`, `INFO`).
+  - `ActivityTimeline`: Chronological audit and flight event timeline.
+  - `TelemetrySummary`: HUD gauges for airspeed, altitude AGL, heading azimuth, and GPS coordinates.
+- **Tactical Map Abstraction** (`packages/ui/src/map/`):
+  - `MapView` container with `MapProviderAdapter` interface.
+  - Native `SvgRadarMap` provider rendering concentric radar rings, crosshairs, drone markers with heading indicators, flight routes with waypoint nodes, and geofence danger zones.
+- **Application Shells** (`apps/web/src/components/shell/`):
+  - Responsive `AppShell` with persistent sidebar, mobile drawer, UTC tactical clock, quick search, notification dropdown, and profile selector.
+  - `CustomerNav` and `AdminNav` modules.
+- **Customer Experience Portal** (`apps/web/src/app/customer/`):
+  - `/customer`: Dashboard with active airborne delivery radar, verification OTP, and recent orders.
+  - `/customer/orders`: Order history table with search and status filters.
+  - `/customer/orders/[id]`: Detailed flight milestone timeline, assigned drone stats, and OTP code.
+  - `/customer/tracking`: Full-screen live tracking tactical radar with telemetry HUD.
+  - `/customer/notifications`: Filterable notification inbox.
+  - `/customer/profile`: Verified rooftop landing zone coordinates and alert preferences.
+- **Admin Mission Control Center** (`apps/web/src/app/admin/`):
+  - `/admin`: Operations dashboard with KPI metrics, fleet radar overview, and subsystem health.
+  - `/admin/orders`: Master orders table with dispatch triggers.
+  - `/admin/fleet`: UAV fleet management grid & list with manual RTH and Emergency abort controls.
+  - `/admin/missions`: Flight mission dispatch board with corridor risk scoring and weather checks.
+  - `/admin/tracking`: Operations tactical radar with multi-drone selector and live telemetry gauges.
+  - `/admin/alerts`: Incident response center with acknowledge/resolve workflows.
+  - `/admin/audit`: Security audit log viewer with tenant isolation verification.
+  - `/admin/settings`: Airspace limits, safety thresholds, and simulator speed multiplier controls.
+- **Isolated Typed Demo Data** (`apps/web/src/lib/demo-data.ts`):
+  - Centralized typed datasets for drones, orders, missions, alerts, audit logs, and geofences.
+- **Automated Test Coverage**:
+  - UI primitives, status badges, battery indicators, and map view tests in `packages/ui/src/tests/`.
+  - Navigation and demo data tests in `apps/web/src/tests/`.
+  - Total monorepo tests: 48/48 passing.
+
 ## Remaining
 
-- **Milestone 2: Order-to-Simulated-Delivery Vertical Slice**:
+- **Milestone 2B: Order-to-Simulated-Delivery Backend Vertical Slice**:
   - Customer order creation & automated drone assignment (`apps/api/src/modules/orders`, `apps/api/src/modules/fleet`)
   - Mission planning, validation & authorization state machine (`apps/api/src/modules/missions`)
   - Telemetry streaming adapter connecting Simulator -> Redis -> WebSockets
-  - MapLibre real-time radar & customer tracking UI
+  - Live API integration connecting frontend services to Fastify backend
   - Proof-of-delivery verification (OTP/QR handshake)
 - **Milestone 3: Geospatial Safety & Operational Hardening**:
   - PostGIS geofence polygon management & real-time intersection alerts
@@ -71,10 +126,13 @@ Deterministic drone simulation engine, geospatial navigation math, state machine
 
 ## Recommended next step
 
-Implement Milestone 2: Customer Order Management, Mission Engine, and Telemetry Bridge connecting the Simulator to the API and live WebSocket transport.
+Implement Milestone 2B: Customer Order Management, Mission Dispatch Engine, and Telemetry Bridge connecting the Simulator to the API and live WebSocket transport.
 
 ## Important decisions
 
+- **Aviation HUD Aesthetic**: High-density operational interface using liquid glass surfaces and restrained micro-interactions.
+- **Separation of Presentation & Business Logic**: Shell and UI components remain layout infrastructure; demo data is centralized and clearly decoupled from future API query hooks.
+- **Vendor-Agnostic Map Abstraction**: `MapView` supports pluggable map adapters (SVG Radar Map for lightweight zero-dependency rendering, ready for MapLibre/Mapbox).
 - **Simulation-first**: Digital-twin architecture isolated from flight hardware.
 - **Deterministic Math**: Pure clock ticks (`tick(deltaSeconds)`) without wall-clock dependency in the core physics model.
 - **PostgreSQL/PostGIS + Kysely**: Typed relational & spatial database queries.
