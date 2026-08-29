@@ -15,10 +15,32 @@ import {
   ClockIcon
 } from "@skynav/ui";
 import { DEMO_DRONES, DEMO_ORDERS, DEMO_WAREHOUSE, DEMO_GEOFENCES } from "@/lib/demo-data";
+import { useRealtimeTelemetry } from "@/lib/realtime";
 
 export default function CustomerLiveTrackingPage() {
   const [selectedDroneId, setSelectedDroneId] = useState(DEMO_DRONES[0].id);
-  const activeDrone = DEMO_DRONES.find((d) => d.id === selectedDroneId) || DEMO_DRONES[0];
+  const baseDrone = DEMO_DRONES.find((d) => d.id === selectedDroneId) || DEMO_DRONES[0];
+
+  const { telemetryMap } = useRealtimeTelemetry({
+    channel: "telemetry:drone",
+    targetId: baseDrone.id,
+    autoConnect: true
+  });
+
+  const liveTelemetry = telemetryMap.get(baseDrone.id);
+  const activeDrone = liveTelemetry
+    ? {
+        ...baseDrone,
+        latitude: liveTelemetry.position.latitude,
+        longitude: liveTelemetry.position.longitude,
+        altitudeMeters: liveTelemetry.position.altitudeMeters ?? baseDrone.altitudeMeters,
+        headingDegrees: liveTelemetry.headingDegrees ?? baseDrone.headingDegrees,
+        speedMetersPerSecond: liveTelemetry.speedMetersPerSecond ?? baseDrone.speedMetersPerSecond,
+        batteryPercent: liveTelemetry.batteryPercent ?? baseDrone.batteryPercent,
+        status: (liveTelemetry.state as any) ?? baseDrone.status
+      }
+    : baseDrone;
+
   const linkedOrder = DEMO_ORDERS.find((o) => o.assignedDroneId === activeDrone.id) || DEMO_ORDERS[0];
 
   const mapMarkers = [

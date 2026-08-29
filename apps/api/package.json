@@ -14,16 +14,20 @@
     "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.3.0",
     "@fastify/jwt": "^10.2.2",
+    "@fastify/websocket": "^11.3.0",
     "@skynav/config": "workspace:*",
     "@skynav/contracts": "workspace:*",
     "argon2": "^0.45.1",
     "fastify": "^5.2.0",
+    "ioredis": "^6.0.0",
     "kysely": "^0.29.5",
     "pg": "^8.23.0",
+    "ws": "^8.21.3",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.19.0"
   }
 }

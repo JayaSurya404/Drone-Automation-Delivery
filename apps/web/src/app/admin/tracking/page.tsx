@@ -22,12 +22,34 @@ import {
   DEMO_WAREHOUSE,
   DEMO_GEOFENCES
 } from "@/lib/demo-data";
+import { useRealtimeTelemetry } from "@/lib/realtime";
 
 export default function AdminLiveTrackingPage() {
   const [selectedDroneId, setSelectedDroneId] = useState(DEMO_DRONES[0].id);
   const [drones, setDrones] = useState(DEMO_DRONES);
 
-  const selectedDrone = drones.find((d) => d.id === selectedDroneId) || drones[0];
+  const { status: wsStatus, telemetryMap } = useRealtimeTelemetry({
+    channel: "telemetry:organization",
+    autoConnect: true
+  });
+
+  // Apply live telemetry updates to drones
+  const liveDrones = drones.map((d) => {
+    const live = telemetryMap.get(d.id);
+    if (!live) return d;
+    return {
+      ...d,
+      latitude: live.position.latitude,
+      longitude: live.position.longitude,
+      altitudeMeters: live.position.altitudeMeters ?? d.altitudeMeters,
+      headingDegrees: live.headingDegrees ?? d.headingDegrees,
+      speedMetersPerSecond: live.speedMetersPerSecond ?? d.speedMetersPerSecond,
+      batteryPercent: live.batteryPercent ?? d.batteryPercent,
+      status: (live.state as any) ?? d.status
+    };
+  });
+
+  const selectedDrone = liveDrones.find((d) => d.id === selectedDroneId) || liveDrones[0];
   const linkedMission = DEMO_MISSIONS.find((m) => m.droneId === selectedDrone.id);
 
   const handleRTH = () => {
@@ -50,7 +72,7 @@ export default function AdminLiveTrackingPage() {
       longitude: DEMO_WAREHOUSE.longitude,
       title: "Depot Alpha"
     },
-    ...drones.map((d) => ({
+    ...liveDrones.map((d) => ({
       id: d.id,
       type: "drone" as const,
       latitude: d.latitude,

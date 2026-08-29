@@ -552,19 +552,27 @@ export type MissionListResponse = z.infer<typeof missionListResponseSchema>;
 // ============================================================================
 
 export const telemetrySchema = z.object({
-  version: z.literal("v1"),
+  version: z.literal("v1").default("v1"),
   organizationId: organizationIdSchema,
   droneId: uuidSchema,
+  missionId: uuidSchema.optional(),
   observedAt: z.string().datetime(),
   position: coordinateSchema,
   speedMetersPerSecond: z.number().nonnegative(),
   headingDegrees: z.number().gte(0).lt(360),
-  batteryPercent: z.number().gte(0).lte(100)
+  batteryPercent: z.number().gte(0).lte(100),
+  state: droneStatusSchema.optional(),
+  currentWaypointIndex: z.number().int().nonnegative().optional(),
+  totalWaypoints: z.number().int().nonnegative().optional(),
+  distanceToTargetMeters: z.number().nonnegative().optional(),
+  totalDistanceFlownMeters: z.number().nonnegative().optional(),
+  emergencyReason: z.string().optional(),
+  flightTimeSeconds: z.number().nonnegative().optional()
 });
 export type Telemetry = z.infer<typeof telemetrySchema>;
 
 export const eventEnvelopeSchema = z.object({
-  version: z.literal("v1"),
+  version: z.literal("v1").default("v1"),
   id: uuidSchema,
   occurredAt: z.string().datetime(),
   organizationId: organizationIdSchema,
@@ -573,3 +581,103 @@ export const eventEnvelopeSchema = z.object({
   payload: z.unknown()
 });
 export type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
+
+// ============================================================================
+// Realtime WebSocket Protocol Contracts
+// ============================================================================
+
+export const wsSubscriptionChannelSchema = z.enum([
+  "telemetry:organization",
+  "telemetry:drone",
+  "telemetry:mission"
+]);
+export type WsSubscriptionChannel = z.infer<typeof wsSubscriptionChannelSchema>;
+
+export const wsClientAuthMessageSchema = z.object({
+  type: z.literal("AUTH"),
+  token: z.string().min(1)
+});
+export type WsClientAuthMessage = z.infer<typeof wsClientAuthMessageSchema>;
+
+export const wsClientSubscribeMessageSchema = z.object({
+  type: z.literal("SUBSCRIBE"),
+  channel: wsSubscriptionChannelSchema,
+  id: uuidSchema.optional()
+});
+export type WsClientSubscribeMessage = z.infer<typeof wsClientSubscribeMessageSchema>;
+
+export const wsClientUnsubscribeMessageSchema = z.object({
+  type: z.literal("UNSUBSCRIBE"),
+  channel: wsSubscriptionChannelSchema,
+  id: uuidSchema.optional()
+});
+export type WsClientUnsubscribeMessage = z.infer<typeof wsClientUnsubscribeMessageSchema>;
+
+export const wsClientPingMessageSchema = z.object({
+  type: z.literal("PING"),
+  timestamp: z.string().optional()
+});
+export type WsClientPingMessage = z.infer<typeof wsClientPingMessageSchema>;
+
+export const wsClientMessageSchema = z.discriminatedUnion("type", [
+  wsClientAuthMessageSchema,
+  wsClientSubscribeMessageSchema,
+  wsClientUnsubscribeMessageSchema,
+  wsClientPingMessageSchema
+]);
+export type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
+
+export const wsServerAuthenticatedMessageSchema = z.object({
+  type: z.literal("AUTHENTICATED"),
+  user: z.object({
+    id: uuidSchema,
+    email: z.string().email(),
+    name: z.string(),
+    organizationId: uuidSchema,
+    organizationName: z.string(),
+    role: userRoleSchema,
+    permissions: z.array(permissionSchema)
+  }),
+  timestamp: z.string().datetime()
+});
+
+export const wsServerSubscribedMessageSchema = z.object({
+  type: z.literal("SUBSCRIBED"),
+  channel: z.string(),
+  timestamp: z.string().datetime()
+});
+
+export const wsServerUnsubscribedMessageSchema = z.object({
+  type: z.literal("UNSUBSCRIBED"),
+  channel: z.string(),
+  timestamp: z.string().datetime()
+});
+
+export const wsServerTelemetryMessageSchema = z.object({
+  type: z.literal("TELEMETRY"),
+  channel: z.string(),
+  telemetry: telemetrySchema,
+  timestamp: z.string().datetime()
+});
+
+export const wsServerErrorMessageSchema = z.object({
+  type: z.literal("ERROR"),
+  code: z.string(),
+  message: z.string(),
+  timestamp: z.string().datetime()
+});
+
+export const wsServerPongMessageSchema = z.object({
+  type: z.literal("PONG"),
+  timestamp: z.string().datetime()
+});
+
+export const wsServerMessageSchema = z.discriminatedUnion("type", [
+  wsServerAuthenticatedMessageSchema,
+  wsServerSubscribedMessageSchema,
+  wsServerUnsubscribedMessageSchema,
+  wsServerTelemetryMessageSchema,
+  wsServerErrorMessageSchema,
+  wsServerPongMessageSchema
+]);
+export type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
