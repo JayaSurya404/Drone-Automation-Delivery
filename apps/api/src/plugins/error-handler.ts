@@ -1,6 +1,12 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import { AuthError } from "../modules/auth/auth.service.js";
+import {
+  OrderNotFoundError,
+  OrderForbiddenError,
+  OrderCancellationProhibitedError
+} from "../modules/orders/order.service.js";
+import { InvalidOrderStateTransitionError } from "../modules/orders/order.state-machine.js";
 
 export function errorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
   const timestamp = new Date().toISOString();
@@ -36,6 +42,60 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
       code: error.code,
       timestamp,
       details: error.details
+    });
+  }
+
+  // Handle domain OrderNotFoundError
+  if (error instanceof OrderNotFoundError) {
+    return reply.status(404).send({
+      type: "https://skynav.io/errors/order-not-found",
+      title: "Order Not Found",
+      status: 404,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain OrderForbiddenError
+  if (error instanceof OrderForbiddenError) {
+    return reply.status(403).send({
+      type: "https://skynav.io/errors/forbidden",
+      title: "Order Access Forbidden",
+      status: 403,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle domain InvalidOrderStateTransitionError
+  if (error instanceof InvalidOrderStateTransitionError) {
+    return reply.status(422).send({
+      type: "https://skynav.io/errors/invalid-order-state-transition",
+      title: "Invalid Order State Transition",
+      status: 422,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp,
+      currentStatus: error.currentStatus,
+      targetStatus: error.targetStatus
+    });
+  }
+
+  // Handle domain OrderCancellationProhibitedError
+  if (error instanceof OrderCancellationProhibitedError) {
+    return reply.status(422).send({
+      type: "https://skynav.io/errors/order-cancellation-prohibited",
+      title: "Order Cancellation Prohibited",
+      status: 422,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
     });
   }
 

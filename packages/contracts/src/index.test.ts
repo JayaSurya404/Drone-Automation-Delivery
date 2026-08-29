@@ -6,7 +6,11 @@ import {
   ROLE_PERMISSIONS,
   getPermissionsForRole,
   roleHasPermission,
-  problemDetailsSchema
+  problemDetailsSchema,
+  createOrderRequestSchema,
+  updateOrderStatusRequestSchema,
+  cancelOrderRequestSchema,
+  orderResponseSchema
 } from "./index.js";
 
 describe("Contracts / Authentication & RBAC Schemas", () => {
@@ -46,6 +50,7 @@ describe("Contracts / Authentication & RBAC Schemas", () => {
     assert.ok(roleHasPermission("OPERATOR", "missions:command"));
     assert.ok(!roleHasPermission("CUSTOMER", "missions:authorize"));
     assert.ok(roleHasPermission("CUSTOMER", "orders:create"));
+    assert.ok(roleHasPermission("OPERATOR", "orders:update"));
 
     const operatorPerms = getPermissionsForRole("OPERATOR");
     assert.ok(operatorPerms.includes("missions:authorize"));
@@ -63,5 +68,94 @@ describe("Contracts / Authentication & RBAC Schemas", () => {
     };
     const parsed = problemDetailsSchema.parse(problem);
     assert.equal(parsed.status, 401);
+  });
+});
+
+describe("Contracts / Order Domain Schemas", () => {
+  it("validates valid order creation payload", () => {
+    const orderPayload = {
+      pickup: {
+        latitude: 37.7749,
+        longitude: -122.4194,
+        altitudeMeters: 10,
+        address: "Depot West"
+      },
+      delivery: {
+        latitude: 37.7833,
+        longitude: -122.4167,
+        altitudeMeters: 15,
+        address: "Customer Pad"
+      },
+      package: {
+        weightGrams: 1200,
+        lengthCm: 30,
+        widthCm: 20,
+        heightCm: 15,
+        description: "Medical Box"
+      },
+      priority: "EXPRESS",
+      deliveryNotes: "Rooftop drop"
+    };
+    const parsed = createOrderRequestSchema.parse(orderPayload);
+    assert.equal(parsed.priority, "EXPRESS");
+    assert.equal(parsed.package.weightGrams, 1200);
+  });
+
+  it("rejects invalid geographic coordinates and negative package weights", () => {
+    assert.throws(() => {
+      createOrderRequestSchema.parse({
+        pickup: { latitude: 95.0, longitude: 0 },
+        delivery: { latitude: 0, longitude: 0 },
+        package: { weightGrams: 500 }
+      });
+    });
+
+    assert.throws(() => {
+      createOrderRequestSchema.parse({
+        pickup: { latitude: 0, longitude: -190.0 },
+        delivery: { latitude: 0, longitude: 0 },
+        package: { weightGrams: 500 }
+      });
+    });
+
+    assert.throws(() => {
+      createOrderRequestSchema.parse({
+        pickup: { latitude: 0, longitude: 0 },
+        delivery: { latitude: 0, longitude: 0 },
+        package: { weightGrams: -100 }
+      });
+    });
+  });
+
+  it("validates status update and cancellation payloads", () => {
+    const update = updateOrderStatusRequestSchema.parse({
+      status: "ASSIGNED",
+      reason: "Drone allocated"
+    });
+    assert.equal(update.status, "ASSIGNED");
+
+    const cancel = cancelOrderRequestSchema.parse({
+      reason: "Weather grounding"
+    });
+    assert.equal(cancel.reason, "Weather grounding");
+  });
+
+  it("validates full order response schema", () => {
+    const response = {
+      id: "11111111-1111-1111-1111-111111111111",
+      orderNumber: "ORD-TEST-001",
+      organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      customerId: "22222222-2222-2222-2222-222222222222",
+      status: "CREATED",
+      priority: "STANDARD",
+      pickup: { latitude: 37.77, longitude: -122.41 },
+      delivery: { latitude: 37.78, longitude: -122.42 },
+      package: { weightGrams: 300 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const parsed = orderResponseSchema.parse(response);
+    assert.equal(parsed.id, response.id);
+    assert.equal(parsed.status, "CREATED");
   });
 });
