@@ -15,7 +15,10 @@ import {
   updateDroneRequestSchema,
   createMissionRequestSchema,
   assignMissionRequestSchema,
-  updateMissionStatusRequestSchema
+  updateMissionStatusRequestSchema,
+  telemetrySchema,
+  wsClientMessageSchema,
+  wsServerMessageSchema
 } from "./index.js";
 
 describe("Contracts / Authentication & RBAC Schemas", () => {
@@ -214,5 +217,51 @@ describe("Contracts / Fleet & Mission Schemas", () => {
       reason: "Takeoff completed"
     });
     assert.equal(statusUpdate.status, "IN_PROGRESS");
+  });
+
+  it("validates extended telemetry and WebSocket protocol message schemas", () => {
+    const validTelemetry = {
+      version: "v1" as const,
+      organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      droneId: "11111111-1111-1111-1111-111111111111",
+      missionId: "22222222-2222-2222-2222-222222222222",
+      observedAt: new Date().toISOString(),
+      position: { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 50 },
+      speedMetersPerSecond: 12.5,
+      headingDegrees: 90,
+      batteryPercent: 88,
+      state: "EN_ROUTE" as const,
+      currentWaypointIndex: 2,
+      totalWaypoints: 5,
+      distanceToTargetMeters: 450,
+      totalDistanceFlownMeters: 1200,
+      flightTimeSeconds: 150
+    };
+    const parsedTelemetry = telemetrySchema.parse(validTelemetry);
+    assert.equal(parsedTelemetry.state, "EN_ROUTE");
+    assert.equal(parsedTelemetry.droneId, validTelemetry.droneId);
+
+    // Client WS messages
+    const authMsg = wsClientMessageSchema.parse({ type: "AUTH", token: "jwt-token-xyz" });
+    assert.equal(authMsg.type, "AUTH");
+
+    const subMsg = wsClientMessageSchema.parse({
+      type: "SUBSCRIBE",
+      channel: "telemetry:drone",
+      id: "11111111-1111-1111-1111-111111111111"
+    });
+    assert.equal(subMsg.type, "SUBSCRIBE");
+
+    const pingMsg = wsClientMessageSchema.parse({ type: "PING" });
+    assert.equal(pingMsg.type, "PING");
+
+    // Server WS messages
+    const telemServerMsg = wsServerMessageSchema.parse({
+      type: "TELEMETRY",
+      channel: "telemetry:drone:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:11111111-1111-1111-1111-111111111111",
+      telemetry: validTelemetry,
+      timestamp: new Date().toISOString()
+    });
+    assert.equal(telemServerMsg.type, "TELEMETRY");
   });
 });

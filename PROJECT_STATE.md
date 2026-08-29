@@ -2,15 +2,16 @@
 
 ## Current milestone
 
-Milestone 2C — Fleet Inventory + Mission Dispatch Foundation (**COMPLETED**)
+Milestone 2D — Telemetry Transport + Realtime Live Bridge (**COMPLETED**)
 
 ## Foundation status
 
 - **Backend & Identity Foundation**: Argon2id password security, JWT refresh token rotation, RBAC, tenant isolation, and transactional audit logging completed.
 - **Simulator Foundation**: Deterministic 3D kinematic engine, state machine validator, battery failsafes, RTH without teleportation, and multi-drone fleet manager completed.
-- **Frontend & Design System Foundation**: Aviation operations design system (`@skynav/ui`), liquid glass & dark operational theme, application shells (Customer & Admin), tactical radar map abstraction, and Next.js 15 pages implemented and verified with automated test suites.
+- **Frontend & Design System Foundation**: Aviation operations design system (`@skynav/ui`), liquid glass & dark operational theme, application shells (Customer & Admin), tactical radar map abstraction, and Next.js 15 pages implemented.
 - **Orders Domain & API Foundation**: Centralized strict order state machine, WGS84 geographic location validation, package specifications, multi-tenant database scoping, customer ownership enforcement, RBAC hooks, and RFC 7807 Problem Details error envelopes implemented.
-- **Fleet Inventory & Mission Dispatch Foundation**: Centralized UAV operational state machine, fleet inventory management, mission planning state machine, atomic transactional drone-to-mission assignment with race condition protection, decoupled simulator gateway adapter, and comprehensive behavioral test suites (60 API tests, 99 total monorepo tests).
+- **Fleet Inventory & Mission Dispatch Foundation**: Centralized UAV operational state machine, fleet inventory management, mission planning state machine, atomic transactional drone-to-mission assignment with race condition protection, and decoupled simulator gateway adapter implemented.
+- **Realtime Telemetry & WebSocket Gateway**: High-throughput tenant-isolated Redis Pub/Sub transport, TelemetryWorker with schema validation and out-of-order frame tracking, authenticated Fastify WebSocket gateway (`/api/v1/ws/telemetry`), backpressure management, and Next.js realtime tactical radar hook completed and verified.
 
 > **SAFETY NOTICE**: This is a deterministic software simulator and operational platform designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
@@ -64,24 +65,10 @@ Milestone 2C — Fleet Inventory + Mission Dispatch Foundation (**COMPLETED**)
   - Coherent tokens for semantic colors, elevation, aviation cyan/blue accents, radius, and typography.
   - Liquid glass and glassmorphism styling utilities (`.glass-panel`, `.glass-card`, `.hud-panel`).
 - **Design System Primitives** (`packages/ui/src/primitives/`):
-  - `Button` (primary, secondary, destructive, ghost, outline, glass variants with loading states).
-  - `Input`, `Select`, `Textarea`, `Checkbox`, `Switch`, `Badge`.
-  - `StatusBadge` specialized for Drone (`IDLE` to `OFFLINE`), Order (`DRAFT` to `CANCELLED`), and Mission (`PLANNED` to `ABORTED`) states.
-  - `Card`, `GlassPanel`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`.
-  - `Modal` (accessible dialog with focus management), `Dropdown`, `Tooltip`, `Tabs`, `Table`, `Pagination`.
-  - `Alert`, `Skeleton`, `Spinner`, `EmptyState`, `ErrorState`, `Breadcrumb`, `Avatar`.
+  - `Button`, `Input`, `Select`, `Textarea`, `Checkbox`, `Switch`, `Badge`, `StatusBadge`, `Card`, `GlassPanel`, `Modal`, `Dropdown`, `Tooltip`, `Tabs`, `Table`, `Pagination`, `Alert`, `Skeleton`, `Spinner`, `EmptyState`, `ErrorState`, `Breadcrumb`, `Avatar`.
   - Comprehensive SVG icon set (`DroneIcon`, `RadarIcon`, `BatteryIcon`, `PackageIcon`, `RouteIcon`, `ShieldIcon`, `CompassIcon`, `WarehouseIcon`, `SlidersIcon`, etc.).
 - **Domain & Operational Components** (`packages/ui/src/domain/`):
-  - `StatCard`: KPI metric cards with delta percentages and trend coloring.
-  - `DroneCard`: UAV cards with battery bar, altitude, ground speed, heading, and quick RTH/Abort buttons.
-  - `MissionCard`: Flight mission summary with progress bar, waypoints count, and ETA.
-  - `OrderCard`: Order summary cards with package details and recipient info.
-  - `BatteryIndicator`: Color-coded battery gauge with voltage readout and charging states.
-  - `ConnectionStatus`: Heartbeat indicator with latency display.
-  - `SystemHealthGrid`: Real-time infrastructure status grid (API, Simulator, Telemetry, Database).
-  - `AlertCard`: Incident alert cards with severity tagging (`CRITICAL`, `WARNING`, `INFO`).
-  - `ActivityTimeline`: Chronological audit and flight event timeline.
-  - `TelemetrySummary`: HUD gauges for airspeed, altitude AGL, heading azimuth, and GPS coordinates.
+  - `StatCard`, `DroneCard`, `MissionCard`, `OrderCard`, `BatteryIndicator`, `ConnectionStatus`, `SystemHealthGrid`, `AlertCard`, `ActivityTimeline`, `TelemetrySummary`.
 - **Tactical Map Abstraction** (`packages/ui/src/map/`):
   - `MapView` container with `MapProviderAdapter` interface.
   - Native `SvgRadarMap` provider rendering concentric radar rings, crosshairs, drone markers with heading indicators, flight routes with waypoint nodes, and geofence danger zones.
@@ -89,21 +76,9 @@ Milestone 2C — Fleet Inventory + Mission Dispatch Foundation (**COMPLETED**)
   - Responsive `AppShell` with persistent sidebar, mobile drawer, UTC tactical clock, quick search, notification dropdown, and profile selector.
   - `CustomerNav` and `AdminNav` modules.
 - **Customer Experience Portal** (`apps/web/src/app/customer/`):
-  - `/customer`: Dashboard with active airborne delivery radar, verification OTP, and recent orders.
-  - `/customer/orders`: Order history table with search and status filters.
-  - `/customer/orders/[id]`: Detailed flight milestone timeline, assigned drone stats, and OTP code.
-  - `/customer/tracking`: Full-screen live tracking tactical radar with telemetry HUD.
-  - `/customer/notifications`: Filterable notification inbox.
-  - `/customer/profile`: Verified rooftop landing zone coordinates and alert preferences.
+  - `/customer`, `/customer/orders`, `/customer/orders/[id]`, `/customer/tracking`, `/customer/notifications`, `/customer/profile`.
 - **Admin Mission Control Center** (`apps/web/src/app/admin/`):
-  - `/admin`: Operations dashboard with KPI metrics, fleet radar overview, and subsystem health.
-  - `/admin/orders`: Master orders table with dispatch triggers.
-  - `/admin/fleet`: UAV fleet management grid & list with manual RTH and Emergency abort controls.
-  - `/admin/missions`: Flight mission dispatch board with corridor risk scoring and weather checks.
-  - `/admin/tracking`: Operations tactical radar with multi-drone selector and live telemetry gauges.
-  - `/admin/alerts`: Incident response center with acknowledge/resolve workflows.
-  - `/admin/audit`: Security audit log viewer with tenant isolation verification.
-  - `/admin/settings`: Airspace limits, safety thresholds, and simulator speed multiplier controls.
+  - `/admin`, `/admin/orders`, `/admin/fleet`, `/admin/missions`, `/admin/tracking`, `/admin/alerts`, `/admin/audit`, `/admin/settings`.
 - **Isolated Typed Demo Data** (`apps/web/src/lib/demo-data.ts`):
   - Centralized typed datasets for drones, orders, missions, alerts, audit logs, and geofences.
 
@@ -120,34 +95,42 @@ Milestone 2C — Fleet Inventory + Mission Dispatch Foundation (**COMPLETED**)
 ### 5. Milestone 2C: Fleet Inventory + Mission Dispatch Foundation
 - **Centralized UAV Operational State Machine** (`apps/api/src/modules/fleet/drone.state-machine.ts`):
   - Drone operational status model: `IDLE`, `AVAILABLE`, `ASSIGNED`, `TAKEOFF`, `EN_ROUTE`, `ARRIVED`, `DELIVERING`, `RETURNING`, `LANDED`, `MAINTENANCE`, `EMERGENCY`, `OFFLINE`.
-  - State machine validator `validateDroneStateTransition(currentStatus, targetStatus)` preventing illegal jumps (e.g. `DELIVERING -> IDLE`).
 - **Fleet Inventory & Multi-Tenant Scoping** (`apps/api/src/modules/fleet/`):
   - Server-side tenant isolation: Every drone query scoped by `organization_id`.
   - Unique call sign constraint per organization (`idx_drones_org_call_sign`).
   - Endpoints: `POST /api/v1/drones`, `GET /api/v1/drones`, `GET /api/v1/drones/:droneId`, `PATCH /api/v1/drones/:droneId`.
-  - Strict RBAC: Customers receive `403 Forbidden` on fleet registration and command endpoints.
 - **Mission Lifecycle & State Machine** (`apps/api/src/modules/missions/mission.state-machine.ts`):
   - Delivery mission progression: `PENDING -> ASSIGNED -> LAUNCHING -> IN_PROGRESS -> DELIVERING -> RETURNING -> COMPLETED`.
-  - Terminal states (`COMPLETED`, `CANCELLED`, `FAILED`, `ABORTED`) reject further transitions.
   - Partial unique index preventing duplicate active missions for the same order (`idx_missions_order_active`).
 - **Atomic Transactional Drone Assignment** (`apps/api/src/modules/missions/mission.repository.ts`):
-  - Row-level lock (`forUpdate()`) on mission, drone, and order.
-  - Atomically verifies availability, reserves drone (`ASSIGNED`), updates mission (`ASSIGNED`, `drone_id`), and updates order (`ASSIGNED`).
-  - Prevents race conditions from concurrent operator assignment attempts.
-- **Simulator Gateway Boundary** (`apps/api/src/modules/missions/simulator.adapter.ts`):
-  - Decoupled `SimulatorGateway` interface isolating HTTP/Database layers from physical simulation internals.
-- **Audit Trail Integration**:
-  - Emits structured audit logs (`DRONE_REGISTERED`, `DRONE_UPDATED`, `DRONE_STATUS_UPDATED`, `MISSION_CREATED`, `MISSION_ASSIGNED`, `MISSION_STATUS_UPDATED`, `EMERGENCY_COMMAND_ISSUED`).
+  - Row-level lock (`forUpdate()`) on mission, drone, and order tables within a single database transaction.
+
+### 6. Milestone 2D: Telemetry Transport + Realtime Live Bridge
+- **Redis Pub/Sub Transport Topology** (`services/telemetry-worker/src/publisher.ts`):
+  - Tenant-isolated channel naming: `telemetry:org:${organizationId}` (organization stream) and `telemetry:drone:${organizationId}:${droneId}` (targeted UAV stream).
+  - Pipelined JSON serialization and error-isolated publishing without blocking simulation physics.
+- **Decoupled Simulator Bridge Boundary** (`services/telemetry-worker/src/tests/simulator-bridge.test.ts`):
+  - Bridges `FleetSimulator.onTelemetry` to `TelemetryPublisher` asynchronously without mutating simulator clock progression or requiring Redis in unit tests.
+- **Telemetry Worker** (`services/telemetry-worker/src/worker.ts`):
+  - Automatic reconnects with exponential backoff and pattern subscription (`telemetry:org:*`, `telemetry:drone:*`).
+  - Strict schema validation with Zod (`parseTelemetry`) and out-of-order / stale timestamp tracking per drone.
+  - Operational metrics tracking (`messagesReceived`, `messagesValid`, `messagesInvalid`, `messagesOutOfOrder`).
+- **Fastify WebSocket Gateway** (`apps/api/src/modules/realtime/`):
+  - Endpoint: `GET /api/v1/ws/telemetry`.
+  - Authenticated via JWT token query param, Authorization Bearer header, or `AUTH` message handshake with a 10-second unauthenticated disconnect timer.
+  - Granular RBAC and Tenant Isolation:
+    - `ADMIN`, `OPERATOR`, `FLEET_MANAGER`, `DISPATCHER`: Can subscribe to entire organization stream `telemetry:organization` or specific drones.
+    - `CUSTOMER`: Prohibited from organization-wide streams (`INSUFFICIENT_PERMISSIONS`); restricted strictly to drones associated with their own active orders.
+    - Cross-tenant subscription attempts are rejected immediately (`CROSS_TENANT_SUBSCRIPTION_DENIED`).
+  - Bounded client backpressure queue (drops older intermediate frames when socket buffer exceeds 64KB).
+  - Heartbeat `PING` / `PONG` support and clean subscription teardown on socket disconnect.
+- **Frontend Realtime Hook** (`apps/web/src/lib/realtime.ts`):
+  - `useRealtimeTelemetry` hook providing automatic connection, channel subscription, reconnects, and live marker updates for `admin/tracking` and `customer/tracking`.
 - **Automated Test Coverage**:
-  - 60 automated tests in `apps/api/src/modules/` covering state transitions, tenant isolation, RBAC, duplicate prevention, and atomic assignment race condition protection.
-  - Total monorepo tests: 99/99 passing.
+  - 114 total automated tests across all monorepo packages (69 API tests, 21 simulator tests, 8 telemetry worker tests, 13 contracts tests, 3 web tests).
 
 ## Remaining
 
-- **Milestone 2D: Telemetry Transport & Real-time Live Bridge**:
-  - Telemetry streaming adapter connecting Simulator -> Redis Pub/Sub -> Fastify WebSockets
-  - Live API integration connecting frontend tracking components to Fastify backend
-  - Proof-of-delivery verification (OTP/QR handshake)
 - **Milestone 3: Geospatial Safety & Operational Hardening**:
   - PostGIS geofence polygon management & real-time intersection alerts
   - Weather snapshot risk scoring & automatic hold/reroute rules
@@ -157,18 +140,16 @@ Milestone 2C — Fleet Inventory + Mission Dispatch Foundation (**COMPLETED**)
 
 ## Recommended next step
 
-Implement Milestone 2D: Telemetry Transport & Real-time Live Bridge connecting the Simulator to Redis Pub/Sub and live WebSocket streaming to the Web tactical radar.
+Implement Milestone 3: Geospatial Safety & Operational Hardening (PostGIS geofence polygon boundary checks, spatial containment queries, weather risk scoring, and operator intervention controls).
 
 ## Important decisions
 
-- **Decoupled Simulator Gateway**: The backend mission and fleet layers communicate through a `SimulatorGateway` interface, maintaining a clean boundary that does not leak simulation classes or physics calculations into API handlers.
-- **Atomic Transactional Assignment**: Database transactions with row locks guarantee that conflicting concurrent drone assignments fail cleanly with `422/409` rather than corrupting state.
-- **Server-Side Identity Authority**: `organization_id` and `customer_id` are derived strictly from verified JWT claims; client payload claims are ignored to eliminate IDOR and tenant spoofing.
-- **Strict State Machines**: Centralized state transition validators for both Drones and Missions prevent out-of-order execution.
+- **Tenant-Scoped Redis Channel Architecture**: Redis channels incorporate `organizationId` directly in the channel key (`telemetry:org:{orgId}`, `telemetry:drone:{orgId}:{droneId}`), guaranteeing that cross-tenant message leakage is impossible at the transport tier.
+- **Pure Simulator Boundary**: Simulator core remains 100% deterministic and free of Redis/Fastify/network dependencies. The bridge consumes simulator events via standard callbacks.
+- **Server-Side Authorization on Subscriptions**: WebSocket subscription requests are verified against server-side session JWT claims and database ownership records, preventing unauthorized client-side claims.
+- **Bounded Backpressure & Stale Frame Dropping**: High-frequency telemetry streams prioritize freshness over historical buffering; if a client buffer backs up or an older packet arrives late, it is dropped in favor of current state.
 - **Aviation HUD Aesthetic**: High-density operational interface using liquid glass surfaces and restrained micro-interactions.
 - **Vendor-Agnostic Map Abstraction**: `MapView` supports pluggable map adapters (SVG Radar Map for lightweight zero-dependency rendering, ready for MapLibre/Mapbox).
-- **Simulation-first**: Digital-twin architecture isolated from flight hardware.
-- **Deterministic Math**: Pure clock ticks (`tick(deltaSeconds)`) without wall-clock dependency in the core physics model.
 - **PostgreSQL/PostGIS + Kysely**: Typed relational & spatial database queries.
 - **Token Rotation & Reuse Detection**: Refresh tokens are single-use; reuse triggers instant revocation of all active sessions.
 - **AI is Advisory**: Route scores and ETAs are recommendations; safety policy and human operator sign-off remain authoritative.

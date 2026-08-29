@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
+import websocket from "@fastify/websocket";
 import type { Kysely } from "kysely";
 import type { Database } from "./infrastructure/db/schema.js";
 import { getDb } from "./infrastructure/db/client.js";
@@ -22,6 +23,8 @@ import { createMissionRepository, type MissionRepository } from "./modules/missi
 import { createMissionService, type MissionService } from "./modules/missions/mission.service.js";
 import { createMissionRoutes } from "./modules/missions/mission.routes.js";
 import { createSimulatorGateway, type SimulatorGateway } from "./modules/missions/simulator.adapter.js";
+import { RealtimeService } from "./modules/realtime/realtime.service.js";
+import { createRealtimeRoutes } from "./modules/realtime/realtime.routes.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -36,6 +39,7 @@ export interface AppOptions {
   missionRepo?: MissionRepository;
   missionService?: MissionService;
   simulatorGateway?: SimulatorGateway;
+  realtimeService?: RealtimeService;
   logger?: boolean;
 }
 
@@ -70,6 +74,12 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     secret: env.JWT_SECRET
   });
 
+  app.register(websocket, {
+    options: {
+      maxPayload: 1048576 // 1MB
+    }
+  });
+
   // JWT Token Signing Helper for AuthService
   const jwtSign = (payload: Record<string, unknown>, opts?: { expiresIn?: string }) => {
     return app.jwt.sign(payload as any, { expiresIn: opts?.expiresIn ?? env.JWT_ACCESS_TTL });
@@ -81,6 +91,13 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const missionService =
     options.missionService ??
     createMissionService(missionRepo, orderRepo, fleetRepo, simulatorGateway, auditService);
+  const realtimeService =
+    options.realtimeService ??
+    new RealtimeService({
+      fleetRepo,
+      orderRepo,
+      missionRepo
+    });
 
   // Pre-handler hook to authenticate requests with Bearer tokens
   app.addHook("onRequest", async (request) => {
@@ -146,6 +163,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   app.register(createOrderRoutes(orderService));
   app.register(createFleetRoutes(fleetService));
   app.register(createMissionRoutes(missionService));
+  app.register(createRealtimeRoutes(realtimeService));
 
   return app;
 }
