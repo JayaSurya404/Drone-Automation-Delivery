@@ -17,6 +17,7 @@
     "@fastify/websocket": "^11.3.0",
     "@skynav/config": "workspace:*",
     "@skynav/contracts": "workspace:*",
+    "@skynav/simulator": "workspace:*",
     "argon2": "^0.45.1",
     "fastify": "^5.2.0",
     "ioredis": "^6.0.0",

@@ -51,6 +51,9 @@ importers:
       '@skynav/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@skynav/simulator':
+        specifier: workspace:*
+        version: link:../../services/simulator
       argon2:
         specifier: ^0.45.1
         version: 0.45.1
