@@ -210,7 +210,31 @@ export interface NotificationTable {
   organization_id: string;
   user_id: string | null;
   type: string;
-  created_at: ColumnType<Date, string | undefined, never>;
+  severity: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  read_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  aggregate_type: string | null;
+  aggregate_id: string | null;
+  event_id: string | null;
+  metadata: ColumnType<unknown, string | object | null | undefined, string | object | null | undefined>;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string | undefined>;
+}
+
+export interface OutboxEventTable {
+  id: string;
+  organization_id: string;
+  event_type: string;
+  aggregate_type: string;
+  aggregate_id: string;
+  actor_id: string | null;
+  payload: ColumnType<unknown, string | object | null | undefined, string | object | null | undefined>;
+  occurred_at: ColumnType<Date, Date | string | undefined, never>;
+  processed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null | undefined>;
+  attempts: number;
+  last_error: string | null;
 }
 
 export interface SchemaMigrationsTable {
@@ -239,5 +263,6 @@ export interface Database {
   alerts: AlertTable;
   incidents: IncidentTable;
   notifications: NotificationTable;
+  outbox_events: OutboxEventTable;
   _schema_migrations: SchemaMigrationsTable;
 }

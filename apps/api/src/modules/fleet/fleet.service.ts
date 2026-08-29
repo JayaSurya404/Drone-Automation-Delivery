@@ -51,9 +51,12 @@ export interface FleetService {
   listDrones(user: AuthenticatedUser, query: DroneListQuery): Promise<DroneListResponse>;
 }
 
+import type { OutboxRepository } from "../events/outbox.repository.js";
+
 export function createFleetService(
   fleetRepo: FleetRepository,
-  auditService: AuditService
+  auditService: AuditService,
+  outboxRepo?: OutboxRepository
 ): FleetService {
   function mapRecordToResponse(record: DroneRecord): DroneResponse {
     return {
@@ -108,6 +111,25 @@ export function createFleetService(
         home_altitude_meters: input.homeLocation?.altitudeMeters ?? 0,
         is_active: true
       });
+
+      if (outboxRepo) {
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType: "DRONE_REGISTERED",
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "DRONE",
+          aggregateId: droneId,
+          actorId: user.id,
+          payload: {
+            callSign: newRecord.call_sign,
+            model: newRecord.model,
+            maxPayloadGrams: newRecord.max_payload_grams,
+            batteryPercent: newRecord.battery_percent
+          }
+        });
+      }
 
       await auditService.log({
         organizationId: user.organizationId,
@@ -188,6 +210,38 @@ export function createFleetService(
       }
 
       const isStatusChange = input.status && input.status !== existing.status;
+
+      if (outboxRepo && isStatusChange) {
+        const droneEventMap: Record<string, string> = {
+          TAKEOFF: "DRONE_TAKEOFF",
+          EN_ROUTE: "DRONE_EN_ROUTE",
+          ARRIVED: "DRONE_ARRIVED",
+          DELIVERING: "DRONE_DELIVERING",
+          RETURNING: "DRONE_RETURNING",
+          LANDED: "DRONE_LANDED",
+          MAINTENANCE: "DRONE_MAINTENANCE",
+          EMERGENCY: "DRONE_EMERGENCY"
+        };
+        const eventType = (droneEventMap[input.status!] ?? "DRONE_STATUS_UPDATED") as any;
+
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType,
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "DRONE",
+          aggregateId: droneId,
+          actorId: user.id,
+          payload: {
+            callSign: updated.call_sign,
+            previousStatus: existing.status,
+            status: updated.status,
+            batteryPercent: updated.battery_percent
+          }
+        });
+      }
+
       await auditService.log({
         organizationId: user.organizationId,
         actorUserId: user.id,

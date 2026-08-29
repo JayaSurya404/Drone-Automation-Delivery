@@ -25,6 +25,12 @@ import { createMissionRoutes } from "./modules/missions/mission.routes.js";
 import { createSimulatorGateway, type SimulatorGateway } from "./modules/missions/simulator.adapter.js";
 import { RealtimeService } from "./modules/realtime/realtime.service.js";
 import { createRealtimeRoutes } from "./modules/realtime/realtime.routes.js";
+import { createOutboxRepository, type OutboxRepository } from "./modules/events/outbox.repository.js";
+import { RedisEventPublisher, InMemoryEventPublisher, type EventPublisher } from "./modules/events/event.publisher.js";
+import { OutboxService } from "./modules/events/outbox.service.js";
+import { createNotificationRepository, type NotificationRepository } from "./modules/notifications/notification.repository.js";
+import { createNotificationService, type NotificationService } from "./modules/notifications/notification.service.js";
+import { createNotificationRoutes } from "./modules/notifications/notification.routes.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -40,6 +46,11 @@ export interface AppOptions {
   missionService?: MissionService;
   simulatorGateway?: SimulatorGateway;
   realtimeService?: RealtimeService;
+  outboxRepo?: OutboxRepository;
+  eventPublisher?: EventPublisher;
+  outboxService?: OutboxService;
+  notificationRepo?: NotificationRepository;
+  notificationService?: NotificationService;
   logger?: boolean;
 }
 
@@ -48,14 +59,25 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     logger: options.logger ?? false
   });
 
+  const isMockEnvironment = Boolean(
+    options.authRepo ||
+    options.orderRepo ||
+    options.fleetRepo ||
+    options.missionRepo ||
+    options.notificationRepo
+  );
+
   // Database and services dependency injection
-  const db = options.db ?? getDb();
-  const auditService = options.auditService ?? createAuditService(db);
-  const authRepo = options.authRepo ?? createAuthRepository(db);
-  const orderRepo = options.orderRepo ?? createOrderRepository(db);
-  const fleetRepo = options.fleetRepo ?? createFleetRepository(db);
-  const missionRepo = options.missionRepo ?? createMissionRepository(db);
+  const db = options.db ?? (!isMockEnvironment ? getDb() : undefined);
+  const auditService = options.auditService ?? (db ? createAuditService(db) : undefined as any);
+  const authRepo = options.authRepo ?? (db ? createAuthRepository(db) : undefined as any);
+  const orderRepo = options.orderRepo ?? (db ? createOrderRepository(db) : undefined as any);
+  const fleetRepo = options.fleetRepo ?? (db ? createFleetRepository(db) : undefined as any);
+  const missionRepo = options.missionRepo ?? (db ? createMissionRepository(db) : undefined as any);
   const simulatorGateway = options.simulatorGateway ?? createSimulatorGateway();
+  const outboxRepo = options.outboxRepo ?? (db ? createOutboxRepository(db) : undefined);
+  const notificationRepo = options.notificationRepo ?? (db ? createNotificationRepository(db) : undefined as any);
+  const eventPublisher = options.eventPublisher ?? (process.env.REDIS_URL ? new RedisEventPublisher() : new InMemoryEventPublisher());
 
   // Error handling plugin
   app.setErrorHandler(errorHandler);
@@ -85,12 +107,25 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     return app.jwt.sign(payload as any, { expiresIn: opts?.expiresIn ?? env.JWT_ACCESS_TTL });
   };
 
-  const authService = options.authService ?? createAuthService(authRepo, auditService, jwtSign);
-  const orderService = options.orderService ?? createOrderService(orderRepo, auditService);
-  const fleetService = options.fleetService ?? createFleetService(fleetRepo, auditService);
+  const authService = options.authService ?? (authRepo && auditService ? createAuthService(authRepo, auditService, jwtSign) : undefined as any);
+  const orderService = options.orderService ?? (orderRepo && auditService ? createOrderService(orderRepo, auditService, outboxRepo) : undefined as any);
+  const fleetService = options.fleetService ?? (fleetRepo && auditService ? createFleetService(fleetRepo, auditService, outboxRepo) : undefined as any);
   const missionService =
     options.missionService ??
-    createMissionService(missionRepo, orderRepo, fleetRepo, simulatorGateway, auditService);
+    (missionRepo && orderRepo && fleetRepo && auditService
+      ? createMissionService(missionRepo, orderRepo, fleetRepo, simulatorGateway, auditService, outboxRepo)
+      : undefined as any);
+  const notificationService =
+    options.notificationService ??
+    (notificationRepo ? createNotificationService(notificationRepo, auditService) : undefined as any);
+  const outboxService =
+    options.outboxService ??
+    (outboxRepo
+      ? new OutboxService({
+          outboxRepo,
+          eventPublisher
+        })
+      : undefined);
   const realtimeService =
     options.realtimeService ??
     new RealtimeService({
@@ -158,12 +193,13 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   app.get("/api/v1/modules", async () => ({ modules }));
 
   // Register domain routes
-  app.register(createAuthRoutes(authService));
-  app.register(createAuditRoutes(auditService));
-  app.register(createOrderRoutes(orderService));
-  app.register(createFleetRoutes(fleetService));
-  app.register(createMissionRoutes(missionService));
-  app.register(createRealtimeRoutes(realtimeService));
+  if (authService) app.register(createAuthRoutes(authService));
+  if (auditService) app.register(createAuditRoutes(auditService));
+  if (orderService) app.register(createOrderRoutes(orderService));
+  if (fleetService) app.register(createFleetRoutes(fleetService));
+  if (missionService) app.register(createMissionRoutes(missionService));
+  if (notificationService) app.register(createNotificationRoutes(notificationService));
+  if (realtimeService) app.register(createRealtimeRoutes(realtimeService));
 
   return app;
 }

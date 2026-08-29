@@ -18,7 +18,10 @@ import {
   updateMissionStatusRequestSchema,
   telemetrySchema,
   wsClientMessageSchema,
-  wsServerMessageSchema
+  wsServerMessageSchema,
+  domainEventEnvelopeSchema,
+  notificationResponseSchema,
+  notificationListQuerySchema
 } from "./index.js";
 
 describe("Contracts / Authentication & RBAC Schemas", () => {
@@ -263,5 +266,79 @@ describe("Contracts / Fleet & Mission Schemas", () => {
       timestamp: new Date().toISOString()
     });
     assert.equal(telemServerMsg.type, "TELEMETRY");
+  });
+
+  it("validates domain event envelope schema and rejects malformed events (1, 2, 3, 4)", () => {
+    const validEvent = {
+      id: "11111111-1111-1111-1111-111111111111",
+      version: "v1" as const,
+      eventType: "ORDER_CREATED" as const,
+      occurredAt: new Date().toISOString(),
+      organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      aggregateType: "ORDER" as const,
+      aggregateId: "22222222-2222-2222-2222-222222222222",
+      actorId: "33333333-3333-3333-3333-333333333333",
+      payload: {
+        orderNumber: "ORD-2026-001",
+        customerId: "33333333-3333-3333-3333-333333333333"
+      }
+    };
+    const parsed = domainEventEnvelopeSchema.parse(validEvent);
+    assert.equal(parsed.eventType, "ORDER_CREATED");
+    assert.equal(parsed.organizationId, validEvent.organizationId);
+
+    // Reject unknown event type
+    assert.throws(() => {
+      domainEventEnvelopeSchema.parse({
+        ...validEvent,
+        eventType: "UNRECOGNIZED_EVENT"
+      });
+    });
+
+    // Reject invalid organization ID
+    assert.throws(() => {
+      domainEventEnvelopeSchema.parse({
+        ...validEvent,
+        organizationId: "not-a-uuid"
+      });
+    });
+  });
+
+  it("validates notification response, list query, and WebSocket notification envelopes", () => {
+    const notification = {
+      id: "11111111-1111-1111-1111-111111111111",
+      organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      userId: "22222222-2222-2222-2222-222222222222",
+      type: "ORDER_UPDATE" as const,
+      severity: "INFO" as const,
+      title: "Order Confirmed",
+      message: "Your order ORD-2026-001 has been confirmed and queued for UAV dispatch.",
+      isRead: false,
+      aggregateType: "ORDER",
+      aggregateId: "33333333-3333-3333-3333-333333333333",
+      eventId: "44444444-4444-4444-4444-444444444444",
+      metadata: { orderNumber: "ORD-2026-001" },
+      createdAt: new Date().toISOString()
+    };
+    const parsedNotification = notificationResponseSchema.parse(notification);
+    assert.equal(parsedNotification.title, "Order Confirmed");
+    assert.equal(parsedNotification.isRead, false);
+
+    const query = notificationListQuerySchema.parse({
+      isRead: "false",
+      type: "ORDER_UPDATE",
+      limit: "10",
+      offset: "0"
+    });
+    assert.equal(query.isRead, false);
+    assert.equal(query.limit, 10);
+
+    const wsNotifMsg = wsServerMessageSchema.parse({
+      type: "NOTIFICATION",
+      channel: "notifications:user:22222222-2222-2222-2222-222222222222",
+      notification: parsedNotification,
+      timestamp: new Date().toISOString()
+    });
+    assert.equal(wsNotifMsg.type, "NOTIFICATION");
   });
 });

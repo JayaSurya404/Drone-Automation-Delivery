@@ -45,12 +45,15 @@ export interface MissionService {
   listMissions(user: AuthenticatedUser, query: MissionListQuery): Promise<MissionListResponse>;
 }
 
+import type { OutboxRepository } from "../events/outbox.repository.js";
+
 export function createMissionService(
   missionRepo: MissionRepository,
   orderRepo: OrderRepository,
   fleetRepo: FleetRepository,
   simulatorGateway: SimulatorGateway,
-  auditService: AuditService
+  auditService: AuditService,
+  outboxRepo?: OutboxRepository
 ): MissionService {
   function generateMissionNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -135,6 +138,24 @@ export function createMissionService(
         emergency_reason: null
       });
 
+      if (outboxRepo) {
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType: "MISSION_CREATED",
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "MISSION",
+          aggregateId: missionId,
+          actorId: user.id,
+          payload: {
+            missionNumber,
+            orderId: input.orderId,
+            customerId: order.customer_id
+          }
+        });
+      }
+
       await auditService.log({
         organizationId: user.organizationId,
         actorUserId: user.id,
@@ -186,6 +207,25 @@ export function createMissionService(
           altitudeMeters: mission.destination_altitude_meters ?? 0
         }
       });
+
+      if (outboxRepo) {
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType: "MISSION_ASSIGNED",
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "MISSION",
+          aggregateId: mission.id,
+          actorId: user.id,
+          payload: {
+            droneId: drone.id,
+            droneCallSign: drone.call_sign,
+            orderId: order.id,
+            customerId: order.customer_id
+          }
+        });
+      }
 
       // Audit logs
       await auditService.log({
@@ -254,6 +294,43 @@ export function createMissionService(
       const updated = await missionRepo.update(missionId, user.organizationId, updates);
       if (!updated) {
         throw new MissionNotFoundError(missionId);
+      }
+
+      if (outboxRepo) {
+        const missionEventMap: Record<string, string> = {
+          LAUNCHING: "MISSION_LAUNCHED",
+          IN_PROGRESS: "MISSION_IN_PROGRESS",
+          DELIVERING: "MISSION_DELIVERING",
+          RETURNING: "MISSION_RETURNING",
+          COMPLETED: "MISSION_COMPLETED",
+          CANCELLED: "MISSION_CANCELLED",
+          FAILED: "MISSION_FAILED",
+          EMERGENCY: "MISSION_EMERGENCY"
+        };
+        const eventType = (missionEventMap[input.status] ?? "MISSION_STATUS_UPDATED") as any;
+
+        // Fetch order to include customerId in payload if possible
+        const linkedOrder = await orderRepo.findById(updated.order_id, user.organizationId);
+
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType,
+          occurredAt: new Date().toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "MISSION",
+          aggregateId: missionId,
+          actorId: user.id,
+          payload: {
+            missionNumber: updated.mission_number,
+            orderId: updated.order_id,
+            droneId: updated.drone_id,
+            customerId: linkedOrder?.customer_id ?? null,
+            previousStatus: existing.status,
+            status: updated.status,
+            reason: input.reason ?? null
+          }
+        });
       }
 
       let auditAction = "MISSION_STATUS_UPDATED";
