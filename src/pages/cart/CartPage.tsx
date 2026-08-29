@@ -331,7 +331,7 @@ export const CartPage: React.FC = () => {
               )}
               {appliedPromo && (
                 <div className="applied-promo-pill">
-                  <span>Code: <strong>{appliedPromo.code}</strong> applied ({appliedPromo.discountPercent}% OFF)</span>
+                  <span>Code: <strong>{appliedPromo}</strong> applied</span>
                   <button type="button" onClick={removePromoCode} className="remove-promo-btn">Remove</button>
                 </div>
               )}

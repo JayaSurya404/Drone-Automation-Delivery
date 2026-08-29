@@ -1,102 +1,136 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Navigation, ShieldCheck, Zap, PhoneCall, Heart } from 'lucide-react';
+import { Plane, ShieldCheck, Zap, PhoneCall, Heart, Send, MapPin, Award, Lock } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="app-footer">
-      <div className="footer-inner">
-        <div>
-          <div className="nav-brand" style={{ marginBottom: '0.85rem' }}>
-            <div className="nav-brand-icon">
-              <Navigation size={18} />
-            </div>
+    <footer className="ecom-app-footer">
+      {/* ── Top Trust Bar in Footer ── */}
+      <div className="footer-trust-strip">
+        <div className="footer-trust-inner">
+          <div className="footer-trust-col">
+            <ShieldCheck size={20} className="trust-strip-icon" />
             <div>
-              <span className="text-gradient">SkyLink</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: 500, marginLeft: '0.4rem', color: 'var(--text-secondary)' }}>
-                Drone Delivery
-              </span>
+              <strong>FAA & EASA Compliant</strong>
+              <span>Certified autonomous urban flight corridors</span>
             </div>
           </div>
-          <p style={{ fontSize: '0.875rem', lineHeight: 1.6, maxWidth: '320px', color: 'var(--text-secondary)' }}>
-            Autonomous electric drone delivery engineered for ultra-fast, safe, and whisper-quiet consumer transport of food, medicine, groceries, and urgent goods.
-          </p>
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.25rem' }}>
-            <div className="badge badge-cyan" style={{ fontSize: '0.75rem' }}>
-              <ShieldCheck size={14} />
-              <span>Safe Air Corridor Certified</span>
-            </div>
-            <div className="badge badge-success" style={{ fontSize: '0.75rem' }}>
-              <Zap size={14} />
-              <span>100% Electric Zero-Emission</span>
+          <div className="footer-trust-col">
+            <Lock size={20} className="trust-strip-icon" />
+            <div>
+              <strong>100% Secure Checkout</strong>
+              <span>256-bit encrypted payments</span>
             </div>
           </div>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '0.95rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>Customer Portal</h4>
-          <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.875rem' }}>
-            <li>
-              <Link to="/products" style={{ color: 'var(--text-secondary)' }}>Browse Products</Link>
-            </li>
-            <li>
-              <Link to="/orders" style={{ color: 'var(--text-secondary)' }}>Order History</Link>
-            </li>
-            <li>
-              <Link to="/cart" style={{ color: 'var(--text-secondary)' }}>Shopping Cart</Link>
-            </li>
-            <li>
-              <Link to="/addresses" style={{ color: 'var(--text-secondary)' }}>Delivery Addresses</Link>
-            </li>
-            <li>
-              <Link to="/profile" style={{ color: 'var(--text-secondary)' }}>Account Settings</Link>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '0.95rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>Support & Safety</h4>
-          <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.875rem' }}>
-            <li>
-              <Link to="/support" style={{ color: 'var(--text-secondary)' }}>Help Center & FAQs</Link>
-            </li>
-            <li>
-              <Link to="/support" style={{ color: 'var(--text-secondary)' }}>Report Drop-off Issue</Link>
-            </li>
-            <li>
-              <Link to="/support" style={{ color: 'var(--text-secondary)' }}>Landing Pad Guidelines</Link>
-            </li>
-            <li>
-              <span style={{ color: 'var(--text-secondary)' }}>Terms of Service</span>
-            </li>
-            <li>
-              <span style={{ color: 'var(--text-secondary)' }}>Privacy Policy</span>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 style={{ fontSize: '0.95rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>Live Flight Support</h4>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-            Need help with an active delivery drop-off? Our ground operations team is available 24/7.
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-cyan)', fontWeight: 600, fontSize: '0.95rem' }}>
-            <PhoneCall size={16} />
-            <span>1-800-SKY-DRONE</span>
+          <div className="footer-trust-col">
+            <Zap size={20} className="trust-strip-icon" />
+            <div>
+              <strong>10–20 Min Delivery</strong>
+              <span>Direct aerial dispatch to landing zone</span>
+            </div>
           </div>
-          <div style={{ marginTop: '0.5rem', fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
-            Average response time: &lt; 45 seconds
+          <div className="footer-trust-col">
+            <PhoneCall size={20} className="trust-strip-icon" />
+            <div>
+              <strong>24/7 Ground Ops</strong>
+              <span>Instant live support for all flights</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="footer-bottom">
-        <div>
-          &copy; {new Date().getFullYear()} SkyLink Autonomous Drone Delivery Inc. All rights reserved. (Customer Portal Only).
+      {/* ── Main Multi-Column Footer ── */}
+      <div className="footer-main-container">
+        <div className="footer-columns-grid">
+          {/* Col 1: Brand & Mission */}
+          <div className="footer-col brand-col">
+            <Link to="/dashboard" className="footer-brand-logo">
+              <div className="brand-icon-box">
+                <Plane size={20} />
+              </div>
+              <div className="brand-text-block">
+                <span className="brand-name">SkyLink</span>
+                <span className="brand-tagline">DRONE STORE</span>
+              </div>
+            </Link>
+            <p className="footer-brand-desc">
+              Next-generation autonomous electric drone delivery engineered for ultra-fast, whisper-quiet, and contactless transport of food, medicine, groceries, and tech essentials.
+            </p>
+            <div className="footer-flight-support-box">
+              <div className="flight-support-label">Live Ground Control Helpline</div>
+              <div className="flight-support-phone">
+                <PhoneCall size={16} /> 1-800-SKY-DRONE
+              </div>
+              <span className="flight-support-sub">Toll-free 24/7 flight assistance</span>
+            </div>
+          </div>
+
+          {/* Col 2: Shop Categories */}
+          <div className="footer-col">
+            <h4 className="footer-heading">Shop Marketplace</h4>
+            <ul className="footer-links-list">
+              <li><Link to="/products">All Products</Link></li>
+              <li><Link to="/products?category=Medicine">Pharmacy & First Aid</Link></li>
+              <li><Link to="/products?category=Food">Hot Gourmet Meals</Link></li>
+              <li><Link to="/products?category=Groceries">Fresh Groceries & Coffee</Link></li>
+              <li><Link to="/products?category=Electronics">Tech, GaN & Audio</Link></li>
+              <li><Link to="/products?category=Documents">Secure Legal Courier</Link></li>
+              <li><Link to="/products?deals=true">Lightning Deals & Discounts</Link></li>
+            </ul>
+          </div>
+
+          {/* Col 3: Customer Care */}
+          <div className="footer-col">
+            <h4 className="footer-heading">Customer Care</h4>
+            <ul className="footer-links-list">
+              <li><Link to="/orders">Track Active Flight</Link></li>
+              <li><Link to="/orders">Order History & Invoices</Link></li>
+              <li><Link to="/addresses">Saved Drop Zones & Pads</Link></li>
+              <li><Link to="/cart">Shopping Basket</Link></li>
+              <li><Link to="/wishlist">Saved Favorites</Link></li>
+              <li><Link to="/support">Help Center & FAQs</Link></li>
+              <li><Link to="/support">Report Drop-off Issue</Link></li>
+            </ul>
+          </div>
+
+          {/* Col 4: Drone Delivery Info */}
+          <div className="footer-col">
+            <h4 className="footer-heading">Drone Aviation</h4>
+            <ul className="footer-links-list">
+              <li><Link to="/support">How Drone Delivery Works</Link></li>
+              <li><Link to="/support">Lawn & Rooftop Pad Setup</Link></li>
+              <li><Link to="/support">Weather & Wind Safety Limits</Link></li>
+              <li><Link to="/support">Zero-Carbon Electric Fleet</Link></li>
+              <li><Link to="/support">Acoustic Noise Certification</Link></li>
+              <li><Link to="/support">Flight Corridor Coverage Map</Link></li>
+            </ul>
+          </div>
+
+          {/* Col 5: Account & Legal */}
+          <div className="footer-col">
+            <h4 className="footer-heading">Account & Trust</h4>
+            <ul className="footer-links-list">
+              <li><Link to="/profile">Customer Profile</Link></li>
+              <li><Link to="/notifications">Notification Preferences</Link></li>
+              <li><span className="footer-static-link">Terms of Drone Service</span></li>
+              <li><span className="footer-static-link">Customer Privacy Policy</span></li>
+              <li><span className="footer-static-link">FAA Flight Safety Notice</span></li>
+              <li><span className="footer-static-link">Consumer Air Transport Rights</span></li>
+            </ul>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          <span>Powered by Clean Autonomous Aviation</span>
-          <Heart size={14} color="#ef4444" fill="#ef4444" />
+      </div>
+
+      {/* ── Bottom Copyright Bar ── */}
+      <div className="footer-bottom-bar">
+        <div className="footer-bottom-inner">
+          <div className="footer-copyright-text">
+            &copy; {new Date().getFullYear()} SkyLink Autonomous Drone Delivery Inc. All rights reserved. (Customer Shopping Portal).
+          </div>
+          <div className="footer-bottom-badge">
+            <span>Powered by 100% Clean Autonomous Aviation</span>
+            <Heart size={14} fill="#ef4444" color="#ef4444" />
+          </div>
         </div>
       </div>
     </footer>
