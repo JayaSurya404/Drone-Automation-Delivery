@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import type { MapProviderAdapterProps, MapMarker } from "./map-view.js";
+import type { MapViewProps, MapMarker, MapRoute, MapGeofence } from "./types.js";
 
 export function SvgRadarMap({
-  markers,
+  markers = [],
   routes = [],
   geofences = [],
   selectedMarkerId,
@@ -12,7 +12,7 @@ export function SvgRadarMap({
   zoom = 14,
   onMarkerClick,
   className = ""
-}: MapProviderAdapterProps) {
+}: MapViewProps) {
   const [hoveredMarker, setHoveredMarker] = useState<MapMarker | null>(null);
 
   // Compute map bounding center or fallback

@@ -9,7 +9,11 @@ export const envSchema = z.object({
   REDIS_URL: z.string().default("redis://localhost:6379"),
   JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters long").default("skynav-development-jwt-secret-key-32chars"),
   JWT_ACCESS_TTL: z.string().default("15m"),
-  JWT_REFRESH_TTL: z.string().default("7d")
+  JWT_REFRESH_TTL: z.string().default("7d"),
+  MAP_PROVIDER: z.enum(["osm", "maplibre", "custom", "radar"]).default("osm"),
+  MAP_STYLE_URL: z.string().default(""),
+  MAP_TILES_URL: z.string().default("https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+  MAX_TRAIL_POINTS: z.coerce.number().int().min(5).max(100).default(25)
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

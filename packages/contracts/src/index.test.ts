@@ -21,7 +21,20 @@ import {
   wsServerMessageSchema,
   domainEventEnvelopeSchema,
   notificationResponseSchema,
-  notificationListQuerySchema
+  notificationListQuerySchema,
+  isValidCoordinate,
+  haversineDistanceMeters,
+  distance3DMeters,
+  initialBearingDegrees,
+  interpolateCoordinate,
+  projectPosition,
+  computeRouteDistanceMeters,
+  computeRemainingRouteDistanceMeters,
+  calculateDynamicEtaSeconds,
+  formatDistance,
+  formatDuration,
+  computeBoundingBox,
+  calculateTelemetryFreshness
 } from "./index.js";
 
 describe("Contracts / Authentication & RBAC Schemas", () => {
@@ -342,3 +355,95 @@ describe("Contracts / Fleet & Mission Schemas", () => {
     assert.equal(wsNotifMsg.type, "NOTIFICATION");
   });
 });
+
+describe("Contracts / Geospatial Utilities & Calculations", () => {
+  const sfDepot = { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 10 };
+  const sfDelivery = { latitude: 37.7833, longitude: -122.4167, altitudeMeters: 25 };
+
+  it("validates coordinate boundaries accurately", () => {
+    assert.ok(isValidCoordinate({ latitude: 37.7749, longitude: -122.4194 }));
+    assert.ok(isValidCoordinate({ latitude: -90, longitude: 180 }));
+    assert.ok(isValidCoordinate({ latitude: 90, longitude: -180 }));
+    assert.ok(!isValidCoordinate({ latitude: 90.1, longitude: 0 }));
+    assert.ok(!isValidCoordinate({ latitude: 0, longitude: 180.1 }));
+    assert.ok(!isValidCoordinate(null));
+    assert.ok(!isValidCoordinate({ latitude: NaN, longitude: 0 } as any));
+  });
+
+  it("calculates accurate Haversine surface distance and 3D distance", () => {
+    const dist2D = haversineDistanceMeters(sfDepot, sfDelivery);
+    assert.ok(dist2D > 900 && dist2D < 1100, `Expected ~960m, got ${dist2D}`);
+
+    const dist3D = distance3DMeters(sfDepot, sfDelivery);
+    assert.ok(dist3D >= dist2D, "3D distance must be greater than or equal to 2D surface distance");
+  });
+
+  it("computes initial forward bearing accurately", () => {
+    const northPt1 = { latitude: 0, longitude: 0 };
+    const northPt2 = { latitude: 1, longitude: 0 };
+    const bearingNorth = initialBearingDegrees(northPt1, northPt2);
+    assert.ok(Math.abs(bearingNorth - 0) < 0.1 || Math.abs(bearingNorth - 360) < 0.1);
+
+    const eastPt = { latitude: 0, longitude: 1 };
+    const bearingEast = initialBearingDegrees(northPt1, eastPt);
+    assert.ok(Math.abs(bearingEast - 90) < 0.1);
+  });
+
+  it("interpolates and projects positions accurately", () => {
+    const midpoint = interpolateCoordinate(sfDepot, sfDelivery, 0.5);
+    assert.ok(Math.abs(midpoint.latitude - (sfDepot.latitude + sfDelivery.latitude) / 2) < 0.0001);
+    assert.ok(Math.abs(midpoint.longitude - (sfDepot.longitude + sfDelivery.longitude) / 2) < 0.0001);
+    assert.equal(midpoint.altitudeMeters, 17.5);
+
+    const projected = projectPosition(sfDepot, 90, 1000);
+    assert.ok(isValidCoordinate(projected));
+    assert.ok(projected.longitude > sfDepot.longitude);
+  });
+
+  it("computes cumulative route distance and remaining distance", () => {
+    const route = [
+      sfDepot,
+      { latitude: 37.778, longitude: -122.418, altitudeMeters: 50 },
+      sfDelivery
+    ];
+    const totalDist = computeRouteDistanceMeters(route);
+    assert.ok(totalDist > 0);
+
+    const remaining = computeRemainingRouteDistanceMeters(sfDepot, route, 1);
+    assert.ok(remaining > 0 && remaining <= totalDist);
+  });
+
+  it("calculates dynamic ETA and formats distance/duration", () => {
+    const etaSecs = calculateDynamicEtaSeconds(1500, 15);
+    assert.equal(etaSecs, 100);
+
+    assert.equal(formatDistance(450), "450 m");
+    assert.equal(formatDistance(2400), "2.4 km");
+    assert.equal(formatDuration(45), "45s");
+    assert.equal(formatDuration(125), "2m 5s");
+    assert.equal(formatDuration(3660), "1h 1m");
+  });
+
+  it("computes bounding boxes accurately", () => {
+    const bbox = computeBoundingBox([sfDepot, sfDelivery]);
+    assert.ok(bbox !== null);
+    assert.equal(bbox.minLat, sfDepot.latitude);
+    assert.equal(bbox.maxLat, sfDelivery.latitude);
+    assert.ok(bbox.center.latitude > sfDepot.latitude && bbox.center.latitude < sfDelivery.latitude);
+  });
+
+  it("evaluates telemetry freshness correctly based on observation time", () => {
+    const now = new Date("2026-08-30T12:00:00Z");
+    const liveTime = new Date("2026-08-30T11:59:58Z"); // 2s old
+    const degradedTime = new Date("2026-08-30T11:59:54Z"); // 6s old
+    const staleTime = new Date("2026-08-30T11:59:40Z"); // 20s old
+    const offlineTime = new Date("2026-08-30T11:58:00Z"); // 120s old
+
+    assert.equal(calculateTelemetryFreshness(liveTime, now), "LIVE");
+    assert.equal(calculateTelemetryFreshness(degradedTime, now), "DEGRADED");
+    assert.equal(calculateTelemetryFreshness(staleTime, now), "STALE");
+    assert.equal(calculateTelemetryFreshness(offlineTime, now), "OFFLINE");
+    assert.equal(calculateTelemetryFreshness(null, now), "OFFLINE");
+  });
+});
+
