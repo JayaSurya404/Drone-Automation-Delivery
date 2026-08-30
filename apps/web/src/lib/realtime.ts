@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { Telemetry, WsServerMessage } from "@skynav/contracts";
+import type { Telemetry, WsServerMessage, TelemetryFreshness } from "@skynav/contracts";
+import { calculateTelemetryFreshness, isValidCoordinate } from "@skynav/contracts";
 
 export type ConnectionStatus = "DISCONNECTED" | "CONNECTING" | "CONNECTED" | "ERROR";
+
+export interface DroneTrailPoint {
+  latitude: number;
+  longitude: number;
+  altitudeMeters?: number;
+  timestamp: string;
+}
 
 export interface UseRealtimeTelemetryOptions {
   url?: string;
@@ -11,6 +19,7 @@ export interface UseRealtimeTelemetryOptions {
   autoConnect?: boolean;
   channel?: "telemetry:organization" | "telemetry:drone" | "telemetry:mission";
   targetId?: string;
+  maxTrailPoints?: number;
 }
 
 export function useRealtimeTelemetry(options: UseRealtimeTelemetryOptions = {}) {
@@ -19,11 +28,13 @@ export function useRealtimeTelemetry(options: UseRealtimeTelemetryOptions = {}) 
     token,
     autoConnect = true,
     channel = "telemetry:organization",
-    targetId
+    targetId,
+    maxTrailPoints = 25
   } = options;
 
   const [status, setStatus] = useState<ConnectionStatus>("DISCONNECTED");
   const [telemetryMap, setTelemetryMap] = useState<Map<string, Telemetry>>(new Map());
+  const [trailsMap, setTrailsMap] = useState<Map<string, DroneTrailPoint[]>>(new Map());
   const [lastMessageAt, setLastMessageAt] = useState<string | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
@@ -57,12 +68,29 @@ export function useRealtimeTelemetry(options: UseRealtimeTelemetryOptions = {}) 
       socket.onmessage = (event) => {
         try {
           const msg: WsServerMessage = JSON.parse(event.data);
-          setLastMessageAt(new Date().toISOString());
+          const nowStr = new Date().toISOString();
+          setLastMessageAt(nowStr);
 
-          if (msg.type === "TELEMETRY") {
+          if (msg.type === "TELEMETRY" && isValidCoordinate(msg.telemetry.position)) {
+            const droneId = msg.telemetry.droneId;
+            const newPoint: DroneTrailPoint = {
+              latitude: msg.telemetry.position.latitude,
+              longitude: msg.telemetry.position.longitude,
+              altitudeMeters: msg.telemetry.position.altitudeMeters,
+              timestamp: msg.telemetry.observedAt
+            };
+
             setTelemetryMap((prev) => {
               const next = new Map(prev);
-              next.set(msg.telemetry.droneId, msg.telemetry);
+              next.set(droneId, msg.telemetry);
+              return next;
+            });
+
+            setTrailsMap((prev) => {
+              const next = new Map(prev);
+              const currentTrail = next.get(droneId) || [];
+              const updatedTrail = [...currentTrail, newPoint].slice(-maxTrailPoints);
+              next.set(droneId, updatedTrail);
               return next;
             });
           }
@@ -86,7 +114,7 @@ export function useRealtimeTelemetry(options: UseRealtimeTelemetryOptions = {}) 
     } catch {
       setStatus("ERROR");
     }
-  }, [url, token, channel, targetId]);
+  }, [url, token, channel, targetId, maxTrailPoints]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -100,6 +128,15 @@ export function useRealtimeTelemetry(options: UseRealtimeTelemetryOptions = {}) 
     setStatus("DISCONNECTED");
   }, []);
 
+  const getDroneFreshness = useCallback(
+    (droneId: string): TelemetryFreshness => {
+      const telem = telemetryMap.get(droneId);
+      if (!telem) return "OFFLINE";
+      return calculateTelemetryFreshness(telem.observedAt);
+    },
+    [telemetryMap]
+  );
+
   useEffect(() => {
     if (autoConnect) {
       connect();
@@ -112,7 +149,9 @@ export function useRealtimeTelemetry(options: UseRealtimeTelemetryOptions = {}) 
   return {
     status,
     telemetryMap,
+    trailsMap,
     lastMessageAt,
+    getDroneFreshness,
     connect,
     disconnect
   };

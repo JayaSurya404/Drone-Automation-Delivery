@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, use } from "react";
+import React, { useState, useMemo, use } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -23,7 +23,17 @@ import {
   TableCell
 } from "@skynav/ui";
 import { DEMO_MISSIONS, DEMO_ORDERS, DEMO_DRONES, DEMO_WAREHOUSE, DEMO_GEOFENCES, DemoMission } from "@/lib/demo-data";
+import { useRealtimeTelemetry } from "@/lib/realtime";
 import { CancelMissionModal } from "@/features/admin/cancel-mission-modal";
+import {
+  haversineDistanceMeters,
+  computeRouteDistanceMeters,
+  computeRemainingRouteDistanceMeters,
+  calculateDynamicEtaSeconds,
+  formatDistance,
+  formatDuration,
+  calculateTelemetryFreshness
+} from "@skynav/contracts";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -39,6 +49,17 @@ export default function MissionDetailPage({ params }: PageProps) {
 
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
+  const baseDrone = mission
+    ? DEMO_DRONES.find((d) => d.id === mission.droneId || d.callsign === mission.droneCallsign) || DEMO_DRONES[0]
+    : DEMO_DRONES[0];
+
+  const { status: wsStatus, telemetryMap, trailsMap } = useRealtimeTelemetry({
+    channel: "telemetry:drone",
+    targetId: baseDrone.id,
+    autoConnect: true,
+    maxTrailPoints: 30
+  });
+
   if (!mission) {
     return (
       <div className="p-8 text-center space-y-4">
@@ -53,85 +74,134 @@ export default function MissionDetailPage({ params }: PageProps) {
     );
   }
 
+  const liveTelemetry = telemetryMap.get(baseDrone.id);
+  const liveTrail = trailsMap.get(baseDrone.id) || baseDrone.trail || [];
+
+  const assignedDrone = useMemo(() => {
+    if (!liveTelemetry) return { ...baseDrone, trail: liveTrail };
+    return {
+      ...baseDrone,
+      latitude: liveTelemetry.position.latitude,
+      longitude: liveTelemetry.position.longitude,
+      altitudeMeters: liveTelemetry.position.altitudeMeters ?? baseDrone.altitudeMeters,
+      headingDegrees: liveTelemetry.headingDegrees ?? baseDrone.headingDegrees,
+      speedMetersPerSecond: liveTelemetry.speedMetersPerSecond ?? baseDrone.speedMetersPerSecond,
+      batteryPercent: liveTelemetry.batteryPercent ?? baseDrone.batteryPercent,
+      status: (liveTelemetry.state as any) ?? baseDrone.status,
+      trail: liveTrail
+    };
+  }, [baseDrone, liveTelemetry, liveTrail]);
+
   const linkedOrder = DEMO_ORDERS.find((o) => o.id === mission.orderId);
-  const assignedDrone = DEMO_DRONES.find((d) => d.id === mission.droneId || d.callsign === mission.droneCallsign);
 
-  const waypoints = [
-    {
-      id: "wp-0",
-      seq: 0,
-      name: "Depot Alpha Climb Out",
-      lat: mission.originCoords.latitude,
-      lng: mission.originCoords.longitude,
-      alt: 60,
-      speed: 15,
-      status: "COMPLETED"
-    },
-    {
-      id: "wp-1",
-      seq: 1,
-      name: "Corridor Midway Bravo",
-      lat: (mission.originCoords.latitude + mission.destinationCoords.latitude) / 2,
-      lng: (mission.originCoords.longitude + mission.destinationCoords.longitude) / 2,
-      alt: 60,
-      speed: 18,
-      status: mission.status === "IN_PROGRESS" ? "ACTIVE" : "COMPLETED"
-    },
-    {
-      id: "wp-2",
-      seq: 2,
-      name: "Descent & Touchdown Pad",
-      lat: mission.destinationCoords.latitude,
-      lng: mission.destinationCoords.longitude,
-      alt: 2,
-      speed: 2,
-      status: "PENDING"
-    }
-  ];
+  const waypoints = useMemo(() => {
+    return [
+      {
+        id: "wp-0",
+        seq: 0,
+        name: "Depot Alpha Climb Out",
+        latitude: mission.originCoords.latitude,
+        longitude: mission.originCoords.longitude,
+        altitudeMeters: 60,
+        speedMps: 15,
+        status: "COMPLETED"
+      },
+      {
+        id: "wp-1",
+        seq: 1,
+        name: "Corridor Midway Bravo",
+        latitude: (mission.originCoords.latitude + mission.destinationCoords.latitude) / 2,
+        longitude: (mission.originCoords.longitude + mission.destinationCoords.longitude) / 2,
+        altitudeMeters: 60,
+        speedMps: 18,
+        status: mission.status === "IN_PROGRESS" ? "ACTIVE" : "COMPLETED"
+      },
+      {
+        id: "wp-2",
+        seq: 2,
+        name: "Descent & Touchdown Pad",
+        latitude: mission.destinationCoords.latitude,
+        longitude: mission.destinationCoords.longitude,
+        altitudeMeters: 2,
+        speedMps: 2,
+        status: "PENDING"
+      }
+    ];
+  }, [mission]);
 
-  const mapMarkers = [
-    {
-      id: "origin",
-      type: "warehouse" as const,
-      latitude: mission.originCoords.latitude,
-      longitude: mission.originCoords.longitude,
-      title: mission.originAddress
-    },
-    {
-      id: "dest",
-      type: "destination" as const,
-      latitude: mission.destinationCoords.latitude,
-      longitude: mission.destinationCoords.longitude,
-      title: mission.destinationAddress
-    },
-    ...(assignedDrone
-      ? [
-          {
-            id: assignedDrone.id,
-            type: "drone" as const,
-            latitude: assignedDrone.latitude,
-            longitude: assignedDrone.longitude,
-            headingDegrees: assignedDrone.headingDegrees,
-            altitudeMeters: assignedDrone.altitudeMeters,
-            batteryPercent: assignedDrone.batteryPercent,
-            title: assignedDrone.callsign,
-            status: assignedDrone.status
-          }
-        ]
-      : [])
-  ];
+  // Route metrics
+  const totalCorridorDistanceMeters = useMemo(() => {
+    return computeRouteDistanceMeters(waypoints);
+  }, [waypoints]);
 
-  const mapRoutes = [
-    {
-      id: mission.id,
-      coordinates: [
-        { latitude: mission.originCoords.latitude, longitude: mission.originCoords.longitude },
-        ...(assignedDrone ? [{ latitude: assignedDrone.latitude, longitude: assignedDrone.longitude }] : []),
-        { latitude: mission.destinationCoords.latitude, longitude: mission.destinationCoords.longitude }
-      ],
-      color: mission.status === "ABORTED" ? "#ef4444" : "#00f0ff"
-    }
-  ];
+  const remainingCorridorDistanceMeters = useMemo(() => {
+    return computeRemainingRouteDistanceMeters(
+      { latitude: assignedDrone.latitude, longitude: assignedDrone.longitude, altitudeMeters: assignedDrone.altitudeMeters },
+      waypoints,
+      1
+    );
+  }, [assignedDrone, waypoints]);
+
+  const dynamicEtaSeconds = useMemo(() => {
+    return calculateDynamicEtaSeconds(remainingCorridorDistanceMeters, assignedDrone.speedMetersPerSecond, 15);
+  }, [remainingCorridorDistanceMeters, assignedDrone.speedMetersPerSecond]);
+
+  const freshness = useMemo(() => {
+    if (!liveTelemetry) return "LIVE";
+    return calculateTelemetryFreshness(liveTelemetry.observedAt);
+  }, [liveTelemetry]);
+
+  const mapMarkers = useMemo(() => {
+    return [
+      {
+        id: "origin",
+        type: "warehouse" as const,
+        latitude: mission.originCoords.latitude,
+        longitude: mission.originCoords.longitude,
+        title: mission.originAddress
+      },
+      {
+        id: "dest",
+        type: "destination" as const,
+        latitude: mission.destinationCoords.latitude,
+        longitude: mission.destinationCoords.longitude,
+        title: mission.destinationAddress
+      },
+      ...(assignedDrone
+        ? [
+            {
+              id: assignedDrone.id,
+              type: "drone" as const,
+              latitude: assignedDrone.latitude,
+              longitude: assignedDrone.longitude,
+              headingDegrees: assignedDrone.headingDegrees,
+              altitudeMeters: assignedDrone.altitudeMeters,
+              speedMetersPerSecond: assignedDrone.speedMetersPerSecond,
+              batteryPercent: assignedDrone.batteryPercent,
+              freshness,
+              title: assignedDrone.callsign,
+              status: assignedDrone.status,
+              trail: assignedDrone.trail
+            }
+          ]
+        : [])
+    ];
+  }, [mission, assignedDrone, freshness]);
+
+  const mapRoutes = useMemo(() => {
+    return [
+      {
+        id: mission.id,
+        coordinates: waypoints.map((w) => ({
+          latitude: w.latitude,
+          longitude: w.longitude,
+          altitudeMeters: w.altitudeMeters
+        })),
+        color: mission.status === "ABORTED" ? "#ef4444" : "#00f0ff",
+        activeWaypointIndex: 1
+      }
+    ];
+  }, [mission, waypoints]);
 
   const handleConfirmCancel = (reason: string) => {
     setMission((prev) => (prev ? { ...prev, status: "ABORTED", progressPercent: 0 } : null));
@@ -161,6 +231,9 @@ export default function MissionDetailPage({ params }: PageProps) {
               }`}>
                 {mission.status}
               </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
+                Total: {formatDistance(totalCorridorDistanceMeters)}
+              </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               Flight Plan & Corridor Execution Cockpit
@@ -187,7 +260,7 @@ export default function MissionDetailPage({ params }: PageProps) {
           <span className="text-xs text-slate-400 block font-medium">Flight Corridor Progress</span>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="font-mono text-2xl font-bold text-cyan-400">{mission.progressPercent}%</span>
-            <span className="text-xs text-slate-400">ETA: {mission.etaMinutes} mins</span>
+            <span className="text-xs text-emerald-400 font-mono">ETA: {formatDuration(dynamicEtaSeconds)}</span>
           </div>
           <div className="mt-2 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
             <div className="h-full bg-cyan-400 rounded-full transition-all" style={{ width: `${mission.progressPercent}%` }} />
@@ -217,35 +290,32 @@ export default function MissionDetailPage({ params }: PageProps) {
         </Card>
 
         <Card variant="glass" className="p-4">
-          <span className="text-xs text-slate-400 block font-medium">Flight Plan Waypoints</span>
+          <span className="text-xs text-slate-400 block font-medium">Remaining Distance</span>
           <div className="mt-2 flex items-baseline justify-between">
-            <span className="font-mono text-2xl font-bold text-white">{waypoints.length} Fixes</span>
-            <span className="text-xs text-emerald-400">Corridor Active</span>
+            <span className="font-mono text-2xl font-bold text-cyan-300">{formatDistance(remainingCorridorDistanceMeters)}</span>
+            <span className="text-xs text-slate-400 font-mono">of {formatDistance(totalCorridorDistanceMeters)}</span>
           </div>
-          <span className="text-xs text-slate-400 mt-1 block">Cruising Alt: 60m MSL</span>
+          <span className="text-xs text-slate-400 mt-1 block">{waypoints.length} Corridor Waypoints</span>
         </Card>
       </div>
 
       {/* Main Grid: Radar Map + Flight Plan */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <Card variant="glass" className="overflow-hidden">
-            <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle>Flight Corridor Map Viewport</CardTitle>
-              <span className="text-xs font-mono text-slate-400">{mission.originAddress} → {mission.destinationAddress}</span>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="h-96 w-full">
-                <MapView
-                  markers={mapMarkers}
-                  routes={mapRoutes}
-                  geofences={DEMO_GEOFENCES}
-                  center={{ latitude: mission.originCoords.latitude, longitude: mission.originCoords.longitude }}
-                  title={`Mission Flight Plan — ${mission.code}`}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="h-[480px] w-full rounded-2xl overflow-hidden border border-slate-750 shadow-2xl">
+            <MapView
+              markers={mapMarkers}
+              routes={mapRoutes}
+              geofences={DEMO_GEOFENCES}
+              center={{ latitude: mission.originCoords.latitude, longitude: mission.originCoords.longitude }}
+              zoom={14}
+              title={`Corridor Flight Plan // ${mission.code}`}
+              mapProvider="osm"
+              showControls={true}
+              showLayerToggles={true}
+              showCoordinatesHud={true}
+            />
+          </div>
 
           {/* Waypoints Table */}
           <Card variant="glass">
@@ -269,9 +339,9 @@ export default function MissionDetailPage({ params }: PageProps) {
                     <TableRow key={wp.id}>
                       <TableCell className="font-mono text-slate-400">{wp.seq}</TableCell>
                       <TableCell className="font-medium text-white">{wp.name}</TableCell>
-                      <TableCell className="font-mono text-xs text-cyan-300">{wp.lat.toFixed(4)}, {wp.lng.toFixed(4)}</TableCell>
-                      <TableCell className="font-mono text-slate-300">{wp.alt} m</TableCell>
-                      <TableCell className="font-mono text-slate-300">{wp.speed} m/s</TableCell>
+                      <TableCell className="font-mono text-xs text-cyan-300">{wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}</TableCell>
+                      <TableCell className="font-mono text-slate-300">{wp.altitudeMeters} m</TableCell>
+                      <TableCell className="font-mono text-slate-300">{wp.speedMps} m/s</TableCell>
                       <TableCell>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                           wp.status === "COMPLETED"
@@ -338,6 +408,10 @@ export default function MissionDetailPage({ params }: PageProps) {
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                   <span className="text-slate-400">Callsign:</span>
                   <span className="font-mono font-bold text-cyan-400">{assignedDrone.callsign}</span>
+                </div>
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <span className="text-slate-400">Signal Freshness:</span>
+                  <span className="font-mono text-emerald-400 font-bold">● {freshness}</span>
                 </div>
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                   <span className="text-slate-400">Battery:</span>

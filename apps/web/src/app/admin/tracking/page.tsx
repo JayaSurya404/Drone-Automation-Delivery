@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   MapView,
@@ -30,6 +30,7 @@ import { ReturnToHomeModal } from "@/features/admin/rth-modal";
 import { EmergencyHaltModal } from "@/features/admin/emergency-modal";
 import { EmergencyClearModal } from "@/features/admin/emergency-clear-modal";
 import { EmergencyBanner } from "@/features/admin/emergency-banner";
+import { calculateTelemetryFreshness, formatDistance } from "@skynav/contracts";
 
 export default function AdminLiveTrackingPage() {
   const [selectedDroneId, setSelectedDroneId] = useState(DEMO_DRONES[0].id);
@@ -40,26 +41,31 @@ export default function AdminLiveTrackingPage() {
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
 
-  const { status: wsStatus, telemetryMap } = useRealtimeTelemetry({
+  const { status: wsStatus, telemetryMap, trailsMap } = useRealtimeTelemetry({
     channel: "telemetry:organization",
-    autoConnect: true
+    autoConnect: true,
+    maxTrailPoints: 30
   });
 
-  // Apply live telemetry updates to drones
-  const liveDrones = drones.map((d) => {
-    const live = telemetryMap.get(d.id);
-    if (!live) return d;
-    return {
-      ...d,
-      latitude: live.position.latitude,
-      longitude: live.position.longitude,
-      altitudeMeters: live.position.altitudeMeters ?? d.altitudeMeters,
-      headingDegrees: live.headingDegrees ?? d.headingDegrees,
-      speedMetersPerSecond: live.speedMetersPerSecond ?? d.speedMetersPerSecond,
-      batteryPercent: live.batteryPercent ?? d.batteryPercent,
-      status: (live.state as any) ?? d.status
-    };
-  });
+  // Apply live telemetry and bounded trails to drones
+  const liveDrones = useMemo(() => {
+    return drones.map((d) => {
+      const live = telemetryMap.get(d.id);
+      const trail = trailsMap.get(d.id) || d.trail || [];
+      if (!live) return { ...d, trail };
+      return {
+        ...d,
+        latitude: live.position.latitude,
+        longitude: live.position.longitude,
+        altitudeMeters: live.position.altitudeMeters ?? d.altitudeMeters,
+        headingDegrees: live.headingDegrees ?? d.headingDegrees,
+        speedMetersPerSecond: live.speedMetersPerSecond ?? d.speedMetersPerSecond,
+        batteryPercent: live.batteryPercent ?? d.batteryPercent,
+        status: (live.state as any) ?? d.status,
+        trail
+      };
+    });
+  }, [drones, telemetryMap, trailsMap]);
 
   const selectedDrone = liveDrones.find((d) => d.id === selectedDroneId) || liveDrones[0];
   const linkedMission = DEMO_MISSIONS.find((m) => m.droneId === selectedDrone.id || m.droneCallsign === selectedDrone.callsign);
@@ -83,36 +89,48 @@ export default function AdminLiveTrackingPage() {
     );
   };
 
-  const mapMarkers = [
-    {
-      id: "depot-alpha",
-      type: "warehouse" as const,
-      latitude: DEMO_WAREHOUSE.latitude,
-      longitude: DEMO_WAREHOUSE.longitude,
-      title: "Depot Alpha"
-    },
-    ...liveDrones.map((d) => ({
-      id: d.id,
-      type: "drone" as const,
-      latitude: d.latitude,
-      longitude: d.longitude,
-      headingDegrees: d.headingDegrees,
-      altitudeMeters: d.altitudeMeters,
-      batteryPercent: d.batteryPercent,
-      title: d.callsign,
-      status: d.status
-    }))
-  ];
+  const mapMarkers = useMemo(() => {
+    return [
+      {
+        id: "depot-alpha",
+        type: "warehouse" as const,
+        latitude: DEMO_WAREHOUSE.latitude,
+        longitude: DEMO_WAREHOUSE.longitude,
+        title: "Depot Alpha"
+      },
+      ...liveDrones.map((d) => {
+        const live = telemetryMap.get(d.id);
+        const freshness = live ? calculateTelemetryFreshness(live.observedAt) : "LIVE";
+        return {
+          id: d.id,
+          type: "drone" as const,
+          latitude: d.latitude,
+          longitude: d.longitude,
+          headingDegrees: d.headingDegrees,
+          altitudeMeters: d.altitudeMeters,
+          speedMetersPerSecond: d.speedMetersPerSecond,
+          batteryPercent: d.batteryPercent,
+          title: d.callsign,
+          status: d.status,
+          freshness,
+          trail: d.trail
+        };
+      })
+    ];
+  }, [liveDrones, telemetryMap]);
 
-  const mapRoutes = DEMO_MISSIONS.map((m) => ({
-    id: m.id,
-    coordinates: [
-      { latitude: m.originCoords.latitude, longitude: m.originCoords.longitude },
-      { latitude: m.destinationCoords.latitude, longitude: m.destinationCoords.longitude }
-    ],
-    color: m.droneCallsign === selectedDrone.callsign ? "#00f0ff" : "#475569",
-    dashed: m.droneCallsign !== selectedDrone.callsign
-  }));
+  const mapRoutes = useMemo(() => {
+    return DEMO_MISSIONS.map((m) => ({
+      id: m.id,
+      coordinates: [
+        { latitude: m.originCoords.latitude, longitude: m.originCoords.longitude },
+        { latitude: (m.originCoords.latitude + m.destinationCoords.latitude) / 2, longitude: (m.originCoords.longitude + m.destinationCoords.longitude) / 2 },
+        { latitude: m.destinationCoords.latitude, longitude: m.destinationCoords.longitude }
+      ],
+      color: m.droneCallsign === selectedDrone.callsign ? "#00f0ff" : "#475569",
+      dashed: m.droneCallsign !== selectedDrone.callsign
+    }));
+  }, [selectedDrone.callsign]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -120,9 +138,9 @@ export default function AdminLiveTrackingPage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Tactical Radar & Telemetry HUD</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">Tactical Radar & Fleet Geospatial HUD</h2>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time geospatial tracking, 3D kinematic telemetry, and human-in-the-loop flight control overrides.
+            Real-time multi-UAV cartographic tracking, 3D kinematic telemetry, and human-in-the-loop operational overrides.
           </p>
         </div>
 
@@ -171,15 +189,21 @@ export default function AdminLiveTrackingPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Radar Viewport */}
+        {/* Production Geospatial Map Viewport */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="h-[520px] w-full rounded-2xl overflow-hidden border border-slate-750">
+          <div className="h-[540px] w-full rounded-2xl overflow-hidden border border-slate-750 shadow-2xl">
             <MapView
               markers={mapMarkers}
               routes={mapRoutes}
               geofences={DEMO_GEOFENCES}
               selectedMarkerId={selectedDrone.id}
+              center={{ latitude: selectedDrone.latitude, longitude: selectedDrone.longitude }}
+              zoom={14}
               title={`Airspace Tactical Sector // Selected: ${selectedDrone.callsign}`}
+              mapProvider="osm"
+              showControls={true}
+              showLayerToggles={true}
+              showCoordinatesHud={true}
               onMarkerClick={(m) => {
                 if (m.type === "drone") {
                   setSelectedDroneId(m.id);

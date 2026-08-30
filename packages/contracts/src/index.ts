@@ -915,3 +915,9 @@ export const wsServerMessageSchema = z.discriminatedUnion("type", [
   wsServerPongMessageSchema
 ]);
 export type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
+
+// ============================================================================
+// Geospatial Utilities & Helper Types
+// ============================================================================
+export * from "./geo.js";
+

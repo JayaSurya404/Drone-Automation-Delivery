@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useMemo, use } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -17,12 +17,15 @@ import {
   CheckCircleIcon,
   ChevronLeftIcon,
   MapView,
-  ShieldIcon
+  ShieldIcon,
+  MapMarker
 } from "@skynav/ui";
 import { DEMO_DRONES, DEMO_MISSIONS, DEMO_ORDERS, DEMO_WAREHOUSE, DEMO_GEOFENCES, DemoDrone } from "@/lib/demo-data";
+import { useRealtimeTelemetry } from "@/lib/realtime";
 import { ReturnToHomeModal } from "@/features/admin/rth-modal";
 import { EmergencyHaltModal } from "@/features/admin/emergency-modal";
 import { EmergencyClearModal } from "@/features/admin/emergency-clear-modal";
+import { calculateTelemetryFreshness, formatDistance } from "@skynav/contracts";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -32,7 +35,7 @@ export default function DroneCockpitPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const droneId = resolvedParams.id;
 
-  const [drone, setDrone] = useState<DemoDrone | null>(() => {
+  const [baseDrone, setBaseDrone] = useState<DemoDrone | null>(() => {
     return DEMO_DRONES.find((d) => d.id === droneId) || DEMO_DRONES[0];
   });
 
@@ -40,7 +43,14 @@ export default function DroneCockpitPage({ params }: PageProps) {
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
-  if (!drone) {
+  const { status: wsStatus, telemetryMap, trailsMap } = useRealtimeTelemetry({
+    channel: "telemetry:drone",
+    targetId: droneId,
+    autoConnect: true,
+    maxTrailPoints: 35
+  });
+
+  if (!baseDrone) {
     return (
       <div className="p-8 text-center space-y-4">
         <h2 className="text-xl font-bold text-white">UAV Not Found</h2>
@@ -54,54 +64,102 @@ export default function DroneCockpitPage({ params }: PageProps) {
     );
   }
 
+  const liveTelemetry = telemetryMap.get(baseDrone.id);
+  const liveTrail = trailsMap.get(baseDrone.id) || baseDrone.trail || [];
+
+  const drone = useMemo(() => {
+    if (!liveTelemetry) return { ...baseDrone, trail: liveTrail };
+    return {
+      ...baseDrone,
+      latitude: liveTelemetry.position.latitude,
+      longitude: liveTelemetry.position.longitude,
+      altitudeMeters: liveTelemetry.position.altitudeMeters ?? baseDrone.altitudeMeters,
+      headingDegrees: liveTelemetry.headingDegrees ?? baseDrone.headingDegrees,
+      speedMetersPerSecond: liveTelemetry.speedMetersPerSecond ?? baseDrone.speedMetersPerSecond,
+      batteryPercent: liveTelemetry.batteryPercent ?? baseDrone.batteryPercent,
+      status: (liveTelemetry.state as any) ?? baseDrone.status,
+      trail: liveTrail
+    };
+  }, [baseDrone, liveTelemetry, liveTrail]);
+
   const activeMission = DEMO_MISSIONS.find((m) => m.droneId === drone.id || m.droneCallsign === drone.callsign);
   const activeOrder = activeMission ? DEMO_ORDERS.find((o) => o.id === activeMission.orderId) : null;
 
-  const mapMarkers = [
-    {
-      id: "depot-alpha",
-      type: "warehouse" as const,
-      latitude: DEMO_WAREHOUSE.latitude,
-      longitude: DEMO_WAREHOUSE.longitude,
-      title: "Depot Alpha"
-    },
-    {
-      id: drone.id,
-      type: "drone" as const,
-      latitude: drone.latitude,
-      longitude: drone.longitude,
-      headingDegrees: drone.headingDegrees,
-      altitudeMeters: drone.altitudeMeters,
-      batteryPercent: drone.batteryPercent,
-      title: drone.callsign,
-      status: drone.status
-    }
-  ];
+  const freshness = useMemo(() => {
+    if (!liveTelemetry) return "LIVE";
+    return calculateTelemetryFreshness(liveTelemetry.observedAt);
+  }, [liveTelemetry]);
 
-  const mapRoutes = activeMission
-    ? [
-        {
-          id: activeMission.id,
-          coordinates: [
-            { latitude: activeMission.originCoords.latitude, longitude: activeMission.originCoords.longitude },
-            { latitude: drone.latitude, longitude: drone.longitude },
-            { latitude: activeMission.destinationCoords.latitude, longitude: activeMission.destinationCoords.longitude }
-          ],
-          color: drone.status === "EMERGENCY" ? "#ef4444" : "#00f0ff"
-        }
-      ]
-    : [];
+  const mapMarkers = useMemo(() => {
+    const markersList: MapMarker[] = [
+      {
+        id: "depot-alpha",
+        type: "warehouse" as const,
+        latitude: DEMO_WAREHOUSE.latitude,
+        longitude: DEMO_WAREHOUSE.longitude,
+        title: "Depot Alpha"
+      },
+      {
+        id: drone.id,
+        type: "drone" as const,
+        latitude: drone.latitude,
+        longitude: drone.longitude,
+        headingDegrees: drone.headingDegrees,
+        altitudeMeters: drone.altitudeMeters,
+        speedMetersPerSecond: drone.speedMetersPerSecond,
+        batteryPercent: drone.batteryPercent,
+        freshness,
+        title: drone.callsign,
+        status: drone.status,
+        trail: drone.trail
+      }
+    ];
+
+    if (activeMission) {
+      markersList.push({
+        id: "dest-pad",
+        type: "destination" as const,
+        latitude: activeMission.destinationCoords.latitude,
+        longitude: activeMission.destinationCoords.longitude,
+        title: activeMission.destinationAddress,
+        headingDegrees: 0,
+        altitudeMeters: 2,
+        speedMetersPerSecond: 0,
+        batteryPercent: 100,
+        freshness: "LIVE",
+        status: "ACTIVE",
+        trail: []
+      });
+    }
+
+    return markersList;
+  }, [drone, activeMission, freshness]);
+
+  const mapRoutes = useMemo(() => {
+    if (!activeMission) return [];
+    return [
+      {
+        id: activeMission.id,
+        coordinates: [
+          { latitude: activeMission.originCoords.latitude, longitude: activeMission.originCoords.longitude },
+          { latitude: drone.latitude, longitude: drone.longitude, altitudeMeters: drone.altitudeMeters },
+          { latitude: activeMission.destinationCoords.latitude, longitude: activeMission.destinationCoords.longitude }
+        ],
+        color: drone.status === "EMERGENCY" ? "#ef4444" : "#00f0ff"
+      }
+    ];
+  }, [activeMission, drone]);
 
   const handleConfirmRTH = (reason: string) => {
-    setDrone((prev) => (prev ? { ...prev, status: "RETURNING" } : null));
+    setBaseDrone((prev) => (prev ? { ...prev, status: "RETURNING" } : null));
   };
 
   const handleConfirmEmergency = (reason: string) => {
-    setDrone((prev) => (prev ? { ...prev, status: "EMERGENCY", altitudeMeters: 0, speedMetersPerSecond: 0 } : null));
+    setBaseDrone((prev) => (prev ? { ...prev, status: "EMERGENCY", altitudeMeters: 0, speedMetersPerSecond: 0 } : null));
   };
 
   const handleConfirmClear = (reason: string) => {
-    setDrone((prev) => (prev ? { ...prev, status: "IDLE", altitudeMeters: 0, speedMetersPerSecond: 0 } : null));
+    setBaseDrone((prev) => (prev ? { ...prev, status: "IDLE", altitudeMeters: 0, speedMetersPerSecond: 0 } : null));
   };
 
   return (
@@ -119,9 +177,13 @@ export default function DroneCockpitPage({ params }: PageProps) {
               <h2 className="text-xl font-bold font-mono text-cyan-300 tracking-tight">{drone.callsign}</h2>
               <span className="text-xs text-slate-400 font-sans">({drone.model})</span>
               <DroneStatusBadge status={drone.status} size="sm" />
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${freshness === "LIVE" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                {freshness}
+              </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Live Digital Twin & Operational Telemetry Cockpit
+              Live Digital Twin & Geospatial Operations Cockpit
             </p>
           </div>
         </div>
@@ -216,7 +278,7 @@ export default function DroneCockpitPage({ params }: PageProps) {
 
         <Card variant="glass" className="p-3 text-center">
           <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Signal Link</span>
-          <span className="font-mono text-xs font-bold text-emerald-400 block mt-1">99.8% LIVE</span>
+          <span className="font-mono text-xs font-bold text-emerald-400 block mt-1">99.8% {freshness}</span>
           <span className="text-[10px] text-slate-400 block mt-0.5">10 Hz Lockstep</span>
         </Card>
 
@@ -227,29 +289,25 @@ export default function DroneCockpitPage({ params }: PageProps) {
         </Card>
       </div>
 
-      {/* Main View: Tactical Map + Active Mission Panel */}
+      {/* Main View: Production Map + Active Mission Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tactical Radar Map */}
         <div className="lg:col-span-2 space-y-4">
-          <Card variant="glass" className="overflow-hidden">
-            <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle>Tactical Map Tracking & Flight Path</CardTitle>
-              <span className="font-mono text-xs text-cyan-400">
-                GPS: {drone.latitude.toFixed(5)}, {drone.longitude.toFixed(5)}
-              </span>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="h-96 w-full">
-                <MapView
-                  markers={mapMarkers}
-                  routes={mapRoutes}
-                  geofences={DEMO_GEOFENCES}
-                  center={{ latitude: drone.latitude, longitude: drone.longitude }}
-                  title={`Cockpit Map Sector — ${drone.callsign}`}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="h-[480px] w-full rounded-2xl overflow-hidden border border-slate-750 shadow-2xl">
+            <MapView
+              markers={mapMarkers}
+              routes={mapRoutes}
+              geofences={DEMO_GEOFENCES}
+              selectedMarkerId={drone.id}
+              center={{ latitude: drone.latitude, longitude: drone.longitude }}
+              zoom={15}
+              title={`Cockpit Map Sector // ${drone.callsign}`}
+              mapProvider="osm"
+              showControls={true}
+              showLayerToggles={true}
+              showCoordinatesHud={true}
+            />
+          </div>
         </div>
 
         {/* Active Mission & Package Manifest */}

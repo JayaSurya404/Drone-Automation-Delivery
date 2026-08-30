@@ -12,6 +12,8 @@ Milestone 2D — Telemetry Transport + Realtime Live Bridge (**COMPLETED**)
 - **Orders Domain & API Foundation**: Centralized strict order state machine, WGS84 geographic location validation, package specifications, multi-tenant database scoping, customer ownership enforcement, RBAC hooks, and RFC 7807 Problem Details error envelopes implemented.
 - **Fleet Inventory & Mission Dispatch Foundation**: Centralized UAV operational state machine, fleet inventory management, mission planning state machine, atomic transactional drone-to-mission assignment with race condition protection, and decoupled simulator gateway adapter implemented.
 - **Realtime Telemetry & WebSocket Gateway**: High-throughput tenant-isolated Redis Pub/Sub transport, TelemetryWorker with schema validation and out-of-order frame tracking, authenticated Fastify WebSocket gateway (`/api/v1/ws/telemetry`), backpressure management, and Next.js realtime tactical radar hook completed and verified.
+- **Admin Fleet Operations & Emergency Controls**: Return-To-Home, Emergency Failsafe, and Clear Emergency endpoints, confirmation modals, and cockpits implemented.
+- **Production Geospatial Maps & Routing Foundation**: Production `MapView` with OpenStreetMap cartographic tiles and tactical aerospace overlay, true Spherical Web Mercator projection, real-time drone movement trails (`MAX_TRAIL_POINTS`), dynamic kinematic distance and ETA calculations, telemetry freshness indicators (`LIVE`, `DEGRADED`, `STALE`, `OFFLINE`), and privacy-safe customer tracking implemented.
 
 > **SAFETY NOTICE**: This is a deterministic software simulator and operational platform designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
@@ -107,40 +109,49 @@ Milestone 2D — Telemetry Transport + Realtime Live Bridge (**COMPLETED**)
 
 ### 6. Milestone 2D: Telemetry Transport + Realtime Live Bridge
 - **Redis Pub/Sub Transport Topology** (`services/telemetry-worker/src/publisher.ts`):
-  - Tenant-isolated channel naming: `telemetry:org:${organizationId}` (organization stream) and `telemetry:drone:${organizationId}:${droneId}` (targeted UAV stream).
-  - Pipelined JSON serialization and error-isolated publishing without blocking simulation physics.
-- **Decoupled Simulator Bridge Boundary** (`services/telemetry-worker/src/tests/simulator-bridge.test.ts`):
-  - Bridges `FleetSimulator.onTelemetry` to `TelemetryPublisher` asynchronously without mutating simulator clock progression or requiring Redis in unit tests.
+  - Tenant-isolated channel naming: `telemetry:org:${organizationId}` and `telemetry:drone:${organizationId}:${droneId}`.
 - **Telemetry Worker** (`services/telemetry-worker/src/worker.ts`):
-  - Automatic reconnects with exponential backoff and pattern subscription (`telemetry:org:*`, `telemetry:drone:*`).
-  - Strict schema validation with Zod (`parseTelemetry`) and out-of-order / stale timestamp tracking per drone.
-  - Operational metrics tracking (`messagesReceived`, `messagesValid`, `messagesInvalid`, `messagesOutOfOrder`).
+  - Reconnection with exponential backoff and pattern subscription (`telemetry:org:*`, `telemetry:drone:*`).
+  - Zod validation and out-of-order packet filtering.
 - **Fastify WebSocket Gateway** (`apps/api/src/modules/realtime/`):
-  - Endpoint: `GET /api/v1/ws/telemetry`.
-  - Authenticated via JWT token query param, Authorization Bearer header, or `AUTH` message handshake with a 10-second unauthenticated disconnect timer.
-  - Granular RBAC and Tenant Isolation:
-    - `ADMIN`, `OPERATOR`, `FLEET_MANAGER`, `DISPATCHER`: Can subscribe to entire organization stream `telemetry:organization` or specific drones.
-    - `CUSTOMER`: Prohibited from organization-wide streams (`INSUFFICIENT_PERMISSIONS`); restricted strictly to drones associated with their own active orders.
-    - Cross-tenant subscription attempts are rejected immediately (`CROSS_TENANT_SUBSCRIPTION_DENIED`).
-  - Bounded client backpressure queue (drops older intermediate frames when socket buffer exceeds 64KB).
-  - Heartbeat `PING` / `PONG` support and clean subscription teardown on socket disconnect.
-- **Frontend Realtime Hook** (`apps/web/src/lib/realtime.ts`):
-  - `useRealtimeTelemetry` hook providing automatic connection, channel subscription, reconnects, and live marker updates for `admin/tracking` and `customer/tracking`.
-- **Automated Test Coverage**:
-  - 114 total automated tests across all monorepo packages (69 API tests, 21 simulator tests, 8 telemetry worker tests, 13 contracts tests, 3 web tests).
+  - `/api/v1/ws/telemetry` with token authentication, customer and admin scoping.
+
+### 7. Milestone 3B: Admin Fleet Operations + Emergency Control
+- **Operational Command Endpoints & Auditing**:
+  - `POST /api/v1/drones/:droneId/rth`: Return-To-Home commanding with DB update, outbox events, and audit logging.
+  - `POST /api/v1/drones/:droneId/emergency`: Immediate emergency halt / landing failsafe with mandatory justification.
+  - `POST /api/v1/drones/:droneId/emergency/clear`: Safe operational clearance and reset to IDLE.
+  - `POST /api/v1/missions/:missionId/cancel`: Abort mission and order with automated UAV return-to-home.
+- **Cockpits & Modal Interfaces**:
+  - `ReturnToHomeModal`, `EmergencyHaltModal`, `EmergencyClearModal`, `CancelMissionModal`, `EmergencyBanner`.
+  - `/admin/fleet/[id]` (Drone Operations Cockpit) & `/admin/missions/[id]` (Mission Operations Cockpit).
+
+### 8. Milestone 4A: Production Maps + Geospatial Routing Foundation
+- **Shared Geospatial Core (`packages/contracts/src/geo.ts`)**:
+  - Single-source-of-truth mathematical formulas for Haversine distance, 3D distance, initial bearing azimuth, position projection, coordinate interpolation, polyline cumulative distance, remaining corridor distance, dynamic kinematic ETA, and bounding box computation.
+- **Production Interactive Map (`packages/ui/src/map/interactive-map.tsx`)**:
+  - True Spherical Web Mercator cartographic projection.
+  - Dual-layer rendering: OpenStreetMap background tile support with dark aerospace alpha blend + high-contrast SVG vector tactical overlay.
+  - Live drone markers with true heading rotation, status color coding, and telemetry freshness indicators (`LIVE`, `DEGRADED`, `STALE`, `OFFLINE`).
+  - Bounded recent movement trails (`MAX_TRAIL_POINTS`).
+  - Flight corridor visualizer with numbered waypoint fixes (`WP-0`, `WP-1`, `WP-2`) and altitude tags.
+  - Full pan/zoom interactivity via mouse drag, scroll wheel, touch pinch/drag, keyboard controls, and fullscreen toggle.
+  - Layer toggles (Tiles, Trails, Airspace Geofences, Waypoints) and coordinates HUD.
+- **Customer Tracking Portal (`apps/web/src/app/customer/tracking/page.tsx`)**:
+  - Upgraded to production map with customer privacy isolation, live drone tracking, corridor waypoints, remaining distance, dynamic ETA, and telemetry freshness.
+- **Admin Tracking & Operations Cockpits**:
+  - Upgraded `/admin/tracking`, `/admin/fleet/[id]`, and `/admin/missions/[id]` with production maps, breadcrumb trails, 3D HUD gauges, and operational action modals.
 
 ## Remaining
 
-- **Milestone 3: Geospatial Safety & Operational Hardening**:
-  - PostGIS geofence polygon management & real-time intersection alerts
-  - Weather snapshot risk scoring & automatic hold/reroute rules
-  - Operator intervention suite (Manual Return-To-Home, Emergency Abort)
-- **Milestone 4: Advisory AI & Predictive Routing**
+- **Milestone 4B: PostGIS Geofence Spatial Analysis & Weather Restrictions**
+- **Milestone 4C: Advisory AI & Predictive Multi-Drop Routing**
 - **Milestone 5: Advanced Simulation & Edge Integration**
 
 ## Recommended next step
 
-Implement Milestone 3: Geospatial Safety & Operational Hardening (PostGIS geofence polygon boundary checks, spatial containment queries, weather risk scoring, and operator intervention controls).
+Implement Milestone 4B: PostGIS Geofence Spatial Analysis & Weather Restrictions (PostGIS spatial intersection queries, active corridor containment checks, and automated weather hold rules).
+
 
 ## Important decisions
 

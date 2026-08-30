@@ -19,6 +19,7 @@ export interface DemoDrone {
   flightHours: number;
   payloadCapacityKg: number;
   currentMissionId?: string;
+  trail?: Array<{ latitude: number; longitude: number; altitudeMeters?: number }>;
 }
 
 export interface DemoOrder {
@@ -107,7 +108,13 @@ export const DEMO_DRONES: DemoDrone[] = [
     longitude: -122.4158,
     flightHours: 142.5,
     payloadCapacityKg: 4.5,
-    currentMissionId: "MIS-401"
+    currentMissionId: "MIS-401",
+    trail: [
+      { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 0 },
+      { latitude: 37.7761, longitude: -122.4182, altitudeMeters: 25 },
+      { latitude: 37.7775, longitude: -122.4170, altitudeMeters: 45 },
+      { latitude: 37.7792, longitude: -122.4158, altitudeMeters: 58 }
+    ]
   },
   {
     id: "00000000-0000-0000-0000-000000000012",
@@ -122,7 +129,13 @@ export const DEMO_DRONES: DemoDrone[] = [
     longitude: -122.4082,
     flightHours: 89.1,
     payloadCapacityKg: 2.5,
-    currentMissionId: "MIS-402"
+    currentMissionId: "MIS-402",
+    trail: [
+      { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 0 },
+      { latitude: 37.7790, longitude: -122.4140, altitudeMeters: 55 },
+      { latitude: 37.7820, longitude: -122.4100, altitudeMeters: 50 },
+      { latitude: 37.7845, longitude: -122.4082, altitudeMeters: 3 }
+    ]
   },
   {
     id: "00000000-0000-0000-0000-000000000013",
@@ -137,7 +150,12 @@ export const DEMO_DRONES: DemoDrone[] = [
     longitude: -122.4172,
     flightHours: 210.3,
     payloadCapacityKg: 4.5,
-    currentMissionId: "MIS-403"
+    currentMissionId: "MIS-403",
+    trail: [
+      { latitude: 37.7890, longitude: -122.4010, altitudeMeters: 5 },
+      { latitude: 37.7830, longitude: -122.4090, altitudeMeters: 60 },
+      { latitude: 37.7768, longitude: -122.4172, altitudeMeters: 62 }
+    ]
   },
   {
     id: "00000000-0000-0000-0000-000000000014",
@@ -151,7 +169,8 @@ export const DEMO_DRONES: DemoDrone[] = [
     latitude: 37.7749,
     longitude: -122.4194,
     flightHours: 34.0,
-    payloadCapacityKg: 2.0
+    payloadCapacityKg: 2.0,
+    trail: []
   },
   {
     id: "00000000-0000-0000-0000-000000000015",
@@ -165,7 +184,8 @@ export const DEMO_DRONES: DemoDrone[] = [
     latitude: 37.7749,
     longitude: -122.4194,
     flightHours: 312.8,
-    payloadCapacityKg: 2.5
+    payloadCapacityKg: 2.5,
+    trail: []
   }
 ];
 
