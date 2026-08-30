@@ -3,6 +3,7 @@ import {
   createMissionRequestSchema,
   assignMissionRequestSchema,
   updateMissionStatusRequestSchema,
+  cancelMissionRequestSchema,
   missionListQuerySchema,
   uuidSchema
 } from "@skynav/contracts";
@@ -47,6 +48,25 @@ export function createMissionRoutes(missionService: MissionService): FastifyPlug
         const query = missionListQuerySchema.parse(request.query);
         const result = await missionService.listMissions(request.user!, query);
         return reply.status(200).send(result);
+      }
+    );
+
+    // ------------------------------------------------------------------------
+    // GET /api/v1/missions/:missionId/detail: Retrieve comprehensive mission details
+    // ------------------------------------------------------------------------
+    app.get<{ Params: { missionId: string } }>(
+      "/api/v1/missions/:missionId/detail",
+      {
+        preHandler: [
+          requireAuthenticated,
+          requireTenantIsolation,
+          requirePermission("missions:read")
+        ]
+      },
+      async (request, reply) => {
+        const missionId = uuidSchema.parse(request.params.missionId);
+        const mission = await missionService.getMissionDetail(request.user!, missionId);
+        return reply.status(200).send({ data: mission });
       }
     );
 
@@ -106,6 +126,26 @@ export function createMissionRoutes(missionService: MissionService): FastifyPlug
         const body = updateMissionStatusRequestSchema.parse(request.body);
         const mission = await missionService.updateMissionStatus(request.user!, missionId, body);
         return reply.status(200).send({ data: mission });
+      }
+    );
+
+    // ------------------------------------------------------------------------
+    // POST /api/v1/missions/:missionId/cancel: Safely cancel mission & command RTH
+    // ------------------------------------------------------------------------
+    app.post<{ Params: { missionId: string } }>(
+      "/api/v1/missions/:missionId/cancel",
+      {
+        preHandler: [
+          requireAuthenticated,
+          requireTenantIsolation,
+          requirePermission("missions:command")
+        ]
+      },
+      async (request, reply) => {
+        const missionId = uuidSchema.parse(request.params.missionId);
+        const body = cancelMissionRequestSchema.parse(request.body);
+        const result = await missionService.cancelMission(request.user!, missionId, body.reason);
+        return reply.status(200).send({ data: result });
       }
     );
   };

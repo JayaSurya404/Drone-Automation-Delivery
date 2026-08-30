@@ -476,4 +476,159 @@ describe("Missions / HTTP API Behavioral Integration", () => {
     assert.equal(badTransition.statusCode, 422);
     assert.equal(JSON.parse(badTransition.body).code, "INVALID_MISSION_STATE_TRANSITION");
   });
+
+  it("14. GET /api/v1/missions/:missionId/detail returns detailed mission, order, drone, and 3D flight waypoints", async () => {
+    const { app, orderRepo, fleetRepo, missionRepo, signToken } = await setupTestApp();
+    const opToken = signToken(operatorUser);
+
+    const order = await orderRepo.create({
+      id: crypto.randomUUID(),
+      order_number: "ORD-DET-101",
+      organization_id: operatorUser.organizationId,
+      customer_id: customerUser.id,
+      status: "ASSIGNED",
+      priority: "STANDARD",
+      pickup_latitude: 37.7749,
+      pickup_longitude: -122.4194,
+      pickup_altitude_meters: 0,
+      delivery_latitude: 37.7850,
+      delivery_longitude: -122.4100,
+      delivery_altitude_meters: 0,
+      package_weight_grams: 800,
+      package_length_cm: 10,
+      package_width_cm: 10,
+      package_height_cm: 10,
+      package_description: "Medical Vaccine Cooler"
+    });
+
+    const drone = await fleetRepo.create({
+      id: crypto.randomUUID(),
+      organization_id: operatorUser.organizationId,
+      model_id: null,
+      call_sign: "SKY-MSN-DET",
+      model: "AeroHex V4",
+      serial_number: "SN-999",
+      status: "ASSIGNED",
+      battery_percent: 92,
+      max_payload_grams: 5000,
+      current_latitude: 37.7749,
+      current_longitude: -122.4194,
+      current_altitude_meters: 0,
+      home_latitude: 37.7749,
+      home_longitude: -122.4194,
+      home_altitude_meters: 0,
+      is_active: true
+    });
+
+    const mission = await missionRepo.create({
+      id: crypto.randomUUID(),
+      mission_number: "MSN-DETAIL-TEST",
+      organization_id: operatorUser.organizationId,
+      order_id: order.id,
+      drone_id: drone.id,
+      status: "ASSIGNED",
+      origin_latitude: 37.7749,
+      origin_longitude: -122.4194,
+      destination_latitude: 37.7850,
+      destination_longitude: -122.4100
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/v1/missions/${mission.id}/detail`,
+      headers: { Authorization: `Bearer ${opToken}` }
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.data.id, mission.id);
+    assert.equal(body.data.order.orderNumber, "ORD-DET-101");
+    assert.equal(body.data.drone.callSign, "SKY-MSN-DET");
+    assert.ok(body.data.waypoints.length >= 3);
+    assert.equal(body.data.canCancel, true);
+  });
+
+  it("15. POST /api/v1/missions/:missionId/cancel safely cancels active mission and commands drone RTH", async () => {
+    const { app, orderRepo, fleetRepo, missionRepo, signToken, auditService } = await setupTestApp();
+    const opToken = signToken(operatorUser);
+
+    const order = await orderRepo.create({
+      id: crypto.randomUUID(),
+      order_number: "ORD-CANCEL-1",
+      organization_id: operatorUser.organizationId,
+      customer_id: customerUser.id,
+      status: "IN_TRANSIT",
+      priority: "STANDARD",
+      pickup_latitude: 37.7749,
+      pickup_longitude: -122.4194,
+      pickup_altitude_meters: 0,
+      delivery_latitude: 37.7850,
+      delivery_longitude: -122.4100,
+      delivery_altitude_meters: 0,
+      package_weight_grams: 800,
+      package_length_cm: 10,
+      package_width_cm: 10,
+      package_height_cm: 10,
+      package_description: "Documents"
+    });
+
+    const drone = await fleetRepo.create({
+      id: crypto.randomUUID(),
+      organization_id: operatorUser.organizationId,
+      model_id: null,
+      call_sign: "SKY-CAN-1",
+      model: "AeroHex V4",
+      serial_number: "SN-CAN-1",
+      status: "EN_ROUTE",
+      battery_percent: 88,
+      max_payload_grams: 5000,
+      current_latitude: 37.7780,
+      current_longitude: -122.4150,
+      current_altitude_meters: 60,
+      home_latitude: 37.7749,
+      home_longitude: -122.4194,
+      home_altitude_meters: 0,
+      is_active: true
+    });
+
+    const mission = await missionRepo.create({
+      id: crypto.randomUUID(),
+      mission_number: "MSN-CANCEL-TEST",
+      organization_id: operatorUser.organizationId,
+      order_id: order.id,
+      drone_id: drone.id,
+      status: "IN_PROGRESS",
+      origin_latitude: 37.7749,
+      origin_longitude: -122.4194,
+      destination_latitude: 37.7850,
+      destination_longitude: -122.4100
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/v1/missions/${mission.id}/cancel`,
+      headers: { Authorization: `Bearer ${opToken}` },
+      payload: { reason: "Airspace closed due to sudden VIP flight corridor restrictions" }
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.data.success, true);
+    assert.equal(body.data.command, "CANCEL_MISSION");
+    assert.equal(body.data.status, "CANCELLED");
+
+    // Mission and Order should be cancelled
+    const updatedMission = await missionRepo.findById(mission.id, operatorUser.organizationId);
+    assert.equal(updatedMission?.status, "CANCELLED");
+
+    const updatedOrder = await orderRepo.findById(order.id, operatorUser.organizationId);
+    assert.equal(updatedOrder?.status, "CANCELLED");
+
+    // Airborne drone should be commanded to RETURNING
+    const updatedDrone = await fleetRepo.findById(drone.id, operatorUser.organizationId);
+    assert.equal(updatedDrone?.status, "RETURNING");
+
+    // Audit record logged
+    assert.ok(auditService.logs.some((l) => l.action === "MISSION_CANCELLED"));
+  });
 });

@@ -224,6 +224,10 @@ export class SimulatorSyncService implements SimulatorGateway {
               }
             }).catch(() => {});
           }
+        } else if (state === "IDLE") {
+          await this.fleetRepo?.update(event.droneId, orgId, {
+            status: "IDLE"
+          }).catch(() => {});
         }
       }
     }
@@ -334,11 +338,19 @@ export class SimulatorSyncService implements SimulatorGateway {
     };
   }
 
-  async triggerReturnToHome(droneId: string): Promise<SimulatorGatewayResponse> {
-    this.simulator.returnToHome(droneId, "Return to Home commanded by operator");
+  async triggerReturnToHome(droneId: string, reason = "Return-To-Home commanded by operator"): Promise<SimulatorGatewayResponse> {
+    this.simulator.returnToHome(droneId, reason);
     return {
       accepted: true,
-      message: `Return-To-Home commanded in simulation for UAV '${droneId}'.`
+      message: `Return-To-Home commanded in simulation for UAV '${droneId}': ${reason}.`
+    };
+  }
+
+  async clearEmergency(droneId: string): Promise<SimulatorGatewayResponse> {
+    this.simulator.clearEmergency(droneId);
+    return {
+      accepted: true,
+      message: `Emergency cleared in simulation for UAV '${droneId}'.`
     };
   }
 

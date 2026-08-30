@@ -140,7 +140,11 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
   const authService = options.authService ?? (authRepo && auditService ? createAuthService(authRepo, auditService, jwtSign) : undefined as any);
   const orderService = options.orderService ?? (orderRepo && auditService ? createOrderService(orderRepo, auditService, outboxRepo) : undefined as any);
-  const fleetService = options.fleetService ?? (fleetRepo && auditService ? createFleetService(fleetRepo, auditService, outboxRepo) : undefined as any);
+  const fleetService =
+    options.fleetService ??
+    (fleetRepo && auditService
+      ? createFleetService(fleetRepo, auditService, outboxRepo, simulatorGateway, missionRepo, orderRepo)
+      : undefined as any);
   const missionService =
     options.missionService ??
     (missionRepo && orderRepo && fleetRepo && auditService
