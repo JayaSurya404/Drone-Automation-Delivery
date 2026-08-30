@@ -33,6 +33,8 @@ export interface ListDronesFilter {
   offset: number;
 }
 
+import type { FleetSummaryResponse } from "@skynav/contracts";
+
 export interface FleetRepository {
   create(drone: NewDroneRecord): Promise<DroneRecord>;
   findById(id: string, organizationId: string): Promise<DroneRecord | null>;
@@ -40,6 +42,7 @@ export interface FleetRepository {
   update(id: string, organizationId: string, updates: DroneUpdateRecord): Promise<DroneRecord | null>;
   reserveForMission(id: string, organizationId: string): Promise<DroneRecord | null>;
   list(filter: ListDronesFilter): Promise<{ drones: DroneRecord[]; total: number }>;
+  getSummary(organizationId: string): Promise<FleetSummaryResponse>;
 }
 
 export function createFleetRepository(db: Kysely<Database>): FleetRepository {
@@ -142,6 +145,69 @@ export function createFleetRepository(db: Kysely<Database>): FleetRepository {
       return {
         drones: rows as DroneRecord[],
         total
+      };
+    },
+
+    async getSummary(organizationId: string): Promise<FleetSummaryResponse> {
+      const rows = (await db
+        .selectFrom("drones")
+        .selectAll()
+        .where("organization_id", "=", organizationId)
+        .execute()) as DroneRecord[];
+
+      let availableDrones = 0;
+      let assignedDrones = 0;
+      let inFlightDrones = 0;
+      let deliveringDrones = 0;
+      let returningDrones = 0;
+      let emergencyDrones = 0;
+      let offlineDrones = 0;
+      let lowBatteryDrones = 0;
+      let criticalBatteryDrones = 0;
+
+      for (const d of rows) {
+        if (!d.is_active || d.status === "OFFLINE") {
+          offlineDrones++;
+        } else if (d.status === "EMERGENCY") {
+          emergencyDrones++;
+        } else if (d.status === "AVAILABLE" || d.status === "IDLE") {
+          availableDrones++;
+        } else if (d.status === "ASSIGNED") {
+          assignedDrones++;
+        } else if (
+          d.status === "TAKEOFF" ||
+          d.status === "EN_ROUTE" ||
+          d.status === "IN_FLIGHT" ||
+          d.status === "ARRIVED"
+        ) {
+          inFlightDrones++;
+        } else if (d.status === "DELIVERING") {
+          deliveringDrones++;
+        } else if (d.status === "RETURNING") {
+          returningDrones++;
+        }
+
+        if (d.battery_percent < 30) {
+          lowBatteryDrones++;
+        }
+        if (d.battery_percent < 15) {
+          criticalBatteryDrones++;
+        }
+      }
+
+      return {
+        organizationId,
+        totalDrones: rows.length,
+        availableDrones,
+        assignedDrones,
+        inFlightDrones,
+        deliveringDrones,
+        returningDrones,
+        emergencyDrones,
+        offlineDrones,
+        lowBatteryDrones,
+        criticalBatteryDrones,
+        timestamp: new Date().toISOString()
       };
     }
   };

@@ -122,6 +122,16 @@ export class FleetSimulator {
     }
   }
 
+  /**
+   * Clears active emergency state on a specific drone.
+   */
+  public clearEmergency(droneId: string): void {
+    const drone = this._drones.get(droneId);
+    if (drone) {
+      drone.clearEmergency();
+    }
+  }
+
   // ==========================================================================
   // Simulation Clock Progression
   // ==========================================================================

@@ -6,22 +6,49 @@ import type {
   MissionResponse,
   MissionListQuery,
   MissionListResponse,
-  MissionStatus
+  MissionStatus,
+  MissionDetailResponse,
+  OperationalCommandResponse,
+  WaypointDto,
+  DroneResponse,
+  OrderResponse
 } from "@skynav/contracts";
 import type { MissionRepository, MissionRecord, MissionUpdateRecord } from "./mission.repository.js";
-import { MissionNotFoundError } from "./mission.repository.js";
+import {
+  canAssignDroneToMission,
+  validateMissionStateTransition,
+  isTerminalMissionStatus,
+  InvalidMissionStateTransitionError
+} from "./mission.state-machine.js";
 import type { OrderRepository } from "../orders/order.repository.js";
-import { OrderNotFoundError } from "../orders/order.service.js";
 import type { FleetRepository } from "../fleet/fleet.repository.js";
 import type { SimulatorGateway } from "./simulator.adapter.js";
 import type { AuditService } from "../audit/audit.service.js";
-import { validateMissionStateTransition } from "./mission.state-machine.js";
+import type { OutboxRepository } from "../events/outbox.repository.js";
+import { DroneNotFoundError, DroneNotAvailableError } from "../fleet/fleet.service.js";
+import { OrderNotFoundError } from "../orders/order.service.js";
+
+export class MissionNotFoundError extends Error {
+  public readonly code = "MISSION_NOT_FOUND";
+  constructor(missionId: string) {
+    super(`Mission with ID '${missionId}' was not found in this organization.`);
+    this.name = "MissionNotFoundError";
+  }
+}
 
 export class DuplicateActiveMissionError extends Error {
   public readonly code = "DUPLICATE_ACTIVE_MISSION";
   constructor(orderId: string) {
-    super(`An active delivery mission already exists for order '${orderId}'.`);
+    super(`An active mission is already assigned to Order '${orderId}'.`);
     this.name = "DuplicateActiveMissionError";
+  }
+}
+
+export class MissionAssignmentForbiddenError extends Error {
+  public readonly code = "MISSION_ASSIGNMENT_FORBIDDEN";
+  constructor(message: string) {
+    super(message);
+    this.name = "MissionAssignmentForbiddenError";
   }
 }
 
@@ -36,16 +63,12 @@ export class MissionForbiddenError extends Error {
 export interface MissionService {
   createMission(user: AuthenticatedUser, input: CreateMissionRequest): Promise<MissionResponse>;
   getMission(user: AuthenticatedUser, missionId: string): Promise<MissionResponse>;
+  getMissionDetail(user: AuthenticatedUser, missionId: string): Promise<MissionDetailResponse>;
   assignDrone(user: AuthenticatedUser, missionId: string, droneId: string): Promise<MissionResponse>;
-  updateMissionStatus(
-    user: AuthenticatedUser,
-    missionId: string,
-    input: UpdateMissionStatusRequest
-  ): Promise<MissionResponse>;
+  updateMissionStatus(user: AuthenticatedUser, missionId: string, input: UpdateMissionStatusRequest): Promise<MissionResponse>;
+  cancelMission(user: AuthenticatedUser, missionId: string, reason: string): Promise<OperationalCommandResponse>;
   listMissions(user: AuthenticatedUser, query: MissionListQuery): Promise<MissionListResponse>;
 }
-
-import type { OutboxRepository } from "../events/outbox.repository.js";
 
 export function createMissionService(
   missionRepo: MissionRepository,
@@ -121,21 +144,12 @@ export function createMissionService(
         status: "PENDING",
         origin_latitude: input.origin?.latitude ?? order.pickup_latitude,
         origin_longitude: input.origin?.longitude ?? order.pickup_longitude,
-        origin_altitude_meters: input.origin?.altitudeMeters ?? order.pickup_altitude_meters,
-        origin_address: input.origin?.address ?? order.pickup_address,
+        origin_altitude_meters: input.origin?.altitudeMeters ?? order.pickup_altitude_meters ?? 0,
+        origin_address: input.origin?.address ?? order.pickup_address ?? null,
         destination_latitude: input.destination?.latitude ?? order.delivery_latitude,
         destination_longitude: input.destination?.longitude ?? order.delivery_longitude,
-        destination_altitude_meters: input.destination?.altitudeMeters ?? order.delivery_altitude_meters,
-        destination_address: input.destination?.address ?? order.delivery_address,
-        assigned_at: null,
-        launched_at: null,
-        completed_at: null,
-        cancelled_at: null,
-        cancellation_reason: null,
-        failed_at: null,
-        failure_reason: null,
-        emergency_at: null,
-        emergency_reason: null
+        destination_altitude_meters: input.destination?.altitudeMeters ?? order.delivery_altitude_meters ?? 0,
+        destination_address: input.destination?.address ?? order.delivery_address ?? null
       });
 
       if (outboxRepo) {
@@ -149,8 +163,8 @@ export function createMissionService(
           aggregateId: missionId,
           actorId: user.id,
           payload: {
-            missionNumber,
-            orderId: input.orderId,
+            missionNumber: newRecord.mission_number,
+            orderId: newRecord.order_id,
             customerId: order.customer_id
           }
         });
@@ -163,8 +177,8 @@ export function createMissionService(
         resourceType: "mission",
         resourceId: missionId,
         metadata: {
-          missionNumber,
-          orderId: input.orderId
+          missionNumber: newRecord.mission_number,
+          orderId: newRecord.order_id
         }
       });
 
@@ -176,37 +190,193 @@ export function createMissionService(
       if (!mission) {
         throw new MissionNotFoundError(missionId);
       }
+
       return mapRecordToResponse(mission);
     },
 
-    async assignDrone(
-      user: AuthenticatedUser,
-      missionId: string,
-      droneId: string
-    ): Promise<MissionResponse> {
-      // Execute atomic transaction for mission, drone, and order
-      const { mission, drone, order } = await missionRepo.assignDroneAtomically({
+    async getMissionDetail(user: AuthenticatedUser, missionId: string): Promise<MissionDetailResponse> {
+      const mission = await missionRepo.findById(missionId, user.organizationId);
+      if (!mission) {
+        throw new MissionNotFoundError(missionId);
+      }
+
+      const base = mapRecordToResponse(mission);
+
+      // Resolve linked order
+      let order: OrderResponse | null = null;
+      const orderRecord = await orderRepo.findById(mission.order_id, user.organizationId);
+      if (orderRecord) {
+        order = {
+          id: orderRecord.id,
+          orderNumber: orderRecord.order_number,
+          organizationId: orderRecord.organization_id,
+          customerId: orderRecord.customer_id,
+          status: orderRecord.status as any,
+          priority: orderRecord.priority as any,
+          pickup: {
+            latitude: orderRecord.pickup_latitude,
+            longitude: orderRecord.pickup_longitude,
+            altitudeMeters: orderRecord.pickup_altitude_meters,
+            address: orderRecord.pickup_address ?? undefined
+          },
+          delivery: {
+            latitude: orderRecord.delivery_latitude,
+            longitude: orderRecord.delivery_longitude,
+            altitudeMeters: orderRecord.delivery_altitude_meters,
+            address: orderRecord.delivery_address ?? undefined
+          },
+          package: {
+            weightGrams: orderRecord.package_weight_grams,
+            lengthCm: orderRecord.package_length_cm ?? undefined,
+            widthCm: orderRecord.package_width_cm ?? undefined,
+            heightCm: orderRecord.package_height_cm ?? undefined,
+            description: orderRecord.package_description ?? undefined
+          },
+          deliveryNotes: orderRecord.delivery_notes ?? null,
+          assignedAt: orderRecord.assigned_at ? new Date(orderRecord.assigned_at).toISOString() : null,
+          deliveredAt: orderRecord.delivered_at ? new Date(orderRecord.delivered_at).toISOString() : null,
+          cancelledAt: orderRecord.cancelled_at ? new Date(orderRecord.cancelled_at).toISOString() : null,
+          cancellationReason: orderRecord.cancellation_reason ?? null,
+          createdAt: new Date(orderRecord.created_at).toISOString(),
+          updatedAt: new Date(orderRecord.updated_at).toISOString()
+        };
+      }
+
+      // Resolve assigned drone
+      let drone: DroneResponse | null = null;
+      if (mission.drone_id) {
+        const droneRecord = await fleetRepo.findById(mission.drone_id, user.organizationId);
+        if (droneRecord) {
+          drone = {
+            id: droneRecord.id,
+            organizationId: droneRecord.organization_id,
+            callSign: droneRecord.call_sign,
+            model: droneRecord.model,
+            serialNumber: droneRecord.serial_number ?? null,
+            status: droneRecord.status as any,
+            batteryPercent: droneRecord.battery_percent,
+            maxPayloadGrams: droneRecord.max_payload_grams,
+            currentLocation: {
+              latitude: droneRecord.current_latitude,
+              longitude: droneRecord.current_longitude,
+              altitudeMeters: droneRecord.current_altitude_meters
+            },
+            homeLocation: {
+              latitude: droneRecord.home_latitude,
+              longitude: droneRecord.home_longitude,
+              altitudeMeters: droneRecord.home_altitude_meters
+            },
+            isActive: droneRecord.is_active,
+            createdAt: new Date(droneRecord.created_at).toISOString(),
+            updatedAt: new Date(droneRecord.updated_at).toISOString()
+          };
+        }
+      }
+
+      // Compute waypoints for 3D flight plan
+      const waypoints: WaypointDto[] = [
+        {
+          id: `wp-${mission.id}-origin`,
+          sequence: 0,
+          latitude: mission.origin_latitude,
+          longitude: mission.origin_longitude,
+          altitudeMeters: 60,
+          targetSpeedMps: 15
+        },
+        {
+          id: `wp-${mission.id}-mid`,
+          sequence: 1,
+          latitude: (mission.origin_latitude + mission.destination_latitude) / 2,
+          longitude: (mission.origin_longitude + mission.destination_longitude) / 2,
+          altitudeMeters: 60,
+          targetSpeedMps: 18
+        },
+        {
+          id: `wp-${mission.id}-dest`,
+          sequence: 2,
+          latitude: mission.destination_latitude,
+          longitude: mission.destination_longitude,
+          altitudeMeters: 2,
+          targetSpeedMps: 2,
+          isDeliveryPoint: true
+        }
+      ];
+
+      // Compute progress percent
+      const progressMap: Record<string, number> = {
+        PENDING: 0,
+        PLANNED: 0,
+        VALIDATING: 5,
+        READY: 10,
+        AUTHORIZED: 15,
+        ASSIGNED: 20,
+        LAUNCHING: 30,
+        DISPATCHED: 40,
+        IN_PROGRESS: 60,
+        DELIVERING: 80,
+        RETURNING: 90,
+        COMPLETED: 100,
+        CANCELLED: 0,
+        FAILED: 0,
+        ABORTED: 0,
+        EMERGENCY: 50
+      };
+      const progressPercent = progressMap[mission.status] ?? 0;
+
+      const canCancel = !isTerminalMissionStatus(mission.status as any);
+      const canRTH = Boolean(
+        mission.drone_id &&
+        ["LAUNCHING", "DISPATCHED", "IN_PROGRESS", "DELIVERING", "EMERGENCY"].includes(mission.status)
+      );
+
+      return {
+        ...base,
+        order,
+        drone,
+        waypoints,
+        currentWaypointIndex: mission.status === "COMPLETED" ? 2 : mission.status === "DELIVERING" ? 2 : 1,
+        progressPercent,
+        canCancel,
+        canRTH
+      };
+    },
+
+    async assignDrone(user: AuthenticatedUser, missionId: string, droneId: string): Promise<MissionResponse> {
+      // 1. Verify mission exists
+      const mission = await missionRepo.findById(missionId, user.organizationId);
+      if (!mission) {
+        throw new MissionNotFoundError(missionId);
+      }
+
+      if (!canAssignDroneToMission(mission.status as MissionStatus)) {
+        throw new MissionAssignmentForbiddenError(
+          `Mission '${mission.mission_number}' is in status '${mission.status}' and cannot receive a drone assignment.`
+        );
+      }
+
+      // 2. Perform atomic assignment with DB-level row locks
+      const { mission: updatedMission, drone, order } = await missionRepo.assignDroneAtomically({
         missionId,
         droneId,
         organizationId: user.organizationId
       });
 
-      // Notify Simulator Gateway boundary
+      // 3. Notify Simulator Gateway boundary
       await simulatorGateway.assignMission({
-        missionId: mission.id,
+        missionId: updatedMission.id,
         organizationId: user.organizationId,
         droneId: drone.id,
         orderId: order.id,
         customerId: order.customer_id,
         origin: {
-          latitude: mission.origin_latitude,
-          longitude: mission.origin_longitude,
-          altitudeMeters: mission.origin_altitude_meters ?? 0
+          latitude: updatedMission.origin_latitude,
+          longitude: updatedMission.origin_longitude,
+          altitudeMeters: updatedMission.origin_altitude_meters ?? 0
         },
         destination: {
-          latitude: mission.destination_latitude,
-          longitude: mission.destination_longitude,
-          altitudeMeters: mission.destination_altitude_meters ?? 0
+          latitude: updatedMission.destination_latitude,
+          longitude: updatedMission.destination_longitude,
+          altitudeMeters: updatedMission.destination_altitude_meters ?? 0
         }
       });
 
@@ -218,44 +388,32 @@ export function createMissionService(
           occurredAt: new Date().toISOString(),
           organizationId: user.organizationId,
           aggregateType: "MISSION",
-          aggregateId: mission.id,
+          aggregateId: updatedMission.id,
           actorId: user.id,
           payload: {
+            missionNumber: updatedMission.mission_number,
+            orderId: order.id,
             droneId: drone.id,
             droneCallSign: drone.call_sign,
-            orderId: order.id,
             customerId: order.customer_id
           }
         });
       }
 
-      // Audit logs
       await auditService.log({
         organizationId: user.organizationId,
         actorUserId: user.id,
         action: "MISSION_ASSIGNED",
         resourceType: "mission",
-        resourceId: mission.id,
+        resourceId: updatedMission.id,
         metadata: {
-          droneId,
+          droneId: drone.id,
           droneCallSign: drone.call_sign,
           orderId: order.id
         }
       });
 
-      await auditService.log({
-        organizationId: user.organizationId,
-        actorUserId: user.id,
-        action: "DRONE_STATUS_UPDATED",
-        resourceType: "drone",
-        resourceId: droneId,
-        metadata: {
-          newStatus: "ASSIGNED",
-          missionId: mission.id
-        }
-      });
-
-      return mapRecordToResponse(mission);
+      return mapRecordToResponse(updatedMission);
     },
 
     async updateMissionStatus(
@@ -311,7 +469,6 @@ export function createMissionService(
         };
         const eventType = (missionEventMap[input.status] ?? "MISSION_STATUS_UPDATED") as any;
 
-        // Fetch order to include customerId in payload if possible
         const linkedOrder = await orderRepo.findById(updated.order_id, user.organizationId);
 
         await outboxRepo.insert({
@@ -355,6 +512,126 @@ export function createMissionService(
       });
 
       return mapRecordToResponse(updated);
+    },
+
+    async cancelMission(
+      user: AuthenticatedUser,
+      missionId: string,
+      reason: string
+    ): Promise<OperationalCommandResponse> {
+      if (!reason || reason.trim().length < 3) {
+        throw new Error("Cancellation reason is required and must be at least 3 characters.");
+      }
+
+      const mission = await missionRepo.findById(missionId, user.organizationId);
+      if (!mission) {
+        throw new MissionNotFoundError(missionId);
+      }
+
+      if (isTerminalMissionStatus(mission.status as any)) {
+        throw new InvalidMissionStateTransitionError(mission.status as MissionStatus, "CANCELLED");
+      }
+
+      const now = new Date();
+
+      // 1. If assigned to a drone, handle simulator & fleet state safely
+      if (mission.drone_id) {
+        const drone = await fleetRepo.findById(mission.drone_id, user.organizationId);
+        if (drone) {
+          if (["TAKEOFF", "EN_ROUTE", "DELIVERING", "IN_FLIGHT", "ARRIVED"].includes(drone.status)) {
+            // Drone is in the air: trigger safe Return-To-Home
+            await fleetRepo.update(drone.id, user.organizationId, {
+              status: "RETURNING"
+            });
+            await simulatorGateway.triggerReturnToHome(drone.id, `Mission Cancelled: ${reason}`);
+          } else if (drone.status === "ASSIGNED") {
+            // Drone has not launched: reset to IDLE
+            await fleetRepo.update(drone.id, user.organizationId, {
+              status: "IDLE"
+            });
+          }
+        }
+      }
+
+      // 2. Update mission in database
+      const updatedMission = await missionRepo.update(missionId, user.organizationId, {
+        status: "CANCELLED",
+        cancelled_at: now,
+        cancellation_reason: reason
+      });
+
+      // 3. Update linked order to CANCELLED
+      const order = await orderRepo.findById(mission.order_id, user.organizationId);
+      if (order && order.status !== "DELIVERED" && order.status !== "CANCELLED") {
+        await orderRepo.update(order.id, user.organizationId, {
+          status: "CANCELLED",
+          cancelled_at: now,
+          cancellation_reason: reason
+        });
+      }
+
+      // 4. Emit outbox events
+      if (outboxRepo) {
+        await outboxRepo.insert({
+          id: crypto.randomUUID(),
+          version: "v1",
+          eventType: "MISSION_CANCELLED",
+          occurredAt: now.toISOString(),
+          organizationId: user.organizationId,
+          aggregateType: "MISSION",
+          aggregateId: missionId,
+          actorId: user.id,
+          payload: {
+            missionNumber: mission.mission_number,
+            orderId: mission.order_id,
+            droneId: mission.drone_id,
+            customerId: order?.customer_id ?? null,
+            reason
+          }
+        });
+
+        if (order) {
+          await outboxRepo.insert({
+            id: crypto.randomUUID(),
+            version: "v1",
+            eventType: "ORDER_CANCELLED",
+            occurredAt: now.toISOString(),
+            organizationId: user.organizationId,
+            aggregateType: "ORDER",
+            aggregateId: order.id,
+            actorId: user.id,
+            payload: {
+              orderNumber: order.order_number,
+              customerId: order.customer_id,
+              reason
+            }
+          });
+        }
+      }
+
+      // 5. Log audit
+      await auditService.log({
+        organizationId: user.organizationId,
+        actorUserId: user.id,
+        action: "MISSION_CANCELLED",
+        resourceType: "mission",
+        resourceId: missionId,
+        metadata: {
+          missionNumber: mission.mission_number,
+          orderId: mission.order_id,
+          droneId: mission.drone_id,
+          reason
+        }
+      });
+
+      return {
+        success: true,
+        command: "CANCEL_MISSION",
+        targetId: missionId,
+        status: "CANCELLED",
+        message: `Mission '${mission.mission_number}' was cancelled. Reason: ${reason}.`,
+        timestamp: now.toISOString()
+      };
     },
 
     async listMissions(user: AuthenticatedUser, query: MissionListQuery): Promise<MissionListResponse> {

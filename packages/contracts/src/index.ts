@@ -226,6 +226,10 @@ export const auditActionSchema = z.enum([
   "MISSION_FAILED",
   "EMERGENCY_COMMAND_ISSUED",
   "RETURN_TO_HOME_TRIGGERED",
+  "DRONE_EMERGENCY_TRIGGERED",
+  "DRONE_EMERGENCY_CLEARED",
+  "DRONE_RTH_REQUESTED",
+  "MISSION_CANCEL_REQUESTED",
   "GEOFENCE_CREATED",
   "GEOFENCE_MODIFIED"
 ]);
@@ -555,6 +559,96 @@ export const missionListResponseSchema = z.object({
   })
 });
 export type MissionListResponse = z.infer<typeof missionListResponseSchema>;
+
+// ============================================================================
+// Fleet Operations & Emergency Control Contracts
+// ============================================================================
+
+export const rthCommandRequestSchema = z.object({
+  reason: z.string().trim().min(3, "RTH reason must be at least 3 characters").max(500).default("Operator commanded Return-To-Home")
+});
+export type RTHCommandRequest = z.infer<typeof rthCommandRequestSchema>;
+
+export const emergencyCommandRequestSchema = z.object({
+  reason: z.string().trim().min(3, "Emergency reason is required and must be at least 3 characters").max(500)
+});
+export type EmergencyCommandRequest = z.infer<typeof emergencyCommandRequestSchema>;
+
+export const emergencyClearRequestSchema = z.object({
+  reason: z.string().trim().max(500).optional()
+});
+export type EmergencyClearRequest = z.infer<typeof emergencyClearRequestSchema>;
+
+export const cancelMissionRequestSchema = z.object({
+  reason: z.string().trim().min(3, "Cancellation reason is required and must be at least 3 characters").max(500)
+});
+export type CancelMissionRequest = z.infer<typeof cancelMissionRequestSchema>;
+
+export const operationalCommandResponseSchema = z.object({
+  success: z.boolean(),
+  command: z.enum(["RTH", "EMERGENCY", "EMERGENCY_CLEAR", "CANCEL_MISSION"]),
+  targetId: uuidSchema,
+  status: z.string(),
+  message: z.string(),
+  timestamp: z.string().datetime()
+});
+export type OperationalCommandResponse = z.infer<typeof operationalCommandResponseSchema>;
+
+export const fleetSummaryResponseSchema = z.object({
+  organizationId: uuidSchema,
+  totalDrones: z.number().int().nonnegative(),
+  availableDrones: z.number().int().nonnegative(),
+  assignedDrones: z.number().int().nonnegative(),
+  inFlightDrones: z.number().int().nonnegative(),
+  deliveringDrones: z.number().int().nonnegative(),
+  returningDrones: z.number().int().nonnegative(),
+  emergencyDrones: z.number().int().nonnegative(),
+  offlineDrones: z.number().int().nonnegative(),
+  lowBatteryDrones: z.number().int().nonnegative(),
+  criticalBatteryDrones: z.number().int().nonnegative(),
+  timestamp: z.string().datetime()
+});
+export type FleetSummaryResponse = z.infer<typeof fleetSummaryResponseSchema>;
+
+export const telemetryFreshnessSchema = z.enum(["LIVE", "DEGRADED", "STALE", "OFFLINE"]);
+export type TelemetryFreshness = z.infer<typeof telemetryFreshnessSchema>;
+
+export const droneDetailResponseSchema = droneResponseSchema.extend({
+  freshness: telemetryFreshnessSchema,
+  speedMetersPerSecond: z.number().nonnegative().optional(),
+  headingDegrees: z.number().gte(0).lt(360).optional(),
+  altitudeMeters: z.number().optional(),
+  voltageVolts: z.number().optional(),
+  activeMission: missionResponseSchema.nullable().optional(),
+  activeOrder: orderResponseSchema.nullable().optional(),
+  canRTH: z.boolean(),
+  canEmergency: z.boolean(),
+  canClearEmergency: z.boolean(),
+  emergencyReason: z.string().nullable().optional()
+});
+export type DroneDetailResponse = z.infer<typeof droneDetailResponseSchema>;
+
+export const waypointSchema = z.object({
+  id: z.string(),
+  sequence: z.number().int().nonnegative(),
+  latitude: z.number().gte(-90).lte(90),
+  longitude: z.number().gte(-180).lte(180),
+  altitudeMeters: z.number().nonnegative(),
+  targetSpeedMps: z.number().nonnegative().optional(),
+  isDeliveryPoint: z.boolean().optional()
+});
+export type WaypointDto = z.infer<typeof waypointSchema>;
+
+export const missionDetailResponseSchema = missionResponseSchema.extend({
+  order: orderResponseSchema.nullable().optional(),
+  drone: droneResponseSchema.nullable().optional(),
+  waypoints: z.array(waypointSchema),
+  currentWaypointIndex: z.number().int().nonnegative().optional(),
+  progressPercent: z.number().gte(0).lte(100),
+  canCancel: z.boolean(),
+  canRTH: z.boolean()
+});
+export type MissionDetailResponse = z.infer<typeof missionDetailResponseSchema>;
 
 // ============================================================================
 // Telemetry & Event Contracts

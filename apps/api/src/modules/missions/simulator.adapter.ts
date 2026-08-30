@@ -22,7 +22,8 @@ export interface SimulatorGatewayResponse {
 export interface SimulatorGateway {
   assignMission(plan: MissionFlightPlan): Promise<SimulatorGatewayResponse>;
   triggerEmergency(droneId: string, reason: string): Promise<SimulatorGatewayResponse>;
-  triggerReturnToHome(droneId: string): Promise<SimulatorGatewayResponse>;
+  triggerReturnToHome(droneId: string, reason?: string): Promise<SimulatorGatewayResponse>;
+  clearEmergency(droneId: string): Promise<SimulatorGatewayResponse>;
 }
 
 /**
@@ -46,10 +47,17 @@ export class DefaultSimulatorGateway implements SimulatorGateway {
     };
   }
 
-  async triggerReturnToHome(droneId: string): Promise<SimulatorGatewayResponse> {
+  async triggerReturnToHome(droneId: string, reason = "Return-To-Home commanded by operator"): Promise<SimulatorGatewayResponse> {
     return {
       accepted: true,
-      message: `Return-To-Home protocol acknowledged for drone '${droneId}'.`
+      message: `Return-To-Home protocol acknowledged for drone '${droneId}': ${reason}.`
+    };
+  }
+
+  async clearEmergency(droneId: string): Promise<SimulatorGatewayResponse> {
+    return {
+      accepted: true,
+      message: `Emergency cleared in simulation for drone '${droneId}'.`
     };
   }
 

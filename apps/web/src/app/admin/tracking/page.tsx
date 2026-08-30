@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   MapView,
   TelemetrySummary,
@@ -8,25 +9,36 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  CardFooter,
   Button,
   DroneStatusBadge,
   BatteryIndicator,
   DroneIcon,
-  ShieldIcon,
-  AlertTriangleIcon
+  RotateCcwIcon,
+  AlertTriangleIcon,
+  CheckCircleIcon,
+  EyeIcon
 } from "@skynav/ui";
 import {
   DEMO_DRONES,
   DEMO_MISSIONS,
   DEMO_WAREHOUSE,
-  DEMO_GEOFENCES
+  DEMO_GEOFENCES,
+  DemoDrone
 } from "@/lib/demo-data";
 import { useRealtimeTelemetry } from "@/lib/realtime";
+import { ReturnToHomeModal } from "@/features/admin/rth-modal";
+import { EmergencyHaltModal } from "@/features/admin/emergency-modal";
+import { EmergencyClearModal } from "@/features/admin/emergency-clear-modal";
+import { EmergencyBanner } from "@/features/admin/emergency-banner";
 
 export default function AdminLiveTrackingPage() {
   const [selectedDroneId, setSelectedDroneId] = useState(DEMO_DRONES[0].id);
-  const [drones, setDrones] = useState(DEMO_DRONES);
+  const [drones, setDrones] = useState<DemoDrone[]>(DEMO_DRONES);
+
+  // Modals state
+  const [isRthOpen, setIsRthOpen] = useState(false);
+  const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
+  const [isClearOpen, setIsClearOpen] = useState(false);
 
   const { status: wsStatus, telemetryMap } = useRealtimeTelemetry({
     channel: "telemetry:organization",
@@ -50,17 +62,24 @@ export default function AdminLiveTrackingPage() {
   });
 
   const selectedDrone = liveDrones.find((d) => d.id === selectedDroneId) || liveDrones[0];
-  const linkedMission = DEMO_MISSIONS.find((m) => m.droneId === selectedDrone.id);
+  const linkedMission = DEMO_MISSIONS.find((m) => m.droneId === selectedDrone.id || m.droneCallsign === selectedDrone.callsign);
+  const emergencyDrones = liveDrones.filter((d) => d.status === "EMERGENCY");
 
-  const handleRTH = () => {
+  const handleConfirmRTH = async (reason: string) => {
     setDrones((prev) =>
       prev.map((d) => (d.id === selectedDrone.id ? { ...d, status: "RETURNING" as const } : d))
     );
   };
 
-  const handleEmergency = () => {
+  const handleConfirmEmergency = async (reason: string) => {
     setDrones((prev) =>
-      prev.map((d) => (d.id === selectedDrone.id ? { ...d, status: "EMERGENCY" as const } : d))
+      prev.map((d) => (d.id === selectedDrone.id ? { ...d, status: "EMERGENCY" as const, altitudeMeters: 0, speedMetersPerSecond: 0 } : d))
+    );
+  };
+
+  const handleConfirmClear = async (reason: string) => {
+    setDrones((prev) =>
+      prev.map((d) => (d.id === selectedDrone.id ? { ...d, status: "IDLE" as const, altitudeMeters: 0, speedMetersPerSecond: 0 } : d))
     );
   };
 
@@ -97,6 +116,8 @@ export default function AdminLiveTrackingPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <EmergencyBanner emergencyDrones={emergencyDrones} />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">Tactical Radar & Telemetry HUD</h2>
@@ -106,16 +127,46 @@ export default function AdminLiveTrackingPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {selectedDrone.status !== "IDLE" && selectedDrone.status !== "LANDED" && (
+          {selectedDrone.status === "EMERGENCY" ? (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<CheckCircleIcon size={14} />}
+              onClick={() => setIsClearOpen(true)}
+              className="text-emerald-400 border-emerald-500/50 hover:bg-emerald-950/40"
+            >
+              Clear Emergency
+            </Button>
+          ) : (
             <>
-              <Button variant="outline" size="sm" onClick={handleRTH}>
-                Issue Command: RTH
-              </Button>
-              <Button variant="destructive" size="sm" onClick={handleEmergency}>
-                Emergency Halt
-              </Button>
+              {selectedDrone.status !== "IDLE" && selectedDrone.status !== "LANDED" && selectedDrone.status !== "OFFLINE" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<RotateCcwIcon size={14} />}
+                  onClick={() => setIsRthOpen(true)}
+                >
+                  Command RTH
+                </Button>
+              )}
+              {selectedDrone.status !== "OFFLINE" && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  leftIcon={<AlertTriangleIcon size={14} />}
+                  onClick={() => setIsEmergencyOpen(true)}
+                >
+                  Emergency Halt
+                </Button>
+              )}
             </>
           )}
+
+          <Link href={`/admin/fleet/${selectedDrone.id}`}>
+            <Button variant="primary" size="sm" leftIcon={<EyeIcon size={14} />}>
+              Open Cockpit
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -139,7 +190,7 @@ export default function AdminLiveTrackingPage() {
 
           {/* Quick Drone Selector Bar */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
-            {drones.map((d) => (
+            {liveDrones.map((d) => (
               <button
                 key={d.id}
                 onClick={() => setSelectedDroneId(d.id)}
@@ -180,7 +231,7 @@ export default function AdminLiveTrackingPage() {
 
           <Card variant="glass">
             <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle>Selected UAV Specs</CardTitle>
+              <CardTitle>Selected UAV Status</CardTitle>
               <DroneStatusBadge status={selectedDrone.status} size="sm" />
             </CardHeader>
             <CardContent className="space-y-3 text-xs text-slate-300 font-mono">
@@ -208,6 +259,34 @@ export default function AdminLiveTrackingPage() {
           </Card>
         </div>
       </div>
+
+      {/* Operational Action Modals */}
+      <ReturnToHomeModal
+        isOpen={isRthOpen}
+        onClose={() => setIsRthOpen(false)}
+        droneCallsign={selectedDrone.callsign}
+        droneId={selectedDrone.id}
+        currentAltitude={selectedDrone.altitudeMeters}
+        batteryPercent={selectedDrone.batteryPercent}
+        onConfirm={handleConfirmRTH}
+      />
+
+      <EmergencyHaltModal
+        isOpen={isEmergencyOpen}
+        onClose={() => setIsEmergencyOpen(false)}
+        droneCallsign={selectedDrone.callsign}
+        droneId={selectedDrone.id}
+        currentAltitude={selectedDrone.altitudeMeters}
+        onConfirm={handleConfirmEmergency}
+      />
+
+      <EmergencyClearModal
+        isOpen={isClearOpen}
+        onClose={() => setIsClearOpen(false)}
+        droneCallsign={selectedDrone.callsign}
+        droneId={selectedDrone.id}
+        onConfirm={handleConfirmClear}
+      />
     </div>
   );
 }

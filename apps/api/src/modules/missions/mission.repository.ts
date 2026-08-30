@@ -34,7 +34,31 @@ export type MissionRecord = {
   updated_at: Date;
 };
 
-export type NewMissionRecord = Omit<MissionRecord, "created_at" | "updated_at">;
+export type NewMissionRecord = {
+  id: string;
+  mission_number: string;
+  organization_id: string;
+  order_id: string;
+  drone_id?: string | null;
+  status: string;
+  origin_latitude: number;
+  origin_longitude: number;
+  origin_altitude_meters?: number | null;
+  origin_address?: string | null;
+  destination_latitude: number;
+  destination_longitude: number;
+  destination_altitude_meters?: number | null;
+  destination_address?: string | null;
+  assigned_at?: Date | null;
+  launched_at?: Date | null;
+  completed_at?: Date | null;
+  cancelled_at?: Date | null;
+  cancellation_reason?: string | null;
+  failed_at?: Date | null;
+  failure_reason?: string | null;
+  emergency_at?: Date | null;
+  emergency_reason?: string | null;
+};
 export type MissionUpdateRecord = Partial<Omit<MissionRecord, "id" | "organization_id" | "created_at">>;
 
 export interface ListMissionsFilter {
@@ -73,7 +97,29 @@ export function createMissionRepository(db: Kysely<Database>): MissionRepository
       const result = await db
         .insertInto("missions")
         .values({
-          ...mission,
+          id: mission.id,
+          mission_number: mission.mission_number,
+          organization_id: mission.organization_id,
+          order_id: mission.order_id,
+          drone_id: mission.drone_id ?? null,
+          status: mission.status,
+          origin_latitude: mission.origin_latitude,
+          origin_longitude: mission.origin_longitude,
+          origin_altitude_meters: mission.origin_altitude_meters ?? null,
+          origin_address: mission.origin_address ?? null,
+          destination_latitude: mission.destination_latitude,
+          destination_longitude: mission.destination_longitude,
+          destination_altitude_meters: mission.destination_altitude_meters ?? null,
+          destination_address: mission.destination_address ?? null,
+          assigned_at: mission.assigned_at ?? null,
+          launched_at: mission.launched_at ?? null,
+          completed_at: mission.completed_at ?? null,
+          cancelled_at: mission.cancelled_at ?? null,
+          cancellation_reason: mission.cancellation_reason ?? null,
+          failed_at: mission.failed_at ?? null,
+          failure_reason: mission.failure_reason ?? null,
+          emergency_at: mission.emergency_at ?? null,
+          emergency_reason: mission.emergency_reason ?? null,
           created_at: new Date(),
           updated_at: new Date()
         })

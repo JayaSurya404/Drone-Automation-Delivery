@@ -4,13 +4,11 @@ import React, { useState } from "react";
 import Link from "next/link";
 import {
   StatCard,
-  DroneCard,
   MissionCard,
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-  CardFooter,
   Button,
   DroneIcon,
   RouteIcon,
@@ -29,13 +27,20 @@ import {
   DEMO_ALERTS,
   DEMO_AUDIT_LOGS,
   DEMO_WAREHOUSE,
-  DEMO_GEOFENCES
+  DEMO_GEOFENCES,
+  DemoDrone
 } from "@/lib/demo-data";
+import { EmergencyBanner } from "@/features/admin/emergency-banner";
 
 export default function AdminOperationsCenter() {
-  const activeDronesCount = DEMO_DRONES.filter(
-    (d) => d.status === "EN_ROUTE" || d.status === "DELIVERING" || d.status === "RETURNING"
+  const [drones, setDrones] = useState<DemoDrone[]>(DEMO_DRONES);
+
+  const activeInFlightCount = drones.filter(
+    (d) => d.status === "TAKEOFF" || d.status === "EN_ROUTE" || d.status === "DELIVERING" || d.status === "RETURNING"
   ).length;
+
+  const emergencyDrones = drones.filter((d) => d.status === "EMERGENCY");
+  const lowBatteryCount = drones.filter((d) => d.batteryPercent < 30).length;
 
   const mapMarkers = [
     {
@@ -45,7 +50,7 @@ export default function AdminOperationsCenter() {
       longitude: DEMO_WAREHOUSE.longitude,
       title: "Depot Alpha"
     },
-    ...DEMO_DRONES.map((d) => ({
+    ...drones.map((d) => ({
       id: d.id,
       type: "drone" as const,
       latitude: d.latitude,
@@ -84,6 +89,9 @@ export default function AdminOperationsCenter() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Active Emergency Incident Banner */}
+      <EmergencyBanner emergencyDrones={emergencyDrones} />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -93,6 +101,11 @@ export default function AdminOperationsCenter() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/admin/fleet">
+            <Button variant="outline" size="md" leftIcon={<DroneIcon size={16} />}>
+              Fleet Controls
+            </Button>
+          </Link>
           <Link href="/admin/missions">
             <Button variant="primary" size="md" leftIcon={<RouteIcon size={16} />}>
               Dispatch Mission
@@ -105,10 +118,10 @@ export default function AdminOperationsCenter() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Active UAVs In-Flight"
-          value={activeDronesCount}
+          value={activeInFlightCount}
           delta="+2 this hour"
           deltaType="positive"
-          subtitle="Total fleet size: 5 units"
+          subtitle={`Total fleet size: ${drones.length} units`}
           icon={<DroneIcon size={18} />}
         />
         <StatCard
@@ -120,19 +133,19 @@ export default function AdminOperationsCenter() {
           icon={<PackageIcon size={18} />}
         />
         <StatCard
-          title="Corridor Safety Rating"
-          value="99.4%"
-          delta="Optimal"
-          deltaType="positive"
-          subtitle="Zero geofence incursions"
+          title="Fleet Battery Health"
+          value={`${lowBatteryCount} Low`}
+          delta={lowBatteryCount === 0 ? "Optimal" : "Attention Required"}
+          deltaType={lowBatteryCount === 0 ? "positive" : "neutral"}
+          subtitle="Reserve battery threshold: 30%"
           icon={<ShieldIcon size={18} />}
         />
         <StatCard
           title="Active System Incidents"
-          value={DEMO_ALERTS.filter((a) => !a.acknowledged).length}
-          delta="1 Advisory"
-          deltaType="neutral"
-          subtitle="Airspace density caution"
+          value={emergencyDrones.length + DEMO_ALERTS.filter((a) => !a.acknowledged).length}
+          delta={emergencyDrones.length > 0 ? "CRITICAL EMERGENCY" : "1 Advisory"}
+          deltaType={emergencyDrones.length > 0 ? "negative" : "neutral"}
+          subtitle={emergencyDrones.length > 0 ? "Failsafe active" : "Airspace density caution"}
           icon={<AlertTriangleIcon size={18} />}
         />
       </div>
@@ -145,7 +158,7 @@ export default function AdminOperationsCenter() {
             <CardHeader className="flex-row items-center justify-between">
               <div className="flex items-center gap-2">
                 <CardTitle>Regional Fleet Radar Overview</CardTitle>
-                <span className="text-xs text-slate-400 font-mono">({DEMO_DRONES.length} UAVs tracked)</span>
+                <span className="text-xs text-slate-400 font-mono">({drones.length} UAVs tracked)</span>
               </div>
               <Link href="/admin/tracking">
                 <Button variant="ghost" size="sm" rightIcon={<ChevronRightIcon size={14} />}>
