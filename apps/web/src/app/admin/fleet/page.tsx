@@ -26,6 +26,7 @@ import { EmergencyHaltModal } from "@/features/admin/emergency-modal";
 import { EmergencyClearModal } from "@/features/admin/emergency-clear-modal";
 import { EmergencyBanner } from "@/features/admin/emergency-banner";
 import { PredictiveMaintenanceCard } from "@/features/admin/predictive-maintenance-card";
+import { DigitalTwinCockpit } from "@/features/admin/digital-twin-cockpit";
 
 export default function AdminFleetPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
@@ -334,6 +335,9 @@ export default function AdminFleetPage() {
           </Table>
         </Card>
       )}
+
+      {/* Digital Twin Synchronized Operations Hub */}
+      <DigitalTwinCockpit />
 
       {/* Predictive Fleet Maintenance & Diagnostics */}
       <PredictiveMaintenanceCard />

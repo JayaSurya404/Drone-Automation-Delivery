@@ -724,5 +724,146 @@ describe("Contracts / Computer Vision & Perception Schemas", () => {
     const parsedEvt = perceptionEventSchema.parse(perceptionEvt);
     assert.equal(parsedEvt.type, "PERCEPTION_UPDATE");
   });
+
+  it("validates Digital Twin domain contracts and realtime message schemas", async () => {
+    const {
+      droneTwinSchema,
+      missionTwinSchema,
+      fleetTwinSchema,
+      environmentTwinSchema,
+      digitalTwinSnapshotSchema,
+      twinHealthReportSchema,
+      wsServerMessageSchema
+    } = await import("./index.js");
+
+    const sampleDroneTwin = {
+      droneId: "00000000-0000-0000-0000-000000000011",
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      callSign: "SKY-001",
+      model: "SkyNav Pelican Heavy",
+      operationalState: "EN_ROUTE",
+      authoritativeStatus: "IN_FLIGHT",
+      position: { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 65.0 },
+      headingDegrees: 92.5,
+      groundSpeedMps: 14.8,
+      verticalSpeedMps: 0.1,
+      battery: {
+        percent: 82.5,
+        voltageVolts: 24.8,
+        temperatureCelsius: 29.4,
+        isLow: false,
+        isCritical: false,
+        healthStatus: "NORMAL"
+      },
+      payload: {
+        weightGrams: 1450,
+        maxCapacityGrams: 5000,
+        currentPackageId: "00000000-0000-0000-0000-000000000099",
+        isLoaded: true
+      },
+      currentMission: {
+        missionId: "00000000-0000-0000-0000-000000000055",
+        orderId: "00000000-0000-0000-0000-000000000066",
+        state: "EN_ROUTE",
+        currentWaypointIndex: 2,
+        totalWaypoints: 5,
+        distanceToTargetMeters: 1420.5,
+        etaSeconds: 96
+      },
+      telemetryFreshness: "LIVE",
+      lastTelemetryTimestamp: new Date().toISOString(),
+      lastSyncTimestamp: new Date().toISOString(),
+      health: "HEALTHY",
+      reconciliationWarnings: [],
+      revision: 1
+    };
+    const parsedDrone = droneTwinSchema.parse(sampleDroneTwin);
+    assert.equal(parsedDrone.callSign, "SKY-001");
+    assert.equal(parsedDrone.health, "HEALTHY");
+
+    const sampleMissionTwin = {
+      missionId: "00000000-0000-0000-0000-000000000055",
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      orderId: "00000000-0000-0000-0000-000000000066",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      authoritativeState: "IN_PROGRESS",
+      twinState: "EN_ROUTE",
+      origin: { latitude: 37.7749, longitude: -122.4194 },
+      destination: { latitude: 37.7845, longitude: -122.4082 },
+      currentWaypointIndex: 2,
+      totalWaypoints: 5,
+      progressPercent: 40.0,
+      distanceRemainingMeters: 1420.5,
+      etaSeconds: 96,
+      safetyStatus: "CLEAR",
+      lastSyncTimestamp: new Date().toISOString(),
+      reconciliation: { isConsistent: true, discrepancies: [] }
+    };
+    const parsedMission = missionTwinSchema.parse(sampleMissionTwin);
+    assert.equal(parsedMission.progressPercent, 40.0);
+
+    const sampleFleetTwin = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      totalDrones: 12,
+      availableDrones: 7,
+      activeDrones: 4,
+      returningDrones: 1,
+      emergencyDrones: 0,
+      offlineDrones: 0,
+      maintenanceDrones: 0,
+      activeMissionsCount: 4,
+      batteryHealthSummary: { averagePercent: 88.4, lowBatteryCount: 0, criticalBatteryCount: 0 },
+      telemetryFreshnessSummary: { liveCount: 4, degradedCount: 0, staleCount: 0, offlineCount: 8 },
+      maintenanceRiskSummary: { healthyCount: 11, warningCount: 1, urgentCount: 0 },
+      reconciliationDiscrepanciesCount: 0,
+      lastSyncTimestamp: new Date().toISOString()
+    };
+    const parsedFleet = fleetTwinSchema.parse(sampleFleetTwin);
+    assert.equal(parsedFleet.totalDrones, 12);
+
+    const sampleEnvTwin = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      activeGeofencesCount: 3,
+      noFlyZonesCount: 1,
+      airspaceRiskLevel: "LOW",
+      lastUpdated: new Date().toISOString()
+    };
+    const parsedEnv = environmentTwinSchema.parse(sampleEnvTwin);
+    assert.equal(parsedEnv.airspaceRiskLevel, "LOW");
+
+    const sampleSnapshot = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      fleet: parsedFleet,
+      drones: [parsedDrone],
+      missions: [parsedMission],
+      environment: parsedEnv,
+      snapshotTimestamp: new Date().toISOString(),
+      version: "dt-snap-v1.0.0"
+    };
+    const parsedSnap = digitalTwinSnapshotSchema.parse(sampleSnapshot);
+    assert.equal(parsedSnap.version, "dt-snap-v1.0.0");
+
+    const sampleHealth = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      overallStatus: "HEALTHY",
+      totalDronesTracked: 1,
+      totalMissionsTracked: 1,
+      activeDiscrepanciesCount: 0,
+      issues: [],
+      evaluatedAt: new Date().toISOString()
+    };
+    const parsedHealth = twinHealthReportSchema.parse(sampleHealth);
+    assert.equal(parsedHealth.overallStatus, "HEALTHY");
+
+    const sampleWsTwinMsg = {
+      type: "TWIN_UPDATE",
+      channel: "digital-twin:org:00000000-0000-0000-0000-000000000001",
+      subType: "DRONE",
+      payload: { droneId: parsedDrone.droneId, health: parsedDrone.health },
+      timestamp: new Date().toISOString()
+    };
+    const parsedWsMsg = wsServerMessageSchema.parse(sampleWsTwinMsg);
+    assert.equal(parsedWsMsg.type, "TWIN_UPDATE");
+  });
 });
 

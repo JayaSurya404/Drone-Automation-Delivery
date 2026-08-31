@@ -24,6 +24,10 @@ import {
   AiForbiddenError,
   AiResourceNotFoundError
 } from "../modules/ai/ai.service.js";
+import {
+  DigitalTwinForbiddenError,
+  DigitalTwinNotFoundError
+} from "../modules/digital-twin/digital-twin.types.js";
 
 export function errorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
   const timestamp = new Date().toISOString();
@@ -254,6 +258,31 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
     return reply.status(404).send({
       type: "https://skynav.io/errors/not-found",
       title: "Resource Not Found",
+      status: 404,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  // Handle Digital Twin errors
+  if (error instanceof DigitalTwinForbiddenError) {
+    return reply.status(403).send({
+      type: "https://skynav.io/errors/forbidden",
+      title: "Digital Twin Forbidden",
+      status: 403,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  if (error instanceof DigitalTwinNotFoundError) {
+    return reply.status(404).send({
+      type: "https://skynav.io/errors/not-found",
+      title: "Digital Twin Entity Not Found",
       status: 404,
       detail: error.message,
       instance,
