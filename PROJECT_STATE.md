@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 7 — Production Hardening & Observability (**COMPLETED**)
+Milestone 8 — Production Deployment & Infrastructure (**COMPLETED**)
 
 ## Foundation status
 
@@ -18,6 +18,7 @@ Milestone 7 — Production Hardening & Observability (**COMPLETED**)
 - **Computer Vision & Perception Foundation**: Pluggable `VisionProvider` abstraction (`DevelopmentVisionProvider`, `SimulatorVisionProvider`), visual landing-zone assessment, obstacle & hazard detection, environmental scene classification (Urban, Suburban, Industrial, Rural, Open Field), destination fiducial verification ($dx, dy$ centering), and Fastify / WebSocket integration implemented.
 - **Digital Twin Foundation**: Synchronized software representation of drones, missions, fleet state, environment, and perception. Real-time telemetry reconciliation engine, discrepancy and anomaly detection, twin health evaluation (`HEALTHY`, `DEGRADED`, `CRITICAL`, `INCONSISTENT`, `OFFLINE`), out-of-order timestamp protection, Fastify REST APIs, and operations cockpit UI implemented.
 - **Production Hardening & Observability**: Configuration validation rejecting insecure production defaults, request correlation tracking (`x-correlation-id`), tiered rate limiting (Auth, Emergency, AI, Standard), structured JSON logging with sensitive data redaction, liveness (`/health`) and readiness (`/ready`) probes, in-memory metrics registry (`/metrics`), security headers, request body size protection (1MB), and worker resilience implemented.
+- **Production Deployment & Multi-Service Infrastructure**: Complete container architecture with multi-stage Dockerfiles (`api`, `web`, `ai`, `telemetry-worker`, `notification-worker`), non-root execution, 7-service Docker Compose topology, database migration and seed production safety, standalone worker entrypoints, and comprehensive operational disaster recovery documentation implemented.
 
 > **SAFETY NOTICE**: This is a deterministic software simulator and operational platform designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
@@ -230,10 +231,31 @@ Milestone 7 — Production Hardening & Observability (**COMPLETED**)
   - Updated Docker Compose with service restart policies (`restart: unless-stopped`).
   - Hardened GitHub Actions CI (`.github/workflows/quality.yml`) to run lint, typecheck, tests, build, and Python AI test suite across push and PR events.
 
+### 13. Milestone 8: Production Deployment & Infrastructure
+- **Container Architecture & Multi-Stage Dockerfiles**:
+  - `apps/api/Dockerfile`: Multi-stage Node.js 22 container running Fastify API with non-root user `skynav` (`uid: 1001`), `/health` probe, and port 3001.
+  - `apps/web/Dockerfile`: Multi-stage Node.js 22 container for Next.js 15 web cockpit with non-root user `nextjs` (`uid: 1001`) and port 3000.
+  - `services/ai/Dockerfile`: Lightweight Python 3.11 Alpine container for Advisory AI & CV microservice running with non-root user `skynav` (`uid: 1001`) and port 8000.
+  - `services/telemetry-worker/Dockerfile`: Node.js 22 container executing `TelemetryWorker` with graceful shutdown.
+  - `services/notification-worker/Dockerfile`: Node.js 22 container executing `NotificationWorker` with transactional outbox processing.
+  - `.dockerignore`: Excludes build artifacts, secrets, virtual environments, and node_modules from container context.
+- **Complete 7-Service Docker Compose Stack (`docker-compose.yml`)**:
+  - Configured full local integration stack (`postgres`, `redis`, `ai`, `api`, `web`, `telemetry-worker`, `notification-worker`).
+  - Defined explicit healthchecks and dependency conditions (`service_healthy`) across all services.
+  - Persistent named volumes (`skynav_postgres_data`, `skynav_redis_data`) and unified bridge network (`skynav_network`).
+- **Standalone Worker Entrypoints**:
+  - `services/telemetry-worker/src/main.ts`: Independent process entrypoint with Redis connection, throughput heartbeat, and SIGTERM trap.
+  - `services/notification-worker/src/main.ts`: Independent process entrypoint with Redis connection, outbox processor, and SIGTERM trap.
+- **Production Database & Seed Defense (`db/seeds/index.mjs`)**:
+  - Enforced production guard refusing to seed development test accounts in `production` unless explicitly opted-in via `ALLOW_DEV_SEED_IN_PROD=true`.
+- **Operational & Disaster Recovery Documentation**:
+  - `docs/operations/production-deployment.md`: Full architecture topology, ports, environment matrix, secret handling, and startup procedures.
+  - `docs/operations/backup-and-recovery.md`: Authoritative state hierarchy, PostgreSQL snapshots/PITR, migration rollback strategy, and transactional outbox poison-message isolation.
+
 ## Remaining
 
-- **Milestone 8: Swarm Coordination & Multi-UAV Deconfliction**
-- **Milestone 9: Advanced Autonomy & Final Verification**
+- **Milestone 9: Swarm Coordination & Multi-UAV Deconfliction**
+- **Milestone 10: Advanced Autonomy & Final Verification**
 
 
 ## Important decisions
@@ -245,6 +267,8 @@ Milestone 7 — Production Hardening & Observability (**COMPLETED**)
   1. *Authoritative Domain State*: Database & mission state machine rules.
   2. *Digital Twin Observation*: Reconciled real-time telemetry, kinematics, and discrepancy diagnostics.
   3. *AI / CV Advisory State*: Advisory route recommendations, ETA confidence intervals, and optical perception.
+- **Container Security & Least Privilege**: All production containers execute under unprivileged non-root user IDs (`1001`), use minimal Alpine base images, and do not mount host Docker sockets or require root privileges.
+- **Strict Production Seed Defense**: Development accounts are never seeded into production environments automatically without explicit environment variable overrides.
 - **Strict Separation of Liveness and Readiness**: `/health` is an ultra-fast non-blocking probe indicating process liveness, while `/ready` performs deep dependency health checks (PostgreSQL, Redis, AI) without crashing the service during temporary upstream outages.
 - **Tiered Route Rate Limiting**: Dedicated rate limit quotas protect sensitive authentication, emergency controls, and heavy AI inference endpoints while allowing generous throughput for standard queries and zero throttling on internal telemetry streams.
 - **Server-Side Authorization on Subscriptions**: WebSocket subscription requests are verified against server-side session JWT claims and database ownership records, preventing unauthorized client-side claims.

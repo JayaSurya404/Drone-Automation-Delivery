@@ -7,6 +7,7 @@ Supports standard library http.server execution and optional FastAPI / ASGI serv
 from __future__ import annotations
 import json
 import logging
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 import sys
@@ -267,10 +268,11 @@ def run_server(host: str = "0.0.0.0", port: int = 8000):
 
 
 if __name__ == "__main__":
-    port = 8000
+    host = os.environ.get("AI_HOST", os.environ.get("HOST", "0.0.0.0"))
+    port = int(os.environ.get("AI_PORT", os.environ.get("PORT", "8000")))
     if len(sys.argv) > 1:
         try:
             port = int(sys.argv[1])
         except ValueError:
             pass
-    run_server(port=port)
+    run_server(host=host, port=port)

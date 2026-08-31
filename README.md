@@ -25,26 +25,47 @@ The intended pipeline is `Plan → Validate → Score → Safety Check → Autho
 Requirements: Node.js 22+, pnpm 11+, Docker Compose, and Python 3.11+ for AI development.
 
 ```bash
+# 1. Install dependencies
 pnpm install
+
+# 2. Configure environment
 Copy-Item .env.example .env
-docker compose up -d
+
+# 3. Start backing services (PostgreSQL & Redis)
+docker compose up -d postgres redis
+
+# 4. Run database migrations and seed development accounts
+pnpm db:migrate
+pnpm db:seed
+
+# 5. Quality gates
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
 ```
 
-`docker compose` starts only PostgreSQL/PostGIS and Redis. Database migration execution is intentionally deferred until the production database adapter is chosen; the initial SQL is available at `db/migrations/0001_foundation.sql`.
+## Running the Platform
 
-## Development commands
-
+### Option A: Local Monorepo Dev Mode
 ```bash
 pnpm dev
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
 ```
+Starts all applications and workers concurrently (`web` on `:3000`, `api` on `:3001`).
+
+### Option B: Full Multi-Service Docker Compose Integration
+```bash
+# Start all 7 services (web, api, ai, telemetry-worker, notification-worker, postgres, redis)
+docker compose up -d
+
+# Check status and health
+docker compose ps
+
+# View logs
+docker compose logs -f api web ai
+```
+
+For complete deployment details, see [Production Deployment Guide](docs/operations/production-deployment.md) and [Backup & Disaster Recovery Guide](docs/operations/backup-and-recovery.md).
 
 ## Required reading
 

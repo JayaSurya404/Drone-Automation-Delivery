@@ -45,6 +45,12 @@ const SEED_DATA = {
 };
 
 async function seedDatabase() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEV_SEED_IN_PROD !== "true") {
+    console.error("[seed] CRITICAL: Refusing to seed default development accounts in production environment.");
+    console.error("[seed] To override for staging/demo environments, set ALLOW_DEV_SEED_IN_PROD=true");
+    process.exit(1);
+  }
+
   console.log(`[seed] Connecting to PostgreSQL at ${databaseUrl.replace(/:[^:@]+@/, ":****@")}...`);
   const client = new pg.Client({ connectionString: databaseUrl });
 
