@@ -23,8 +23,6 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: Run Python AI & CV Subsystem Tests
-        run: |
-          pip install -r services/ai/requirements.txt
-          python -m unittest discover -s services/ai/tests -p "test_*.py" -v
+        run: python -m unittest discover -s services/ai/tests -p "test_*.py" -v
         env:
           PYTHONPATH: services/ai
