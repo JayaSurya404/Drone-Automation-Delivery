@@ -14,7 +14,15 @@ import type {
   AiDemandForecastResponse,
   MissionPlanEvaluationRequest,
   MissionPlanEvaluationResponse,
-  RouteCandidate
+  RouteCandidate,
+  VisionFrameAnalysisRequest,
+  VisionFrameAnalysisResponse,
+  AssessLandingZoneRequest,
+  AssessLandingZoneResponse,
+  VerifyDestinationRequest,
+  VerifyDestinationResponse,
+  DetectHazardsRequest,
+  DetectHazardsResponse
 } from "@skynav/contracts";
 import type { AiClient } from "./ai.client.js";
 import type { DeterministicSafetyGate } from "./safety-gate.js";
@@ -39,6 +47,13 @@ export class AiResourceNotFoundError extends Error {
   }
 }
 
+function assertOperatorOrAdmin(user: AuthenticatedUser): void {
+  const allowed = ["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"];
+  if (!allowed.includes(user.role)) {
+    throw new AiForbiddenError(`Role '${user.role}' is not authorized to perform this operation.`);
+  }
+}
+
 export interface AiService {
   scoreRoutes(user: AuthenticatedUser, request: Omit<AiRouteScoringRequest, "organizationId">): Promise<AiRouteScoringResponse>;
   predictEta(user: AuthenticatedUser, request: Omit<AiEtaPredictionRequest, "organizationId">): Promise<AiEtaPredictionResponse>;
@@ -47,6 +62,11 @@ export interface AiService {
   assessWeatherRisk(user: AuthenticatedUser, request: AiWeatherRiskRequest): Promise<AiWeatherRiskResponse>;
   forecastDemand(user: AuthenticatedUser, request: Omit<AiDemandForecastRequest, "organizationId">): Promise<AiDemandForecastResponse>;
   evaluateMissionPlan(user: AuthenticatedUser, request: MissionPlanEvaluationRequest): Promise<MissionPlanEvaluationResponse>;
+  analyzeVisionFrame(user: AuthenticatedUser, request: Omit<VisionFrameAnalysisRequest, "organizationId">): Promise<VisionFrameAnalysisResponse>;
+  assessLandingZone(user: AuthenticatedUser, request: Omit<AssessLandingZoneRequest, "organizationId">): Promise<AssessLandingZoneResponse>;
+  verifyDestination(user: AuthenticatedUser, request: Omit<VerifyDestinationRequest, "organizationId">): Promise<VerifyDestinationResponse>;
+  detectHazards(user: AuthenticatedUser, request: Omit<DetectHazardsRequest, "organizationId">): Promise<DetectHazardsResponse>;
+  getLatestPerception(user: AuthenticatedUser, droneId: string): Promise<VisionFrameAnalysisResponse | null>;
 }
 
 export function createAiService(params: {
@@ -58,6 +78,7 @@ export function createAiService(params: {
   auditService?: AuditService;
 }): AiService {
   const { aiClient, safetyGate, fleetRepo, orderRepo, missionRepo, auditService } = params;
+  const latestPerceptionCache = new Map<string, VisionFrameAnalysisResponse>();
 
   return {
     async scoreRoutes(user, request) {
@@ -285,6 +306,179 @@ export function createAiService(params: {
           : undefined,
         operatorDecisionRationale: rationale
       };
+    },
+
+    async analyzeVisionFrame(user: AuthenticatedUser, request: Omit<VisionFrameAnalysisRequest, "organizationId">): Promise<VisionFrameAnalysisResponse> {
+      assertOperatorOrAdmin(user);
+
+      if (fleetRepo) {
+        const drone = await fleetRepo.findById(request.droneId, user.organizationId);
+        if (!drone) {
+          throw new AiResourceNotFoundError(`Drone '${request.droneId}' not found in your organization.`);
+        }
+      }
+
+      const fullRequest: VisionFrameAnalysisRequest = {
+        ...request,
+        organizationId: user.organizationId
+      };
+
+      const result = await aiClient.analyzeVisionFrame(fullRequest);
+
+      // Store in memory cache
+      latestPerceptionCache.set(`${user.organizationId}:${request.droneId}`, result);
+
+      if (auditService) {
+        await auditService.log({
+          organizationId: user.organizationId,
+          actorUserId: user.id,
+          action: "VISION_FRAME_ANALYZED",
+          resourceType: "drone",
+          resourceId: request.droneId,
+          metadata: {
+            frameId: request.frameId,
+            cameraSource: request.cameraSource,
+            sceneType: result.sceneClassification.sceneType,
+            suitability: result.landingZoneAssessment.suitability,
+            hazardsCount: result.detections.length,
+            advisorySafetyStatus: result.advisorySafetyStatus
+          }
+        });
+
+        if (result.landingZoneAssessment.suitability === "UNSAFE") {
+          await auditService.log({
+            organizationId: user.organizationId,
+            actorUserId: user.id,
+            action: "LANDING_ZONE_REJECTED",
+            resourceType: "drone",
+            resourceId: request.droneId,
+            metadata: {
+              frameId: request.frameId,
+              reasons: result.landingZoneAssessment.reasons
+            }
+          });
+        }
+      }
+
+      return result;
+    },
+
+    async assessLandingZone(user: AuthenticatedUser, request: Omit<AssessLandingZoneRequest, "organizationId">): Promise<AssessLandingZoneResponse> {
+      assertOperatorOrAdmin(user);
+
+      if (fleetRepo) {
+        const drone = await fleetRepo.findById(request.droneId, user.organizationId);
+        if (!drone) {
+          throw new AiResourceNotFoundError(`Drone '${request.droneId}' not found in your organization.`);
+        }
+      }
+
+      const fullRequest: AssessLandingZoneRequest = {
+        ...request,
+        organizationId: user.organizationId
+      };
+
+      const result = await aiClient.assessLandingZone(fullRequest);
+
+      if (auditService) {
+        await auditService.log({
+          organizationId: user.organizationId,
+          actorUserId: user.id,
+          action: "LANDING_ZONE_ASSESSED",
+          resourceType: "drone",
+          resourceId: request.droneId,
+          metadata: {
+            suitability: result.assessment.suitability,
+            confidence: result.assessment.confidence,
+            usableArea: result.assessment.usableAreaSquareMeters,
+            reasons: result.assessment.reasons
+          }
+        });
+      }
+
+      return result;
+    },
+
+    async verifyDestination(user: AuthenticatedUser, request: Omit<VerifyDestinationRequest, "organizationId">): Promise<VerifyDestinationResponse> {
+      assertOperatorOrAdmin(user);
+
+      if (fleetRepo) {
+        const drone = await fleetRepo.findById(request.droneId, user.organizationId);
+        if (!drone) {
+          throw new AiResourceNotFoundError(`Drone '${request.droneId}' not found in your organization.`);
+        }
+      }
+
+      const fullRequest: VerifyDestinationRequest = {
+        ...request,
+        organizationId: user.organizationId
+      };
+
+      const result = await aiClient.verifyDestination(fullRequest);
+
+      if (auditService) {
+        await auditService.log({
+          organizationId: user.organizationId,
+          actorUserId: user.id,
+          action: "DESTINATION_VERIFIED",
+          resourceType: "drone",
+          resourceId: request.droneId,
+          metadata: {
+            status: result.verification.status,
+            isTargetVisible: result.verification.isTargetVisible,
+            confidence: result.verification.confidence
+          }
+        });
+      }
+
+      return result;
+    },
+
+    async detectHazards(user: AuthenticatedUser, request: Omit<DetectHazardsRequest, "organizationId">): Promise<DetectHazardsResponse> {
+      assertOperatorOrAdmin(user);
+
+      if (fleetRepo) {
+        const drone = await fleetRepo.findById(request.droneId, user.organizationId);
+        if (!drone) {
+          throw new AiResourceNotFoundError(`Drone '${request.droneId}' not found in your organization.`);
+        }
+      }
+
+      const fullRequest: DetectHazardsRequest = {
+        ...request,
+        organizationId: user.organizationId
+      };
+
+      const result = await aiClient.detectHazards(fullRequest);
+
+      if (auditService && result.hazardsCount > 0) {
+        await auditService.log({
+          organizationId: user.organizationId,
+          actorUserId: user.id,
+          action: "HAZARD_DETECTED",
+          resourceType: "drone",
+          resourceId: request.droneId,
+          metadata: {
+            hazardsCount: result.hazardsCount,
+            advisorySafetyStatus: result.advisorySafetyStatus
+          }
+        });
+      }
+
+      return result;
+    },
+
+    async getLatestPerception(user: AuthenticatedUser, droneId: string): Promise<VisionFrameAnalysisResponse | null> {
+      assertOperatorOrAdmin(user);
+
+      if (fleetRepo) {
+        const drone = await fleetRepo.findById(droneId, user.organizationId);
+        if (!drone) {
+          throw new AiResourceNotFoundError(`Drone '${droneId}' not found in your organization.`);
+        }
+      }
+
+      return latestPerceptionCache.get(`${user.organizationId}:${droneId}`) ?? null;
     }
   };
 }

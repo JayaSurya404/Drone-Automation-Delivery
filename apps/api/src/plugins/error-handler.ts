@@ -20,6 +20,10 @@ import {
 } from "../modules/missions/mission.service.js";
 import { MissionNotFoundError } from "../modules/missions/mission.repository.js";
 import { InvalidMissionStateTransitionError } from "../modules/missions/mission.state-machine.js";
+import {
+  AiForbiddenError,
+  AiResourceNotFoundError
+} from "../modules/ai/ai.service.js";
 
 export function errorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
   const timestamp = new Date().toISOString();
@@ -230,6 +234,31 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
       timestamp,
       currentStatus: error.currentStatus,
       targetStatus: error.targetStatus
+    });
+  }
+
+  // Handle AI Forbidden and Resource Not Found errors
+  if (error instanceof AiForbiddenError) {
+    return reply.status(403).send({
+      type: "https://skynav.io/errors/forbidden",
+      title: "Forbidden",
+      status: 403,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
+    });
+  }
+
+  if (error instanceof AiResourceNotFoundError) {
+    return reply.status(404).send({
+      type: "https://skynav.io/errors/not-found",
+      title: "Resource Not Found",
+      status: 404,
+      detail: error.message,
+      instance,
+      code: error.code,
+      timestamp
     });
   }
 

@@ -90,6 +90,50 @@ class TestAiServerRoutes(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(res["forecastHorizonHours"], 12)
 
+    def test_vision_frame_analysis_endpoint(self):
+        payload = {
+            "organizationId": "org-test",
+            "frameId": "frame-101",
+            "droneId": "drone-101",
+            "telemetry": {"latitude": 37.7749, "longitude": -122.4194, "altitudeMeters": 15.0},
+            "syntheticSceneDescription": "suburban driveway with clear landing pad"
+        }
+        status, res = self.handler._route_post("/api/v1/ai/vision/analyze-frame", payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(res["landingZoneAssessment"]["suitability"], "SAFE")
+
+    def test_vision_assess_landing_endpoint(self):
+        payload = {
+            "organizationId": "org-test",
+            "droneId": "drone-101",
+            "telemetry": {"latitude": 37.7749, "longitude": -122.4194, "altitudeMeters": 10.0}
+        }
+        status, res = self.handler._route_post("/api/v1/ai/vision/assess-landing", payload)
+        self.assertEqual(status, 200)
+        self.assertIn("assessment", res)
+
+    def test_vision_verify_destination_endpoint(self):
+        payload = {
+            "organizationId": "org-test",
+            "droneId": "drone-101",
+            "destination": {"latitude": 37.7749, "longitude": -122.4194},
+            "telemetry": {"latitude": 37.7749, "longitude": -122.4194}
+        }
+        status, res = self.handler._route_post("/api/v1/ai/vision/verify-destination", payload)
+        self.assertEqual(status, 200)
+        self.assertIn("verification", res)
+
+    def test_vision_detect_hazards_endpoint(self):
+        payload = {
+            "organizationId": "org-test",
+            "droneId": "drone-101",
+            "telemetry": {"altitudeMeters": 20.0},
+            "syntheticSceneDescription": "crane obstruction"
+        }
+        status, res = self.handler._route_post("/api/v1/ai/vision/detect-hazards", payload)
+        self.assertEqual(status, 200)
+        self.assertIn("hazardsCount", res)
+
     def test_unknown_endpoint_returns_404(self):
         status, res = self.handler._route_post("/api/v1/ai/nonexistent", {})
         self.assertEqual(status, 404)

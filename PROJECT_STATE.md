@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 2D — Telemetry Transport + Realtime Live Bridge (**COMPLETED**)
+Milestone 5 — Computer Vision Foundation (**COMPLETED**)
 
 ## Foundation status
 
@@ -14,6 +14,8 @@ Milestone 2D — Telemetry Transport + Realtime Live Bridge (**COMPLETED**)
 - **Realtime Telemetry & WebSocket Gateway**: High-throughput tenant-isolated Redis Pub/Sub transport, TelemetryWorker with schema validation and out-of-order frame tracking, authenticated Fastify WebSocket gateway (`/api/v1/ws/telemetry`), backpressure management, and Next.js realtime tactical radar hook completed and verified.
 - **Admin Fleet Operations & Emergency Controls**: Return-To-Home, Emergency Failsafe, and Clear Emergency endpoints, confirmation modals, and cockpits implemented.
 - **Production Geospatial Maps & Routing Foundation**: Production `MapView` with OpenStreetMap cartographic tiles and tactical aerospace overlay, true Spherical Web Mercator projection, real-time drone movement trails (`MAX_TRAIL_POINTS`), dynamic kinematic distance and ETA calculations, telemetry freshness indicators (`LIVE`, `DEGRADED`, `STALE`, `OFFLINE`), and privacy-safe customer tracking implemented.
+- **Advisory AI & Predictive Routing**: Explainable multi-factor route scoring, kinematic & statistical ETA prediction ($p_{50}, p_{90}, p_{99}$), battery discharge and reserve modeling, prognostic fleet maintenance diagnostics, weather operational risk assessment, and authoritative Deterministic Safety Gate validation implemented.
+- **Computer Vision & Perception Foundation**: Pluggable `VisionProvider` abstraction (`DevelopmentVisionProvider`, `SimulatorVisionProvider`), visual landing-zone assessment, obstacle & hazard detection, environmental scene classification (Urban, Suburban, Industrial, Rural, Open Field), destination fiducial verification ($dx, dy$ centering), and Fastify / WebSocket integration implemented.
 
 > **SAFETY NOTICE**: This is a deterministic software simulator and operational platform designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
@@ -142,15 +144,42 @@ Milestone 2D — Telemetry Transport + Realtime Live Bridge (**COMPLETED**)
 - **Admin Tracking & Operations Cockpits**:
   - Upgraded `/admin/tracking`, `/admin/fleet/[id]`, and `/admin/missions/[id]` with production maps, breadcrumb trails, 3D HUD gauges, and operational action modals.
 
+### 9. Milestone 4: Advisory AI & Predictive Routing
+- **Shared Zod Contracts (`packages/contracts/src/ai.ts`)**:
+  - Request/response schemas for route scoring, ETA confidence intervals ($p_{50}, p_{90}, p_{99}$), battery discharge feasibility (`SAFE`, `CAUTION`, `HIGH_RISK`, `NOT_FEASIBLE`), predictive maintenance diagnostics, weather operational limits, and demand forecasting.
+- **Python AI Microservice (`services/ai/skynav_ai/`)**:
+  - Modular engines for route candidate scoring ($0\text{–}100$), kinematic ETA calculation with wind vector adjustments, battery landing reserve modeling, component health degradation diagnostics (Battery, Motors, Airframe, Avionics), and standard library REST server on port 8000.
+- **Authoritative Deterministic Safety Gate (`apps/api/src/modules/ai/safety-gate.ts`)**:
+  - Evaluates certified payload limits, minimum $20\%$ landing battery reserve, maximum altitude ceilings ($120\text{m}$), operational wind thresholds ($\le 15\text{m/s}$), and spatial no-fly zones. AI output is strictly advisory and cannot override safety gates.
+- **Fastify AI Domain Service & RBAC (`apps/api/src/modules/ai/`)**:
+  - Tenant-isolated endpoints with audit logging (`AI_ROUTE_SCORED`, `AI_SAFETY_GATE_EVALUATED`, `AI_MAINTENANCE_PREDICTED`, `AI_DEMAND_FORECASTED`).
+- **Web Operational Cockpits (`apps/web/src/features/admin/`)**:
+  - `AiRouteScoringCard` and `PredictiveMaintenanceCard` embedded into Admin Mission and Fleet Dispatch Boards.
+
+### 10. Milestone 5: Computer Vision Foundation
+- **Shared Vision Contracts (`packages/contracts/src/vision.ts`)**:
+  - Strongly typed Zod schemas for normalized bounding boxes (`VisionBoundingBox`), detection categories (`LANDING_ZONE`, `LANDING_PAD`, `OBSTACLE`, `PERSON`, `VEHICLE`, `STRUCTURE`, `WATER`, `VEGETATION`, `UNKNOWN_HAZARD`), scene types (`URBAN`, `SUBURBAN`, `INDUSTRIAL`, `RURAL`, `OPEN_FIELD`), landing suitability (`SAFE`, `CAUTION`, `UNSAFE`, `UNKNOWN`), destination verification (`VERIFIED`, `UNVERIFIED`, `OBSTRUCTED`, `NOT_FOUND`), and realtime perception event envelopes.
+- **Python Perception Subsystem (`services/ai/skynav_ai/vision/`)**:
+  - `VisionProvider` abstract base class with pluggable `DevelopmentVisionProvider` (deterministic rule-based baseline) and `SimulatorVisionProvider`.
+  - `ObstacleDetector`: Hazard identification and severity assessment (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) with confidence filtering.
+  - `SceneClassifier`: Environmental context classification and description.
+  - `LandingZoneAssessor`: Evaluates usable drop area, surface suitability (Concrete, Pavement, Grass, Water), slope, and dynamic human/vehicle presence.
+  - `DestinationVerifier`: Optical fiducial pattern recognition and centering offset calculation ($dx, dy$).
+  - Fastify / HTTP endpoints on port 8000 for frame analysis, landing assessment, destination verification, and hazard detection.
+- **Node.js Fastify API Integration (`apps/api/src/modules/ai/`)**:
+  - Added vision methods to `AiClient` with deterministic fallback, RBAC enforcement (`requireRole(["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"])`), tenant isolation, and audit event tracking (`VISION_FRAME_ANALYZED`, `LANDING_ZONE_ASSESSED`, `HAZARD_DETECTED`, `DESTINATION_VERIFIED`, `LANDING_ZONE_REJECTED`).
+  - Added `GET /api/v1/ai/vision/drones/:droneId/latest` for real-time perception state retrieval.
+- **Deterministic Simulator Perception Adapter (`services/simulator/src/perception.ts`)**:
+  - `SimulatedPerceptionSensor` generates deterministic perception frames during waypoint arrival and descent phases without altering simulator clock progression or physics.
+- **Web Perception Cockpit (`apps/web/src/features/admin/vision-perception-cockpit.tsx`)**:
+  - Embedded into Admin Mission Dispatch Board with live camera viewport, target centering crosshairs, landing zone suitability gauge, and detected hazard badges.
+- **AI/ML Honesty Declaration**:
+  - Current perception engine utilizes a development rule-based baseline with synthetic scene processing. It is explicitly architected behind `VisionProvider` to be replaced with production deep learning models (YOLOv8/v11, SegFormer) when training datasets and GPU inference clusters are provisioned.
+
 ## Remaining
 
-- **Milestone 4B: PostGIS Geofence Spatial Analysis & Weather Restrictions**
-- **Milestone 4C: Advisory AI & Predictive Multi-Drop Routing**
-- **Milestone 5: Advanced Simulation & Edge Integration**
-
-## Recommended next step
-
-Implement Milestone 4B: PostGIS Geofence Spatial Analysis & Weather Restrictions (PostGIS spatial intersection queries, active corridor containment checks, and automated weather hold rules).
+- **Milestone 6: Swarm Coordination & Edge Digital-Twin Expansion**
+- **Milestone 7: Production Hardening & Security Audit**
 
 
 ## Important decisions
@@ -164,3 +193,4 @@ Implement Milestone 4B: PostGIS Geofence Spatial Analysis & Weather Restrictions
 - **PostgreSQL/PostGIS + Kysely**: Typed relational & spatial database queries.
 - **Token Rotation & Reuse Detection**: Refresh tokens are single-use; reuse triggers instant revocation of all active sessions.
 - **AI is Advisory**: Route scores and ETAs are recommendations; safety policy and human operator sign-off remain authoritative.
+- **Perception is Advisory**: Computer vision optical hazard and landing assessments are strictly advisory and cannot override deterministic safety gates, geofences, or operator dispatch commands.

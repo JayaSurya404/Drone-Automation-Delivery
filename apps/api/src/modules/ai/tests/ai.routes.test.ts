@@ -277,4 +277,98 @@ describe("AI Advisory & Safety Gate / Route & Domain Logic Tests", () => {
     assert.equal(evaluation.batteryReserveCheck.passed, false);
     assert.equal(evaluation.altitudeEnvelopeCheck.passed, false);
   });
+
+  it("evaluates vision frame analysis with RBAC and valid perception breakdown", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/ai/vision/analyze-frame",
+      headers: { authorization: `Bearer ${operatorToken}` },
+      payload: {
+        frameId: "frame-api-01",
+        droneId: "00000000-0000-0000-0000-000000000011",
+        cameraSource: "DOWNWARD_NAV_CAM",
+        telemetry: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          altitudeMeters: 15.0,
+          headingDegrees: 0,
+          pitchDegrees: 0,
+          rollDegrees: 0
+        },
+        syntheticSceneDescription: "suburban driveway with clear landing pad"
+      }
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.frameId, "frame-api-01");
+    assert.equal(body.landingZoneAssessment.suitability, "SAFE");
+    assert.equal(body.destinationVerification.status, "VERIFIED");
+  });
+
+  it("evaluates landing zone assessment and detects hazardous obstructions", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/ai/vision/assess-landing",
+      headers: { authorization: `Bearer ${operatorToken}` },
+      payload: {
+        droneId: "00000000-0000-0000-0000-000000000011",
+        cameraSource: "DOWNWARD_NAV_CAM",
+        telemetry: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          altitudeMeters: 12.0
+        }
+      }
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.ok(body.assessment);
+    assert.ok(body.advisorySafetyStatus);
+  });
+
+  it("evaluates destination verification and hazard detection endpoints", async () => {
+    const destRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/ai/vision/verify-destination",
+      headers: { authorization: `Bearer ${operatorToken}` },
+      payload: {
+        droneId: "00000000-0000-0000-0000-000000000011",
+        destination: { latitude: 37.7845, longitude: -122.4082 },
+        telemetry: { latitude: 37.7845, longitude: -122.4082 }
+      }
+    });
+    assert.equal(destRes.statusCode, 200);
+    assert.ok(destRes.json().verification);
+
+    const hazRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/ai/vision/detect-hazards",
+      headers: { authorization: `Bearer ${operatorToken}` },
+      payload: {
+        droneId: "00000000-0000-0000-0000-000000000011",
+        telemetry: { latitude: 37.7749, longitude: -122.4194, altitudeMeters: 20.0 },
+        minimumConfidence: 0.6
+      }
+    });
+    assert.equal(hazRes.statusCode, 200);
+    assert.ok(hazRes.json().hazardsCount !== undefined);
+  });
+
+  it("retrieves latest drone perception telemetry and enforces RBAC on Customer", async () => {
+    const getRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/ai/vision/drones/00000000-0000-0000-0000-000000000011/latest",
+      headers: { authorization: `Bearer ${operatorToken}` }
+    });
+    assert.equal(getRes.statusCode, 200);
+
+    const custRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/ai/vision/drones/00000000-0000-0000-0000-000000000011/latest",
+      headers: { authorization: `Bearer ${customerToken}` }
+    });
+    assert.equal(custRes.statusCode, 403);
+  });
 });

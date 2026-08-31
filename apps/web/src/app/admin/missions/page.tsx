@@ -22,6 +22,7 @@ import {
   EyeIcon
 } from "@skynav/ui";
 import { AiRouteScoringCard } from "@/features/admin/ai-route-scoring-card";
+import { VisionPerceptionCockpit } from "@/features/admin/vision-perception-cockpit";
 import { DEMO_MISSIONS, DemoMission } from "@/lib/demo-data";
 
 export default function AdminMissionsPage() {
@@ -131,6 +132,9 @@ export default function AdminMissionsPage() {
 
       {/* AI Advisory Route Scoring & Safety Gate Validation */}
       <AiRouteScoringCard />
+
+      {/* Computer Vision & Optical Landing Perception */}
+      <VisionPerceptionCockpit />
 
       {/* Detailed Mission Validation Table */}
       <Card variant="glass" className="overflow-hidden">

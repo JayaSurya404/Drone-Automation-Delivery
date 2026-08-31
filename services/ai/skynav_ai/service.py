@@ -24,6 +24,7 @@ from .battery import BatteryPredictionEngine
 from .maintenance import PredictiveMaintenanceEngine
 from .weather import WeatherIntelligenceEngine
 from .forecasting import DemandForecastingEngine
+from .vision.service import ComputerVisionService, vision_service
 from .safety import ADVISORY_DISCLAIMER
 
 
@@ -39,6 +40,7 @@ class SkyNavAiService:
         self.maintenance_engine = PredictiveMaintenanceEngine()
         self.weather_engine = WeatherIntelligenceEngine()
         self.forecasting_engine = DemandForecastingEngine()
+        self.vision_service = vision_service
 
     def score_routes(
         self,
@@ -196,6 +198,82 @@ class SkyNavAiService:
         data = res.to_dict()
         data["advisoryDisclaimer"] = ADVISORY_DISCLAIMER
         return data
+
+    def analyze_vision_frame(
+        self,
+        organization_id: str,
+        frame_id: str,
+        drone_id: str,
+        telemetry: Dict[str, Any],
+        camera_source: str = "DOWNWARD_NAV_CAM",
+        image_base64: Optional[str] = None,
+        synthetic_scene_description: Optional[str] = None,
+        target_delivery_location: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Runs full visual frame analysis pipeline."""
+        return self.vision_service.analyze_frame(
+            frame_id=frame_id,
+            drone_id=drone_id,
+            telemetry=telemetry,
+            camera_source=camera_source,
+            image_base64=image_base64,
+            synthetic_scene_description=synthetic_scene_description,
+            target_delivery_location=target_delivery_location
+        )
+
+    def assess_landing_zone(
+        self,
+        organization_id: str,
+        drone_id: str,
+        telemetry: Dict[str, Any],
+        camera_source: str = "DOWNWARD_NAV_CAM",
+        expected_radius_meters: float = 3.0,
+        synthetic_scene_description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Assesses landing zone suitability."""
+        return self.vision_service.assess_landing_zone(
+            drone_id=drone_id,
+            telemetry=telemetry,
+            camera_source=camera_source,
+            expected_radius_meters=expected_radius_meters,
+            synthetic_scene_description=synthetic_scene_description
+        )
+
+    def verify_destination(
+        self,
+        organization_id: str,
+        drone_id: str,
+        destination: Dict[str, Any],
+        telemetry: Dict[str, Any],
+        camera_source: str = "DOWNWARD_NAV_CAM",
+        synthetic_scene_description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies destination landing pad."""
+        return self.vision_service.verify_destination(
+            drone_id=drone_id,
+            destination=destination,
+            telemetry=telemetry,
+            camera_source=camera_source,
+            synthetic_scene_description=synthetic_scene_description
+        )
+
+    def detect_hazards(
+        self,
+        organization_id: str,
+        drone_id: str,
+        telemetry: Dict[str, Any],
+        camera_source: str = "FORWARD_OBSTACLE_CAM",
+        minimum_confidence: float = 0.5,
+        synthetic_scene_description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Detects obstacles and visual hazards."""
+        return self.vision_service.detect_hazards(
+            drone_id=drone_id,
+            telemetry=telemetry,
+            camera_source=camera_source,
+            minimum_confidence=minimum_confidence,
+            synthetic_scene_description=synthetic_scene_description
+        )
 
 
 # Default singleton instance

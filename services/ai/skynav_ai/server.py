@@ -200,6 +200,56 @@ class AiRequestHandler(BaseHTTPRequestHandler):
             )
             return 200, res
 
+        # 7. Vision Frame Analysis
+        elif path == "/api/v1/ai/vision/analyze-frame":
+            res = ai_service.analyze_vision_frame(
+                organization_id=payload.get("organizationId", "default"),
+                frame_id=payload.get("frameId", "frame-001"),
+                drone_id=payload.get("droneId", "default"),
+                telemetry=payload.get("telemetry", {}),
+                camera_source=payload.get("cameraSource", "DOWNWARD_NAV_CAM"),
+                image_base64=payload.get("imageBase64"),
+                synthetic_scene_description=payload.get("syntheticSceneDescription"),
+                target_delivery_location=payload.get("targetDeliveryLocation")
+            )
+            return 200, res
+
+        # 8. Vision Landing Zone Assessment
+        elif path == "/api/v1/ai/vision/assess-landing":
+            res = ai_service.assess_landing_zone(
+                organization_id=payload.get("organizationId", "default"),
+                drone_id=payload.get("droneId", "default"),
+                telemetry=payload.get("telemetry", {}),
+                camera_source=payload.get("cameraSource", "DOWNWARD_NAV_CAM"),
+                expected_radius_meters=payload.get("expectedRadiusMeters", 3.0),
+                synthetic_scene_description=payload.get("syntheticSceneDescription")
+            )
+            return 200, res
+
+        # 9. Vision Destination Verification
+        elif path == "/api/v1/ai/vision/verify-destination":
+            res = ai_service.verify_destination(
+                organization_id=payload.get("organizationId", "default"),
+                drone_id=payload.get("droneId", "default"),
+                destination=payload.get("destination", {}),
+                telemetry=payload.get("telemetry", {}),
+                camera_source=payload.get("cameraSource", "DOWNWARD_NAV_CAM"),
+                synthetic_scene_description=payload.get("syntheticSceneDescription")
+            )
+            return 200, res
+
+        # 10. Vision Hazard Detection
+        elif path == "/api/v1/ai/vision/detect-hazards":
+            res = ai_service.detect_hazards(
+                organization_id=payload.get("organizationId", "default"),
+                drone_id=payload.get("droneId", "default"),
+                telemetry=payload.get("telemetry", {}),
+                camera_source=payload.get("cameraSource", "FORWARD_OBSTACLE_CAM"),
+                minimum_confidence=payload.get("minimumConfidence", 0.5),
+                synthetic_scene_description=payload.get("syntheticSceneDescription")
+            )
+            return 200, res
+
         else:
             return 404, {"error": "NOT_FOUND", "message": f"Endpoint '{path}' does not exist."}
 
