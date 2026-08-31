@@ -28,10 +28,13 @@ import {
   DigitalTwinForbiddenError,
   DigitalTwinNotFoundError
 } from "../modules/digital-twin/digital-twin.types.js";
+import { metricsRegistry } from "../infrastructure/metrics/metrics.registry.js";
+import { logger } from "../infrastructure/logging/logger.js";
 
 export function errorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
   const timestamp = new Date().toISOString();
   const instance = request.url;
+  const correlationId = request.correlationId;
 
   // Handle Zod validation errors
   if (error instanceof ZodError) {
@@ -293,6 +296,8 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
 
   // Handle JWT errors from Fastify
   if ("statusCode" in error && error.statusCode === 401) {
+    metricsRegistry.incrementCounter("auth_failures_total", 1);
+    metricsRegistry.incrementCounter("http_errors_total", 1, { status: 401 });
     return reply.status(401).send({
       type: "https://skynav.io/errors/unauthorized",
       title: "Unauthorized",
@@ -300,13 +305,21 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
       detail: error.message || "Authentication credentials required or expired.",
       instance,
       code: "UNAUTHORIZED",
+      correlationId,
       timestamp
     });
   }
 
   const statusCode = (error as FastifyError).statusCode || 500;
+  metricsRegistry.incrementCounter("http_errors_total", 1, { status: statusCode });
+
   if (statusCode >= 500) {
-    request.log.error({ err: error }, "Unhandled internal server error");
+    logger.error("Unhandled internal server error", {
+      correlationId,
+      route: instance,
+      error,
+      statusCode
+    });
   }
 
   return reply.status(statusCode).send({
@@ -316,6 +329,7 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
     detail: statusCode === 500 ? "An unexpected server error occurred." : error.message,
     instance,
     code: statusCode === 404 ? "NOT_FOUND" : "INTERNAL_ERROR",
+    correlationId,
     timestamp
   });
 }

@@ -1,15 +1,30 @@
 name: quality
-on: [pull_request]
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
+        with:
+          node-version: 22
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Run Python AI & CV Subsystem Tests
+        run: |
+          pip install -r services/ai/requirements.txt
+          python -m unittest discover -s services/ai/tests -p "test_*.py" -v
+        env:
+          PYTHONPATH: services/ai

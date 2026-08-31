@@ -41,6 +41,12 @@ import { createAiService, type AiService } from "./modules/ai/ai.service.js";
 import { createAiRoutes } from "./modules/ai/ai.routes.js";
 import { createDigitalTwinService, type DigitalTwinService } from "./modules/digital-twin/digital-twin.service.js";
 import { createDigitalTwinRoutes } from "./modules/digital-twin/digital-twin.routes.js";
+import { createObservabilityRoutes } from "./modules/observability/observability.routes.js";
+import { setupCorrelation } from "./plugins/correlation.js";
+import { setupSecurityHeaders } from "./plugins/security-headers.js";
+import { setupRateLimiting } from "./plugins/rate-limit.js";
+import { metricsRegistry } from "./infrastructure/metrics/metrics.registry.js";
+import { logger } from "./infrastructure/logging/logger.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -73,7 +79,8 @@ export interface AppOptions {
 
 export function buildApp(options: AppOptions = {}): FastifyInstance {
   const app = Fastify({
-    logger: options.logger ?? false
+    logger: options.logger ?? false,
+    bodyLimit: env.REQUEST_BODY_LIMIT_BYTES
   });
 
   const isMockEnvironment = Boolean(
@@ -95,6 +102,11 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const notificationRepo = options.notificationRepo ?? (db ? createNotificationRepository(db) : undefined as any);
   const eventPublisher = options.eventPublisher ?? (process.env.REDIS_URL ? new RedisEventPublisher() : new InMemoryEventPublisher());
 
+  // Core Request Tracing & Security Plugins
+  setupCorrelation(app);
+  setupSecurityHeaders(app);
+  setupRateLimiting(app);
+
   // Error handling plugin
   app.setErrorHandler(errorHandler);
 
@@ -114,7 +126,28 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
   app.register(websocket, {
     options: {
-      maxPayload: 1048576 // 1MB
+      maxPayload: env.REQUEST_BODY_LIMIT_BYTES
+    }
+  });
+
+  // Request Lifecycle & Metrics Logging
+  app.addHook("onResponse", async (request, reply) => {
+    const durationMs = Date.now() - (request.startTimeMs || Date.now());
+    metricsRegistry.incrementCounter("http_requests_total", 1, {
+      method: request.method,
+      status: reply.statusCode
+    });
+
+    if (request.url !== "/health" && request.url !== "/ready" && request.url !== "/metrics") {
+      logger.info(`${request.method} ${request.url} ${reply.statusCode} - ${durationMs}ms`, {
+        correlationId: request.correlationId,
+        userId: request.user?.id,
+        organizationId: request.user?.organizationId,
+        method: request.method,
+        route: request.url,
+        statusCode: reply.statusCode,
+        durationMs
+      });
     }
   });
 
@@ -241,8 +274,8 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     }
   });
 
-  // Health and discovery endpoints
-  app.get("/health", async () => ({ status: "ok", service: "api", timestamp: new Date().toISOString() }));
+  // Observability & Health Routes (/health, /ready, /metrics)
+  app.register(createObservabilityRoutes({ db, isMockEnvironment }));
 
   const modules = [
     "auth",
@@ -265,7 +298,8 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     "analytics",
     "audit",
     "ai",
-    "digital-twin"
+    "digital-twin",
+    "observability"
   ];
   app.get("/api/v1/modules", async () => ({ modules }));
 

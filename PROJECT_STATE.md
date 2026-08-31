@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 6 — Digital Twin Foundation (**COMPLETED**)
+Milestone 7 — Production Hardening & Observability (**COMPLETED**)
 
 ## Foundation status
 
@@ -17,6 +17,7 @@ Milestone 6 — Digital Twin Foundation (**COMPLETED**)
 - **Advisory AI & Predictive Routing**: Explainable multi-factor route scoring, kinematic & statistical ETA prediction ($p_{50}, p_{90}, p_{99}$), battery discharge and reserve modeling, prognostic fleet maintenance diagnostics, weather operational risk assessment, and authoritative Deterministic Safety Gate validation implemented.
 - **Computer Vision & Perception Foundation**: Pluggable `VisionProvider` abstraction (`DevelopmentVisionProvider`, `SimulatorVisionProvider`), visual landing-zone assessment, obstacle & hazard detection, environmental scene classification (Urban, Suburban, Industrial, Rural, Open Field), destination fiducial verification ($dx, dy$ centering), and Fastify / WebSocket integration implemented.
 - **Digital Twin Foundation**: Synchronized software representation of drones, missions, fleet state, environment, and perception. Real-time telemetry reconciliation engine, discrepancy and anomaly detection, twin health evaluation (`HEALTHY`, `DEGRADED`, `CRITICAL`, `INCONSISTENT`, `OFFLINE`), out-of-order timestamp protection, Fastify REST APIs, and operations cockpit UI implemented.
+- **Production Hardening & Observability**: Configuration validation rejecting insecure production defaults, request correlation tracking (`x-correlation-id`), tiered rate limiting (Auth, Emergency, AI, Standard), structured JSON logging with sensitive data redaction, liveness (`/health`) and readiness (`/ready`) probes, in-memory metrics registry (`/metrics`), security headers, request body size protection (1MB), and worker resilience implemented.
 
 > **SAFETY NOTICE**: This is a deterministic software simulator and operational platform designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
@@ -199,10 +200,40 @@ Milestone 6 — Digital Twin Foundation (**COMPLETED**)
 - **Web Digital Twin Cockpit (`apps/web/src/features/admin/digital-twin-cockpit.tsx`)**:
   - Live synchronization status badge, fleet metrics summary grid, active reconciliation anomaly list, and interactive UAV twin inspector table embedded into Admin Fleet Operations (`/admin/fleet`).
 
+### 12. Milestone 7: Production Hardening & Observability
+- **Environment & Configuration Hardening (`packages/config/src/index.ts`)**:
+  - Validates environment variables and rejects insecure defaults in production (short/default `JWT_SECRET`, default `DATABASE_URL`, wildcard `*` `API_CORS_ORIGIN`, invalid `REDIS_URL`).
+  - Added configuration parameters for rate limits (`RATE_LIMIT_AUTH_MAX`, `RATE_LIMIT_EMERGENCY_MAX`, `RATE_LIMIT_AI_MAX`, `RATE_LIMIT_API_MAX`, `RATE_LIMIT_WINDOW_MS`), payload bounds (`REQUEST_BODY_LIMIT_BYTES`), and metrics.
+- **Request Correlation & Tracing (`apps/api/src/plugins/correlation.ts`)**:
+  - Global `onRequest` hook extracting `x-correlation-id` / `x-request-id` or generating a UUID v4.
+  - Automatically echoes correlation ID in response headers and embeds into RFC 7807 Problem Details error payloads, structured logs, and audit records.
+- **Tiered API Rate Limiting (`apps/api/src/plugins/rate-limit.ts`)**:
+  - Route-aware sliding window rate limiter:
+    - Auth Tier: 10 requests / min (`/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/refresh`).
+    - Emergency Tier: 30 requests / min (`/api/v1/drones/:id/emergency`, `/api/v1/missions/:id/cancel`).
+    - AI Tier: 60 requests / min (`/api/v1/ai/*`).
+    - Standard API Tier: 300 requests / min.
+    - Whitelisted: `/health`, `/ready`, `/metrics`, `/api/v1/modules`.
+  - Returns `429 Too Many Requests` in RFC 7807 Problem Details format with `Retry-After` header.
+- **Structured JSON Logging & Sensitive Data Redaction (`apps/api/src/infrastructure/logging/logger.ts`)**:
+  - Production-grade structured logging format (`timestamp`, `level`, `service`, `environment`, `correlationId`, `userId`, `organizationId`, `route`, `statusCode`, `durationMs`).
+  - Automatic recursive redaction of sensitive credentials (`password`, `token`, `secret`, `authorization`, `cookie`, `key`, `credential`).
+- **Operational Health & Readiness Probes (`apps/api/src/modules/observability/observability.routes.ts`)**:
+  - `GET /health`: Fast, non-blocking liveness probe returning process uptime and service identifier.
+  - `GET /ready`: Structured readiness probe verifying PostgreSQL, Redis, and AI availability with latency metrics. Returns 200 OK when healthy or 503 Service Unavailable when degraded.
+  - `GET /metrics`: In-memory metrics snapshot covering request counts, errors, auth failures, WebSocket states, and memory heap statistics.
+- **Security Headers & Payload Protection**:
+  - Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 0`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security` in production.
+  - Request body payload size bounded to 1MB (`REQUEST_BODY_LIMIT_BYTES`).
+- **Worker & CI Hardening**:
+  - `NotificationWorkerMetrics` and `TelemetryWorkerMetrics` added for background stream observability.
+  - Updated Docker Compose with service restart policies (`restart: unless-stopped`).
+  - Hardened GitHub Actions CI (`.github/workflows/quality.yml`) to run lint, typecheck, tests, build, and Python AI test suite across push and PR events.
+
 ## Remaining
 
-- **Milestone 7: Swarm Coordination & Multi-UAV Deconfliction**
-- **Milestone 8: Production Hardening & Security Audit**
+- **Milestone 8: Swarm Coordination & Multi-UAV Deconfliction**
+- **Milestone 9: Advanced Autonomy & Final Verification**
 
 
 ## Important decisions
@@ -214,6 +245,8 @@ Milestone 6 — Digital Twin Foundation (**COMPLETED**)
   1. *Authoritative Domain State*: Database & mission state machine rules.
   2. *Digital Twin Observation*: Reconciled real-time telemetry, kinematics, and discrepancy diagnostics.
   3. *AI / CV Advisory State*: Advisory route recommendations, ETA confidence intervals, and optical perception.
+- **Strict Separation of Liveness and Readiness**: `/health` is an ultra-fast non-blocking probe indicating process liveness, while `/ready` performs deep dependency health checks (PostgreSQL, Redis, AI) without crashing the service during temporary upstream outages.
+- **Tiered Route Rate Limiting**: Dedicated rate limit quotas protect sensitive authentication, emergency controls, and heavy AI inference endpoints while allowing generous throughput for standard queries and zero throttling on internal telemetry streams.
 - **Server-Side Authorization on Subscriptions**: WebSocket subscription requests are verified against server-side session JWT claims and database ownership records, preventing unauthorized client-side claims.
 - **Bounded Backpressure & Stale Frame Dropping**: High-frequency telemetry streams prioritize freshness over historical buffering; if a client buffer backs up or an older packet arrives late, it is dropped in favor of current state.
 - **Aviation HUD Aesthetic**: High-density operational interface using liquid glass surfaces and restrained micro-interactions.
