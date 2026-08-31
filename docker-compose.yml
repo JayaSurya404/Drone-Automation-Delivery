@@ -42,8 +42,8 @@ services:
   # 3. Python Advisory AI & Computer Vision Microservice
   ai:
     build:
-      context: .
-      dockerfile: services/ai/Dockerfile
+      context: ./services/ai
+      dockerfile: Dockerfile
     container_name: skynav-ai
     restart: unless-stopped
     ports:
