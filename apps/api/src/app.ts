@@ -35,6 +35,10 @@ import { createDroneSelector, type DroneSelector } from "./modules/dispatch/dron
 import { SimulatorSyncService } from "./modules/dispatch/simulator-sync.service.js";
 import { createDeliveryOrchestrator, type DeliveryOrchestrator } from "./modules/dispatch/delivery-orchestrator.js";
 import { createDispatchRoutes } from "./modules/dispatch/dispatch.routes.js";
+import { AiClient } from "./modules/ai/ai.client.js";
+import { DeterministicSafetyGate } from "./modules/ai/safety-gate.js";
+import { createAiService, type AiService } from "./modules/ai/ai.service.js";
+import { createAiRoutes } from "./modules/ai/ai.routes.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -58,6 +62,9 @@ export interface AppOptions {
   outboxService?: OutboxService;
   notificationRepo?: NotificationRepository;
   notificationService?: NotificationService;
+  aiService?: AiService;
+  aiClient?: AiClient;
+  safetyGate?: DeterministicSafetyGate;
   logger?: boolean;
 }
 
@@ -177,6 +184,19 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
         })
       : undefined as any);
 
+  const aiClient = options.aiClient ?? new AiClient();
+  const safetyGate = options.safetyGate ?? new DeterministicSafetyGate();
+  const aiService =
+    options.aiService ??
+    createAiService({
+      aiClient,
+      safetyGate,
+      fleetRepo,
+      orderRepo,
+      missionRepo,
+      auditService
+    });
+
   // Pre-handler hook to authenticate requests with Bearer tokens
   app.addHook("onRequest", async (request) => {
     try {
@@ -231,7 +251,8 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     "deliveries",
     "notifications",
     "analytics",
-    "audit"
+    "audit",
+    "ai"
   ];
   app.get("/api/v1/modules", async () => ({ modules }));
 
@@ -244,6 +265,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   if (notificationService) app.register(createNotificationRoutes(notificationService));
   if (realtimeService) app.register(createRealtimeRoutes(realtimeService));
   if (deliveryOrchestrator) app.register(createDispatchRoutes(deliveryOrchestrator, simulatorSyncService));
+  if (aiService) app.register(createAiRoutes(aiService));
 
   return app;
 }

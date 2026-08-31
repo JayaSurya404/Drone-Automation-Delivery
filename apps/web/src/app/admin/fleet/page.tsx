@@ -25,6 +25,7 @@ import { ReturnToHomeModal } from "@/features/admin/rth-modal";
 import { EmergencyHaltModal } from "@/features/admin/emergency-modal";
 import { EmergencyClearModal } from "@/features/admin/emergency-clear-modal";
 import { EmergencyBanner } from "@/features/admin/emergency-banner";
+import { PredictiveMaintenanceCard } from "@/features/admin/predictive-maintenance-card";
 
 export default function AdminFleetPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
@@ -333,6 +334,9 @@ export default function AdminFleetPage() {
           </Table>
         </Card>
       )}
+
+      {/* Predictive Fleet Maintenance & Diagnostics */}
+      <PredictiveMaintenanceCard />
 
       {/* Operational Modals */}
       {selectedDroneForRTH && (

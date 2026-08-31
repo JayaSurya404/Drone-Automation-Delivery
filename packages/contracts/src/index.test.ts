@@ -34,7 +34,15 @@ import {
   formatDistance,
   formatDuration,
   computeBoundingBox,
-  calculateTelemetryFreshness
+  calculateTelemetryFreshness,
+  aiRouteScoringRequestSchema,
+  aiRouteScoringResponseSchema,
+  aiEtaPredictionRequestSchema,
+  aiBatteryPredictionRequestSchema,
+  aiMaintenancePredictionRequestSchema,
+  aiDemandForecastRequestSchema,
+  deterministicSafetyGateResultSchema,
+  missionPlanEvaluationResponseSchema
 } from "./index.js";
 
 describe("Contracts / Authentication & RBAC Schemas", () => {
@@ -444,6 +452,150 @@ describe("Contracts / Geospatial Utilities & Calculations", () => {
     assert.equal(calculateTelemetryFreshness(staleTime, now), "STALE");
     assert.equal(calculateTelemetryFreshness(offlineTime, now), "OFFLINE");
     assert.equal(calculateTelemetryFreshness(null, now), "OFFLINE");
+  });
+});
+
+describe("Contracts / AI Advisory & Safety Gate Schemas", () => {
+  it("validates valid route scoring request and candidate ranking schema", () => {
+    const validRequest = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      packageWeightGrams: 1500,
+      droneMaxPayloadGrams: 4500,
+      droneBatteryPercent: 95,
+      weather: {
+        windSpeedMps: 4.5,
+        windDirectionDegrees: 180,
+        windGustMps: 6.0,
+        precipitationMmPerHour: 0,
+        visibilityMeters: 10000,
+        temperatureCelsius: 18
+      },
+      candidates: [
+        {
+          id: "route-direct",
+          name: "Direct Route A",
+          waypoints: [
+            { latitude: 37.7749, longitude: -122.4194 },
+            { latitude: 37.7845, longitude: -122.4082 }
+          ],
+          cruiseAltitudeMeters: 60,
+          targetSpeedMps: 15
+        }
+      ],
+      priority: "STANDARD"
+    };
+
+    const parsed = aiRouteScoringRequestSchema.parse(validRequest);
+    assert.equal(parsed.candidates.length, 1);
+    assert.equal(parsed.packageWeightGrams, 1500);
+
+    const validResponse = {
+      modelVersion: "advisory-v1.0.0",
+      generatedAt: new Date().toISOString(),
+      recommendedRouteId: "route-direct",
+      candidates: [
+        {
+          id: "route-direct",
+          name: "Direct Route A",
+          rank: 1,
+          score: 92.5,
+          totalDistanceMeters: 1450,
+          estimatedFlightTimeSeconds: 96,
+          predictedEta: new Date(Date.now() + 96000).toISOString(),
+          estimatedBatteryConsumptionPercent: 8.5,
+          batteryFeasibility: "SAFE",
+          weatherRiskLevel: "NORMAL",
+          compositeRiskScore: 12.0,
+          isRecommended: true,
+          recommendationReason: "Shortest route with optimal wind profile and low airspace congestion.",
+          riskFactors: ["Mild crosswind near delivery point"],
+          scoreBreakdown: {
+            distanceScore: 95,
+            timeScore: 90,
+            batteryScore: 95,
+            weatherScore: 90,
+            priorityBonus: 0
+          },
+          waypoints: [
+            { latitude: 37.7749, longitude: -122.4194 },
+            { latitude: 37.7845, longitude: -122.4082 }
+          ]
+        }
+      ],
+      advisoryDisclaimer: "AI recommendations are advisory only and must pass deterministic safety validation."
+    };
+
+    const parsedRes = aiRouteScoringResponseSchema.parse(validResponse);
+    assert.equal(parsedRes.recommendedRouteId, "route-direct");
+    assert.equal(parsedRes.candidates[0].batteryFeasibility, "SAFE");
+  });
+
+  it("validates ETA and Battery prediction schemas", () => {
+    const etaReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      currentPosition: { latitude: 37.7749, longitude: -122.4194 },
+      currentSpeedMps: 12.5,
+      destination: { latitude: 37.7845, longitude: -122.4082 }
+    };
+    const parsedEtaReq = aiEtaPredictionRequestSchema.parse(etaReq);
+    assert.equal(parsedEtaReq.cruiseSpeedMps, 15);
+
+    const battReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      currentBatteryPercent: 85,
+      routeDistanceMeters: 3000,
+      packageWeightGrams: 2000
+    };
+    const parsedBatt = aiBatteryPredictionRequestSchema.parse(battReq);
+    assert.equal(parsedBatt.currentBatteryPercent, 85);
+  });
+
+  it("validates Predictive Maintenance and Demand Forecasting schemas", () => {
+    const maintReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      callSign: "SKY-001",
+      model: "AeroHex V4",
+      flightHours: 120.5,
+      batteryCycles: 45,
+      batteryHealthPercent: 94
+    };
+    const parsedMaint = aiMaintenancePredictionRequestSchema.parse(maintReq);
+    assert.equal(parsedMaint.flightHours, 120.5);
+
+    const forecastReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      forecastHorizonHours: 12
+    };
+    const parsedForecast = aiDemandForecastRequestSchema.parse(forecastReq);
+    assert.equal(parsedForecast.forecastHorizonHours, 12);
+  });
+
+  it("validates Deterministic Safety Gate and Evaluated Mission Plan schemas", () => {
+    const gateResult = {
+      passed: true,
+      geofenceCheck: { passed: true, reason: "No geofence intersection detected." },
+      batteryReserveCheck: { passed: true, expectedReservePercent: 65, minRequiredReservePercent: 20, reason: "Adequate landing reserve." },
+      payloadCheck: { passed: true, packageWeightGrams: 1500, maxPayloadGrams: 4500, reason: "Payload within operational limits." },
+      weatherCheck: { passed: true, windSpeedMps: 4.5, maxAllowedWindMps: 15, reason: "Wind speed within limits." },
+      altitudeEnvelopeCheck: { passed: true, cruiseAltitudeMeters: 60, maxAltitudeMeters: 120, reason: "Altitude within corridor bounds." },
+      rejectionReasons: []
+    };
+
+    const parsedGate = deterministicSafetyGateResultSchema.parse(gateResult);
+    assert.ok(parsedGate.passed);
+
+    const evalPlan = {
+      orderId: "ord-123",
+      evaluatedAt: new Date().toISOString(),
+      deterministicSafetyGate: gateResult,
+      isMissionAuthorized: true,
+      operatorDecisionRationale: "AI recommended Route A and passed all deterministic safety constraints."
+    };
+
+    const parsedPlan = missionPlanEvaluationResponseSchema.parse(evalPlan);
+    assert.ok(parsedPlan.isMissionAuthorized);
   });
 });
 
