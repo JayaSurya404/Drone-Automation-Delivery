@@ -81,23 +81,35 @@ export function InteractiveMap({
     }
   }, [zoom, minZoom, maxZoom]);
 
-  // Measure container dimensions
+  // Measure container dimensions safely
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
         const { clientWidth, clientHeight } = containerRef.current;
         if (clientWidth > 0 && clientHeight > 0) {
-          setDimensions({ width: clientWidth, height: clientHeight });
+          setDimensions((prev) => {
+            if (prev.width === clientWidth && prev.height === clientHeight) {
+              return prev;
+            }
+            return { width: clientWidth, height: clientHeight };
+          });
         }
       }
     };
 
     updateDimensions();
-    const observer = new ResizeObserver(updateDimensions);
+    let frameId: number;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(updateDimensions);
+    });
     if (containerRef.current) {
       observer.observe(containerRef.current);
     }
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
   }, []);
 
   // Web Mercator projection calculations
@@ -182,16 +194,22 @@ export function InteractiveMap({
     setIsDragging(false);
   };
 
-  // Scroll wheel zoom handler
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const zoomDelta = e.deltaY < 0 ? 0.25 : -0.25;
-    const nextZoom = Math.max(minZoom, Math.min(maxZoom, currentZoom + zoomDelta));
-    if (nextZoom !== currentZoom) {
-      setCurrentZoom(nextZoom);
-      onViewportChange?.({ center: currentCenter, zoom: nextZoom });
-    }
-  };
+  // Scroll wheel zoom handler attached natively with passive: false
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomDelta = e.deltaY < 0 ? 0.25 : -0.25;
+      setCurrentZoom((z) => Math.max(minZoom, Math.min(maxZoom, z + zoomDelta)));
+    };
+
+    container.addEventListener("wheel", handleWheelNative, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheelNative);
+    };
+  }, [minZoom, maxZoom]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -253,7 +271,7 @@ export function InteractiveMap({
     }
   };
 
-  // Compute visible OSM tile grid for current viewport
+  // Compute visible OSM tile grid for current viewport with strict bounds
   const visibleTiles = useMemo(() => {
     if (!layerBaseTiles) return [];
 
@@ -275,14 +293,19 @@ export function InteractiveMap({
           Math.pow(2, z)
       );
 
-    const minX = Math.max(0, lon2tile(topLeft.longitude, intZoom));
-    const maxX = Math.min(Math.pow(2, intZoom) - 1, lon2tile(bottomRight.longitude, intZoom));
-    const minY = Math.max(0, lat2tile(topLeft.latitude, intZoom));
-    const maxY = Math.min(Math.pow(2, intZoom) - 1, lat2tile(bottomRight.latitude, intZoom));
+    const rawMinX = lon2tile(topLeft.longitude, intZoom);
+    const rawMaxX = lon2tile(bottomRight.longitude, intZoom);
+    const rawMinY = lat2tile(topLeft.latitude, intZoom);
+    const rawMaxY = lat2tile(bottomRight.latitude, intZoom);
+
+    const startX = Math.max(0, Math.min(rawMinX, rawMaxX));
+    const endX = Math.min(Math.pow(2, intZoom) - 1, Math.max(rawMinX, rawMaxX), startX + 10);
+    const startY = Math.max(0, Math.min(rawMinY, rawMaxY));
+    const endY = Math.min(Math.pow(2, intZoom) - 1, Math.max(rawMinY, rawMaxY), startY + 10);
 
     const tiles: Array<{ x: number; y: number; z: number; url: string }> = [];
-    for (let x = minX; x <= maxX; x++) {
-      for (let y = minY; y <= maxY; y++) {
+    for (let x = startX; x <= endX; x++) {
+      for (let y = startY; y <= endY; y++) {
         const url = tileUrl
           .replace("{z}", intZoom.toString())
           .replace("{x}", x.toString())
@@ -343,7 +366,13 @@ export function InteractiveMap({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
+      style={{
+        width: "100%",
+        height: "100%",
+        minHeight: isFullscreen ? "100vh" : "380px",
+        position: isFullscreen ? "fixed" : "relative",
+        overflow: "hidden"
+      }}
       className={`relative w-full h-full min-h-[380px] rounded-2xl overflow-hidden border border-slate-750 bg-[#060912] select-none focus:outline-none focus:ring-1 focus:ring-cyan-500/50 ${
         isDragging ? "cursor-grabbing" : "cursor-grab"
       } ${isFullscreen ? "fixed inset-0 z-50 rounded-none border-none" : ""} ${className}`}
