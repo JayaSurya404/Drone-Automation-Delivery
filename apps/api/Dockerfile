@@ -17,7 +17,6 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache curl wget
 RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 skynav
 
