@@ -9,6 +9,13 @@ export interface NotificationWorkerOptions {
   onError?: (error: Error, rawMessage?: string) => void;
 }
 
+export interface NotificationWorkerMetrics {
+  messagesReceived: number;
+  messagesProcessed: number;
+  messagesFailed: number;
+  lastProcessedAt: string | null;
+}
+
 export class NotificationWorker {
   private readonly redis: Redis;
   private readonly ownsClient: boolean;
@@ -16,6 +23,13 @@ export class NotificationWorker {
   private readonly patterns: string[];
   private readonly onError?: (error: Error, rawMessage?: string) => void;
   private isRunning = false;
+
+  public readonly metrics: NotificationWorkerMetrics = {
+    messagesReceived: 0,
+    messagesProcessed: 0,
+    messagesFailed: 0,
+    lastProcessedAt: null
+  };
 
   constructor(options: NotificationWorkerOptions) {
     if (options.redisSubscriber) {
@@ -69,9 +83,14 @@ export class NotificationWorker {
   }
 
   async handleIncomingMessage(rawMessage: string): Promise<void> {
+    this.metrics.messagesReceived++;
+    this.metrics.lastProcessedAt = new Date().toISOString();
+
     try {
       await this.processor.processEvent(rawMessage);
+      this.metrics.messagesProcessed++;
     } catch (err) {
+      this.metrics.messagesFailed++;
       if (this.onError) {
         this.onError(err as Error, rawMessage);
       }
