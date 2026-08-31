@@ -43,7 +43,9 @@ export const permissionSchema = z.enum([
   "notifications:manage",
   "audit:read",
   "users:manage",
-  "org:manage"
+  "org:manage",
+  "digital-twin:read",
+  "digital-twin:manage"
 ]);
 export type Permission = z.infer<typeof permissionSchema>;
 
@@ -71,7 +73,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "notifications:manage",
     "audit:read",
     "users:manage",
-    "org:manage"
+    "org:manage",
+    "digital-twin:read",
+    "digital-twin:manage"
   ],
   OPERATOR: [
     "orders:read",
@@ -90,7 +94,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "telemetry:ingest",
     "notifications:read",
     "notifications:manage",
-    "audit:read"
+    "audit:read",
+    "digital-twin:read",
+    "digital-twin:manage"
   ],
   FLEET_MANAGER: [
     "drones:read",
@@ -100,7 +106,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "fleet:manage",
     "telemetry:read",
     "notifications:read",
-    "audit:read"
+    "audit:read",
+    "digital-twin:read",
+    "digital-twin:manage"
   ],
   DISPATCHER: [
     "orders:read",
@@ -109,16 +117,20 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "orders:cancel",
     "missions:read",
     "missions:create",
+    "missions:authorize",
+    "missions:command",
     "drones:read",
     "fleet:read",
+    "geofences:read",
     "telemetry:read",
-    "notifications:read"
+    "notifications:read",
+    "audit:read",
+    "digital-twin:read"
   ],
   CUSTOMER: [
     "orders:read",
     "orders:create",
     "orders:cancel",
-    "telemetry:read",
     "notifications:read"
   ]
 } as const;
@@ -905,6 +917,14 @@ export const wsServerPongMessageSchema = z.object({
   timestamp: z.string().datetime()
 });
 
+export const wsTwinUpdateMessageSchema = z.object({
+  type: z.literal("TWIN_UPDATE"),
+  channel: z.string(),
+  subType: z.enum(["DRONE", "MISSION", "FLEET", "HEALTH_ALERT", "RECONCILIATION_WARNING"]),
+  payload: z.record(z.unknown()),
+  timestamp: z.string().datetime()
+});
+
 export const wsServerMessageSchema = z.discriminatedUnion("type", [
   wsServerAuthenticatedMessageSchema,
   wsServerSubscribedMessageSchema,
@@ -912,7 +932,8 @@ export const wsServerMessageSchema = z.discriminatedUnion("type", [
   wsServerTelemetryMessageSchema,
   wsServerNotificationMessageSchema,
   wsServerErrorMessageSchema,
-  wsServerPongMessageSchema
+  wsServerPongMessageSchema,
+  wsTwinUpdateMessageSchema
 ]);
 export type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
 
@@ -930,4 +951,9 @@ export * from "./ai.js";
 // Computer Vision & Perception Schemas
 // ============================================================================
 export * from "./vision.js";
+
+// ============================================================================
+// Digital Twin Schemas & Types
+// ============================================================================
+export * from "./digital-twin.js";
 

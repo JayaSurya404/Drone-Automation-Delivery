@@ -39,6 +39,8 @@ import { AiClient } from "./modules/ai/ai.client.js";
 import { DeterministicSafetyGate } from "./modules/ai/safety-gate.js";
 import { createAiService, type AiService } from "./modules/ai/ai.service.js";
 import { createAiRoutes } from "./modules/ai/ai.routes.js";
+import { createDigitalTwinService, type DigitalTwinService } from "./modules/digital-twin/digital-twin.service.js";
+import { createDigitalTwinRoutes } from "./modules/digital-twin/digital-twin.routes.js";
 import type { UserRole, Permission } from "@skynav/contracts";
 
 export interface AppOptions {
@@ -65,6 +67,7 @@ export interface AppOptions {
   aiService?: AiService;
   aiClient?: AiClient;
   safetyGate?: DeterministicSafetyGate;
+  digitalTwinService?: DigitalTwinService;
   logger?: boolean;
 }
 
@@ -197,6 +200,15 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       auditService
     });
 
+  const digitalTwinService =
+    options.digitalTwinService ??
+    createDigitalTwinService({
+      fleetRepo,
+      missionRepo,
+      orderRepo,
+      auditService
+    });
+
   // Pre-handler hook to authenticate requests with Bearer tokens
   app.addHook("onRequest", async (request) => {
     try {
@@ -252,7 +264,8 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     "notifications",
     "analytics",
     "audit",
-    "ai"
+    "ai",
+    "digital-twin"
   ];
   app.get("/api/v1/modules", async () => ({ modules }));
 
@@ -266,6 +279,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   if (realtimeService) app.register(createRealtimeRoutes(realtimeService));
   if (deliveryOrchestrator) app.register(createDispatchRoutes(deliveryOrchestrator, simulatorSyncService));
   if (aiService) app.register(createAiRoutes(aiService));
+  if (digitalTwinService) app.register(createDigitalTwinRoutes(digitalTwinService));
 
   return app;
 }

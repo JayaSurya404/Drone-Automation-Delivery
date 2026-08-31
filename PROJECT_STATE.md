@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 5 — Computer Vision Foundation (**COMPLETED**)
+Milestone 6 — Digital Twin Foundation (**COMPLETED**)
 
 ## Foundation status
 
@@ -16,6 +16,7 @@ Milestone 5 — Computer Vision Foundation (**COMPLETED**)
 - **Production Geospatial Maps & Routing Foundation**: Production `MapView` with OpenStreetMap cartographic tiles and tactical aerospace overlay, true Spherical Web Mercator projection, real-time drone movement trails (`MAX_TRAIL_POINTS`), dynamic kinematic distance and ETA calculations, telemetry freshness indicators (`LIVE`, `DEGRADED`, `STALE`, `OFFLINE`), and privacy-safe customer tracking implemented.
 - **Advisory AI & Predictive Routing**: Explainable multi-factor route scoring, kinematic & statistical ETA prediction ($p_{50}, p_{90}, p_{99}$), battery discharge and reserve modeling, prognostic fleet maintenance diagnostics, weather operational risk assessment, and authoritative Deterministic Safety Gate validation implemented.
 - **Computer Vision & Perception Foundation**: Pluggable `VisionProvider` abstraction (`DevelopmentVisionProvider`, `SimulatorVisionProvider`), visual landing-zone assessment, obstacle & hazard detection, environmental scene classification (Urban, Suburban, Industrial, Rural, Open Field), destination fiducial verification ($dx, dy$ centering), and Fastify / WebSocket integration implemented.
+- **Digital Twin Foundation**: Synchronized software representation of drones, missions, fleet state, environment, and perception. Real-time telemetry reconciliation engine, discrepancy and anomaly detection, twin health evaluation (`HEALTHY`, `DEGRADED`, `CRITICAL`, `INCONSISTENT`, `OFFLINE`), out-of-order timestamp protection, Fastify REST APIs, and operations cockpit UI implemented.
 
 > **SAFETY NOTICE**: This is a deterministic software simulator and operational platform designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
@@ -176,16 +177,43 @@ Milestone 5 — Computer Vision Foundation (**COMPLETED**)
 - **AI/ML Honesty Declaration**:
   - Current perception engine utilizes a development rule-based baseline with synthetic scene processing. It is explicitly architected behind `VisionProvider` to be replaced with production deep learning models (YOLOv8/v11, SegFormer) when training datasets and GPU inference clusters are provisioned.
 
+### 11. Milestone 6: Digital Twin Foundation
+- **Shared Digital Twin Contracts (`packages/contracts/src/digital-twin.ts`)**:
+  - Strongly typed schemas for `DroneTwin`, `MissionTwin`, `FleetTwin`, `EnvironmentTwin`, `PerceptionTwinState`, `AiTwinState`, `DigitalTwinSnapshot`, and `TwinHealthReport`.
+  - Enums for `TwinHealthStatus` (`HEALTHY`, `DEGRADED`, `CRITICAL`, `INCONSISTENT`, `OFFLINE`) and `TwinIssueSeverity` (`INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+  - Added permissions `"digital-twin:read"` and `"digital-twin:manage"` to RBAC roles (`ADMIN`, `OPERATOR`, `FLEET_MANAGER`, `DISPATCHER`).
+- **Synchronized State & Reconciliation Engine (`apps/api/src/modules/digital-twin/`)**:
+  - In-memory bounded, tenant-isolated state store tracking UAV twins, mission lifecycles, and fleet metrics.
+  - Event-driven telemetry ingestion with out-of-order timestamp protection (drops stale frames).
+  - Telemetry freshness computation (`LIVE` $\le 15\text{s}$, `DEGRADED` $\le 30\text{s}$, `STALE` $\le 60\text{s}$, `OFFLINE` $> 60\text{s}$).
+  - Reconciliation validator detecting state discrepancies (Authoritative vs Telemetry), descent altitude envelope anomalies during delivery holds, critical battery reserves ($< 15\%$), and stale telemetry signals.
+  - Structured audit logging (`TWIN_RECONCILIATION_DETECTED`).
+  - Twin Health Evaluator providing actionable diagnostics per drone, mission, and organization fleet.
+- **Fastify Digital Twin REST API (`apps/api/src/modules/digital-twin/digital-twin.routes.ts`)**:
+  - `GET /api/v1/digital-twin/fleet`: Organization fleet-wide metrics.
+  - `GET /api/v1/digital-twin/drones/:droneId`: Single drone twin state.
+  - `GET /api/v1/digital-twin/missions/:missionId`: Mission twin progress & reconciliation.
+  - `GET /api/v1/digital-twin/health`: Diagnostic issue breakdown and health rating.
+  - `GET /api/v1/digital-twin/snapshot`: Complete digital twin snapshot.
+  - Strict tenant isolation and customer access restriction (403 Forbidden).
+- **Web Digital Twin Cockpit (`apps/web/src/features/admin/digital-twin-cockpit.tsx`)**:
+  - Live synchronization status badge, fleet metrics summary grid, active reconciliation anomaly list, and interactive UAV twin inspector table embedded into Admin Fleet Operations (`/admin/fleet`).
+
 ## Remaining
 
-- **Milestone 6: Swarm Coordination & Edge Digital-Twin Expansion**
-- **Milestone 7: Production Hardening & Security Audit**
+- **Milestone 7: Swarm Coordination & Multi-UAV Deconfliction**
+- **Milestone 8: Production Hardening & Security Audit**
 
 
 ## Important decisions
 
 - **Tenant-Scoped Redis Channel Architecture**: Redis channels incorporate `organizationId` directly in the channel key (`telemetry:org:{orgId}`, `telemetry:drone:{orgId}:{droneId}`), guaranteeing that cross-tenant message leakage is impossible at the transport tier.
 - **Pure Simulator Boundary**: Simulator core remains 100% deterministic and free of Redis/Fastify/network dependencies. The bridge consumes simulator events via standard callbacks.
+- **Digital Twin is Observational**: The Digital Twin is a real-time observation, analysis, and synchronization layer. It never directly controls physical UAV hardware, actuators, or autopilots.
+- **Tripartite State Model**:
+  1. *Authoritative Domain State*: Database & mission state machine rules.
+  2. *Digital Twin Observation*: Reconciled real-time telemetry, kinematics, and discrepancy diagnostics.
+  3. *AI / CV Advisory State*: Advisory route recommendations, ETA confidence intervals, and optical perception.
 - **Server-Side Authorization on Subscriptions**: WebSocket subscription requests are verified against server-side session JWT claims and database ownership records, preventing unauthorized client-side claims.
 - **Bounded Backpressure & Stale Frame Dropping**: High-frequency telemetry streams prioritize freshness over historical buffering; if a client buffer backs up or an older packet arrives late, it is dropped in favor of current state.
 - **Aviation HUD Aesthetic**: High-density operational interface using liquid glass surfaces and restrained micro-interactions.
