@@ -12,7 +12,11 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dbPath = path.join(dataDir, 'skylink.db');
+const defaultPath = path.join(dataDir, 'skynav.db');
+const legacyPath = path.join(dataDir, 'skylink.db');
+const dbPath = process.env.DATABASE_URL 
+  ? path.resolve(process.cwd(), process.env.DATABASE_URL) 
+  : (fs.existsSync(legacyPath) && !fs.existsSync(defaultPath) ? legacyPath : defaultPath);
 export const db = new Database(dbPath);
 
 // Enable WAL mode and foreign key constraints

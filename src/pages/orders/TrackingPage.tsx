@@ -363,7 +363,7 @@ export const TrackingPage: React.FC = () => {
             Delivered! 🎉
           </h2>
           <p style={{ color: 'var(--text-secondary)', maxWidth: '380px', margin: '0 auto 1.75rem', fontSize: '0.95rem' }}>
-            Package safely released at your drop zone. Thank you for flying with SkyLink!
+            Package safely released at your drop zone. Thank you for flying with SkyNav!
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <Button variant="primary" size="lg" onClick={() => setIsRatingOpen(true)} leftIcon={<Sparkles size={17} />}>

@@ -15,7 +15,7 @@ export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'skylink_super_secure_jwt_secret_2026_aerodelivery';
+const JWT_SECRET = process.env.JWT_SECRET || 'skynav_super_secure_jwt_secret_2026_aerodelivery';
 
 export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];

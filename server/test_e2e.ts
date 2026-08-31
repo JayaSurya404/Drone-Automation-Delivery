@@ -6,7 +6,7 @@ async function runE2ETest() {
   const loginRes = await fetch(`${baseUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'alex.mercer@skylink.io', password: 'Password123!' }),
+    body: JSON.stringify({ email: 'alex.mercer@skynav.io', password: 'Password123!' }),
   });
   const loginData = await loginRes.json();
   if (!loginRes.ok) throw new Error(`Login failed: ${JSON.stringify(loginData)}`);

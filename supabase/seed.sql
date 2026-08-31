@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SKYLINK AUTONOMOUS DRONE DELIVERY — SUPABASE COMPREHENSIVE SEED DATA
+-- SKYNAV AUTONOMOUS DRONE DELIVERY — SUPABASE COMPREHENSIVE SEED DATA
 -- ==============================================================================
 
 -- 1. SEED CATEGORIES (6 Normalized Core Categories)

@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════════════════════
--- SKYLINK DRONE E-COMMERCE - RELATIONAL DATABASE SCHEMA (SQLITE / POSTGRES-READY)
+-- SKYNAV DRONE E-COMMERCE - RELATIONAL DATABASE SCHEMA (SQLITE / POSTGRES-READY)
 -- ══════════════════════════════════════════════════════════════════════════════
 
 PRAGMA foreign_keys = ON;
@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS delivery_zones (
 CREATE TABLE IF NOT EXISTS drones (
   id TEXT PRIMARY KEY,
   identifier TEXT UNIQUE NOT NULL,
-  model TEXT NOT NULL DEFAULT 'SkyLink Aero-X4 Cargo',
+  model TEXT NOT NULL DEFAULT 'SkyNav Aero-X4 Cargo',
   status TEXT NOT NULL DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE', 'ASSIGNED', 'IN_FLIGHT', 'RETURNING', 'CHARGING', 'MAINTENANCE', 'OFFLINE')),
   battery_level INTEGER NOT NULL DEFAULT 100 CHECK (battery_level BETWEEN 0 AND 100),
   latitude REAL NOT NULL,

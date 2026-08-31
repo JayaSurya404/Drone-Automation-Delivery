@@ -3,12 +3,12 @@ import { db, initDb, queryOne, queryAll, runCommand } from './db/database.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from './services/emailService.js';
 
 async function runAuthTests() {
-  console.log('🧪 Starting SkyLink Customer Authentication & Entry Flow E2E Tests...\n');
+  console.log('🧪 Starting SkyNav Customer Authentication & Entry Flow E2E Tests...\n');
 
   // Ensure DB initialized
   initDb();
 
-  const testEmail = `test.pilot_${Date.now()}@skylink-test.io`;
+  const testEmail = `test.pilot_${Date.now()}@skynav-test.io`;
   const testPassword = 'SecurePassword123!';
   const testName = 'Captain Test Pilot';
   const testPhone = '+1 (555) 999-1234';

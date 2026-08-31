@@ -52,7 +52,7 @@ export const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({
         return {
           icon: <Lock size={28} className="text-indigo-500" />,
           title: title || 'Sign In to Continue',
-          message: message || 'Please sign in to your SkyLink account or create a new one to access this feature.',
+          message: message || 'Please sign in to your SkyNav account or create a new one to access this feature.',
           badge: 'Account Required',
         };
     }

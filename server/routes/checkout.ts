@@ -169,7 +169,7 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
     if (!assignedDrone) {
       assignedDrone = queryOne<any>('SELECT * FROM drones ORDER BY battery_level DESC LIMIT 1') || {
         id: 'drone_01',
-        identifier: 'SkyLink Alpha-01',
+        identifier: 'SkyNav Alpha-01',
       };
     }
 

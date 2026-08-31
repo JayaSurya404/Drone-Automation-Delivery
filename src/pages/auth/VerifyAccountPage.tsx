@@ -46,7 +46,7 @@ export const VerifyAccountPage: React.FC = () => {
 
     try {
       await verifyAccount({ code: cleanCode, email: targetEmail });
-      showToast('Account Verified! 🎉', 'Welcome to SkyLink Autonomous Drone Delivery.', 'success');
+      showToast('Account Verified! 🎉', 'Welcome to SkyNav Autonomous Drone Delivery.', 'success');
 
       await Promise.all([refreshCart(), refreshWishlist()]);
 

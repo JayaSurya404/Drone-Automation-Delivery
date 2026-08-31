@@ -74,7 +74,7 @@ export const Drone3DVisual: React.FC<Drone3DVisualProps> = ({
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           style={{ width: '100%', height: '100%', overflow: 'visible' }}
-          aria-label="SkyLink delivery drone"
+          aria-label="SkyNav delivery drone"
           role="img"
         >
           <defs>
@@ -184,7 +184,7 @@ export const Drone3DVisual: React.FC<Drone3DVisualProps> = ({
               <rect x="0" y="0" width="104" height="60" rx="10" fill="url(#dv-cargoGrad)" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
               {/* Top face highlight */}
               <rect x="0" y="0" width="104" height="20" rx="10" fill="rgba(255,255,255,0.12)" />
-              {/* SkyLink logo circle */}
+              {/* SkyNav logo circle */}
               <circle cx="52" cy="32" r="14" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
               {/* "S" symbol */}
               <text x="52" y="37" textAnchor="middle" fill="white" fontSize="14" fontWeight="800" fontFamily="system-ui">S</text>
@@ -252,9 +252,9 @@ export const Drone3DVisual: React.FC<Drone3DVisualProps> = ({
               strokeLinecap="round"
             />
 
-            {/* Side SkyLink logo */}
+            {/* Side SkyNav logo */}
             <circle cx="240" cy="198" r="10" fill="rgba(14,165,233,0.1)" stroke="rgba(14,165,233,0.3)" strokeWidth="1" />
-            <text x="240" y="202" textAnchor="middle" fill="#0284c7" fontSize="9" fontWeight="800" fontFamily="system-ui">SL</text>
+            <text x="240" y="202" textAnchor="middle" fill="#0284c7" fontSize="9" fontWeight="800" fontFamily="system-ui">SN</text>
           </g>
 
           {/* ── LED Status Indicator ── */}

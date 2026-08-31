@@ -53,7 +53,7 @@ export const RegisterPage: React.FC = () => {
         setIsRegistered(true);
         showToast('Confirmation Email Sent ✉️', `Check ${formData.email.trim()} to verify your account.`, 'info');
       } else {
-        showToast('Account Created 🎉', 'Welcome to SkyLink!', 'success');
+        showToast('Account Created 🎉', 'Welcome to SkyNav!', 'success');
         navigate('/dashboard');
       }
     } catch (err: any) {
@@ -117,7 +117,7 @@ export const RegisterPage: React.FC = () => {
               <CheckCircle2 size={16} style={{ color: 'var(--accent-cyan)' }} />
               <span>Next Steps:</span>
             </div>
-            1. Open the email from <strong>SkyLink Drone Store</strong>.<br />
+            1. Open the email from <strong>SkyNav Drone Store</strong>.<br />
             2. Click the <strong>Confirm your email</strong> link.<br />
             3. You'll be automatically redirected back to continue shopping!
           </div>

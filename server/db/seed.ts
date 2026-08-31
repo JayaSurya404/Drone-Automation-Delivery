@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { db, initDb } from './database.js';
 
 export const seedDatabase = async () => {
-  console.log('🌱 Initializing schema and seeding SkyLink Drone database...');
+  console.log('🌱 Initializing schema and seeding SkyNav Drone database...');
   initDb();
 
   // Clear existing records to ensure clean idempotent seed
@@ -39,7 +39,7 @@ export const seedDatabase = async () => {
   `).run(
     userId,
     'Alex Mercer',
-    'alex.mercer@skylink.io',
+    'alex.mercer@skynav.io',
     '+1 (555) 248-7790',
     passwordHash,
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -97,11 +97,11 @@ export const seedDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  droneStmt.run('drone_01', 'SkyLink Alpha-01', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 37.7625, -122.4480, 0, 0, 0, 4.5);
-  droneStmt.run('drone_02', 'SkyLink Falcon-02', 'AeroCarrier HeavyLift v5', 'AVAILABLE', 100, 37.7625, -122.4480, 0, 0, 0, 5.0);
-  droneStmt.run('drone_03', 'SkyLink Osprey-03', 'Osprey Rapid VTOL', 'AVAILABLE', 92, 37.7850, -122.3950, 0, 0, 0, 3.5);
-  droneStmt.run('drone_04', 'SkyLink Swift-04', 'SwiftCourier MedPod', 'AVAILABLE', 88, 37.7625, -122.4480, 0, 0, 0, 2.5);
-  droneStmt.run('drone_05', 'SkyLink Hawk-05', 'SkyLink Hawk Cargo-X', 'AVAILABLE', 95, 37.7850, -122.3950, 0, 0, 0, 4.0);
+  droneStmt.run('drone_01', 'SkyNav Alpha-01', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 37.7625, -122.4480, 0, 0, 0, 4.5);
+  droneStmt.run('drone_02', 'SkyNav Falcon-02', 'AeroCarrier HeavyLift v5', 'AVAILABLE', 100, 37.7625, -122.4480, 0, 0, 0, 5.0);
+  droneStmt.run('drone_03', 'SkyNav Osprey-03', 'Osprey Rapid VTOL', 'AVAILABLE', 92, 37.7850, -122.3950, 0, 0, 0, 3.5);
+  droneStmt.run('drone_04', 'SkyNav Swift-04', 'SwiftCourier MedPod', 'AVAILABLE', 88, 37.7625, -122.4480, 0, 0, 0, 2.5);
+  droneStmt.run('drone_05', 'SkyNav Hawk-05', 'SkyNav Hawk Cargo-X', 'AVAILABLE', 95, 37.7850, -122.3950, 0, 0, 0, 4.0);
 
   // 4. SEED CATEGORIES
   const categoryStmt = db.prepare(`
@@ -362,7 +362,7 @@ export const seedDatabase = async () => {
       id: 'prod_doc_1',
       name: 'Tamper-Evident Notary & Contract Courier Dispatch',
       slug: 'tamper-evident-notary-contract-courier-dispatch',
-      brand: 'SkyLink Secure Courier',
+      brand: 'SkyNav Secure Courier',
       category_id: 'cat_doc',
       sub_category: 'Legal Logistics',
       description: 'RFID-sealed, military-grade ballistic nylon document pouch with dual-custody OTP biometric verification. Ideal for closing real estate deeds, legal filings, and sensitive corporate affidavits.',
@@ -520,7 +520,7 @@ export const seedDatabase = async () => {
     { id: 'faq_1', q: 'How does autonomous drone delivery work?', a: 'Once your order is confirmed, our automated fulfillment hub packs your items into an aerodynamically sealed cargo pod and assigns an electric autonomous drone. The drone navigates certified aerial corridors at 120m altitude and gently lowers the package to your selected landing zone using sonar tether precision.', cat: 'Delivery' },
     { id: 'faq_2', q: 'Where does the drone land?', a: 'You can choose between a private lawn, designated rooftop pad, driveway, or balcony landing zone. Our drones use LiDAR obstacle sensing and precision optical beacons to deliver contactless and safe drop-offs.', cat: 'Drop Zones' },
     { id: 'faq_3', q: 'What happens in rainy or windy weather?', a: 'Our aircraft operate in wind speeds up to 45 km/h and light rain. If severe weather exceeds certified FAA safety thresholds, the system will automatically notify you and either reroute to the nearest safe ground hub or delay until winds calm down.', cat: 'Safety' },
-    { id: 'faq_4', q: 'What is the maximum payload weight?', a: 'SkyLink standard drones carry up to 4.5 kg (10 lbs). If your basket exceeds this weight, our system automatically schedules a tandem multi-drone flight or heavy-lift carrier.', cat: 'Orders' },
+    { id: 'faq_4', q: 'What is the maximum payload weight?', a: 'SkyNav standard drones carry up to 4.5 kg (10 lbs). If your basket exceeds this weight, our system automatically schedules a tandem multi-drone flight or heavy-lift carrier.', cat: 'Orders' },
   ];
 
   for (const f of faqs) {
@@ -536,7 +536,7 @@ export const seedDatabase = async () => {
   notifStmt.run(
     'notif_1',
     userId,
-    'Welcome to SkyLink Aero Store',
+    'Welcome to SkyNav Aero Store',
     'Your customer account is verified and ready for instant aerial deliveries.',
     'system',
     0,

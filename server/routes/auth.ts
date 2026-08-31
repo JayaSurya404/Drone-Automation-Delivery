@@ -7,7 +7,7 @@ import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'skylink_super_secure_jwt_secret_2026_aerodelivery';
+const JWT_SECRET = process.env.JWT_SECRET || 'skynav_super_secure_jwt_secret_2026_aerodelivery';
 
 // Helper to generate JWT token
 const generateToken = (userId: string, email: string): string => {
@@ -208,7 +208,7 @@ router.post('/verify-account', async (req, res): Promise<void> => {
       // Welcome Notification
       runCommand(`
         INSERT INTO notifications (id, customer_id, title, message, type, is_read, event_id)
-        VALUES (?, ?, 'Email Verified 🎉', 'Welcome to SkyLink Aero Store! Your email is verified and your account is ready for drone deliveries.', 'system', 0, ?)
+        VALUES (?, ?, 'Email Verified 🎉', 'Welcome to SkyNav Aero Store! Your email is verified and your account is ready for drone deliveries.', 'system', 0, ?)
       `, [`notif_verif_${userId}`, userId, `evt_verified_${userId}`]);
     })();
 
@@ -232,7 +232,7 @@ router.post('/verify-account', async (req, res): Promise<void> => {
 
     res.json({
       success: true,
-      message: 'Email successfully verified! Welcome to SkyLink.',
+      message: 'Email successfully verified! Welcome to SkyNav.',
       user: fullUser,
       token: freshToken
     });

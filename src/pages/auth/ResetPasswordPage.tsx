@@ -78,7 +78,7 @@ export const ResetPasswordPage: React.FC = () => {
 
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800 }}>Create New Password</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.35rem', marginBottom: '1.5rem' }}>
-          Enter a secure new password for your SkyLink customer account.
+          Enter a secure new password for your SkyNav customer account.
         </p>
 
         {error && (

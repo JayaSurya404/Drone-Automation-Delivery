@@ -107,7 +107,7 @@ wss.on('connection', (ws: WebSocket, req) => {
 
 server.listen(PORT, () => {
   console.log(`\n======================================================`);
-  console.log(`🚀 SkyLink Autonomous Drone Backend Running on port ${PORT}`);
+  console.log(`🚀 SkyNav Autonomous Drone Backend Running on port ${PORT}`);
   console.log(`📡 REST API: http://localhost:${PORT}/api`);
   console.log(`🛸 WebSocket: ws://localhost:${PORT}/ws`);
   console.log(`💚 Health Check: http://localhost:${PORT}/api/health`);

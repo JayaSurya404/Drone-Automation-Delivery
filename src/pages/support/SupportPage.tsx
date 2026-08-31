@@ -140,7 +140,7 @@ export const SupportPage: React.FC = () => {
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>Email Help Desk</div>
-            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>support@skylink.io</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>support@skynav.io</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Typical reply in &lt; 15 mins</div>
           </div>
         </div>

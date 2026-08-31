@@ -189,7 +189,7 @@ class DroneTrackingService {
 
     let currentIndex = 0;
     const totalPoints = route.length;
-    const droneName = delivery.drone_name || 'SkyLink Swift-04';
+    const droneName = delivery.drone_name || 'SkyNav Swift-04';
 
     const interval = setInterval(() => {
       currentIndex++;
@@ -383,7 +383,7 @@ class DroneTrackingService {
       remainingDistanceKm: delivery.remaining_distance_km,
       estimatedArrivalMins: delivery.estimated_arrival_mins,
       estimatedArrivalFormatted: `${delivery.estimated_arrival_mins} mins`,
-      droneAssignedName: delivery.drone_name || 'SkyLink Aero-X4 Cargo',
+      droneAssignedName: delivery.drone_name || 'SkyNav Aero-X4 Cargo',
       connectionStatus: 'connected',
       lastUpdated: delivery.updated_at,
       isCompleted: delivery.order_status === 'Delivered',

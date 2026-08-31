@@ -1,4 +1,4 @@
-import { CustomerOrder } from '../types/order';
+import { CustomerOrder, CustomerOrderStatus } from '../types/order';
 import { HubLocation, LiveTrackingState, RealtimeCustomerEvent } from '../types/tracking';
 import { api } from './api';
 
@@ -13,7 +13,7 @@ const DEFAULT_HUB: HubLocation = {
 
 class RealtimeDeliveryService {
   private listeners: Set<EventListener> = new Set();
-  private activeIntervals: Map<string, any> = new Map();
+  private activeIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
 
   public getHubLocation(): HubLocation {
     return DEFAULT_HUB;
@@ -38,8 +38,9 @@ class RealtimeDeliveryService {
 
   // Live telemetry broadcaster for autonomous flight path
   public connectToOrderStream(orderId: string, destLat: number = 37.7749, destLng: number = -122.4194): () => void {
-    if (this.activeIntervals.has(orderId)) {
-      clearInterval(this.activeIntervals.get(orderId));
+    const existingInterval = this.activeIntervals.get(orderId);
+    if (existingInterval) {
+      clearInterval(existingInterval);
     }
 
     let progress = 0.15; // 15% along flight route
@@ -89,7 +90,7 @@ class RealtimeDeliveryService {
         currentSpeed = 64 + Math.floor(Math.random() * 8);
       }
 
-      const flightStatus = progress > 0.85 ? 'Arriving' : progress > 0.5 ? 'In Flight' : 'En Route';
+      const flightStatus: CustomerOrderStatus = progress > 0.85 ? 'Arriving' : progress > 0.5 ? 'Near Destination' : 'Out for Delivery';
 
       this.emit({
         type: 'DRONE_LOCATION_UPDATED',
@@ -150,7 +151,7 @@ class RealtimeDeliveryService {
       remainingDistanceKm: 3.8,
       estimatedArrivalMins: 11,
       estimatedArrivalFormatted: '11 mins',
-      droneAssignedName: 'SkyLink Swift-04 (Hexacopter)',
+      droneAssignedName: 'SkyNav Swift-04 (Hexacopter)',
       connectionStatus: 'connected',
       lastUpdated: new Date().toISOString(),
       isCompleted: order.status === 'Delivered',

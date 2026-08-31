@@ -64,7 +64,7 @@ export const RealisticDroneHero: React.FC = () => {
       >
         <img
           src="/drone_hero.jpg"
-          alt="SkyLink Autonomous Delivery Drone"
+          alt="SkyNav Autonomous Delivery Drone"
           className="realistic-drone-photo"
         />
 

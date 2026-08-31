@@ -26,7 +26,7 @@ import {
   Info,
 } from 'lucide-react';
 
-const SAVED_FOR_LATER_KEY = 'skylink_saved_for_later';
+const SAVED_FOR_LATER_KEY = 'skynav_saved_for_later';
 
 export const CartPage: React.FC = () => {
   const {

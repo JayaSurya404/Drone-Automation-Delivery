@@ -8,7 +8,7 @@ import { CustomerUser } from '../types/auth';
 export const INITIAL_USER: CustomerUser = {
   id: 'cust_984210',
   name: 'Alex Mercer',
-  email: 'alex.mercer@skylink.io',
+  email: 'alex.mercer@skynav.io',
   phone: '+1 (555) 248-7790',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
   isVerified: true,
@@ -407,7 +407,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         rating: 5,
         date: 'August 22, 2026',
         title: 'Emergency charger saved my Zoom presentation!',
-        comment: 'My charger died 25 mins before an executive pitch. Ordered via SkyLink and the drone was at my office rooftop in 11 minutes.',
+        comment: 'My charger died 25 mins before an executive pitch. Ordered via SkyNav and the drone was at my office rooftop in 11 minutes.',
         verifiedPurchase: true,
         helpfulCount: 88,
       },
@@ -733,7 +733,7 @@ export const INITIAL_TICKETS: SupportTicket[] = [
       {
         id: 'msg_2',
         sender: 'support',
-        senderName: 'SkyLink Support Team',
+        senderName: 'SkyNav Support Team',
         message: 'Hi Alex! Your office address Horizon Tower 3 is already linked to Rooftop Pad #2. You can simply select it at checkout.',
         timestamp: '2026-08-26T09:20:00.000Z',
       },

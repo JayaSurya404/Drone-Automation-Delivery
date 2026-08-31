@@ -49,7 +49,7 @@ export const Footer: React.FC = () => {
                 <Plane size={20} />
               </div>
               <div className="brand-text-block">
-                <span className="brand-name">SkyLink</span>
+                <span className="brand-name">SkyNav</span>
                 <span className="brand-tagline">DRONE STORE</span>
               </div>
             </Link>
@@ -125,7 +125,7 @@ export const Footer: React.FC = () => {
       <div className="footer-bottom-bar">
         <div className="footer-bottom-inner">
           <div className="footer-copyright-text">
-            &copy; {new Date().getFullYear()} SkyLink Autonomous Drone Delivery Inc. All rights reserved. (Customer Shopping Portal).
+            &copy; {new Date().getFullYear()} SkyNav Autonomous Drone Delivery Inc. All rights reserved. (Customer Shopping Portal).
           </div>
           <div className="footer-bottom-badge">
             <span>Powered by 100% Clean Autonomous Aviation</span>

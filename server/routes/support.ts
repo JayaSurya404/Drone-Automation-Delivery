@@ -85,10 +85,10 @@ router.post('/tickets', authenticateToken, (req: AuthenticatedRequest, res: Resp
       VALUES (?, ?, 'customer', ?, ?)
     `, [`msg_${Date.now()}_1`, ticketId, userName, description.trim()]);
 
-    // Automated SkyLink ground ops acknowledgment
+    // Automated SkyNav ground ops acknowledgment
     runCommand(`
       INSERT INTO support_messages (id, ticket_id, sender_type, sender_name, message)
-      VALUES (?, ?, 'agent', 'SkyLink Flight Ground Ops', 'We have received your ticket. An aviation operations specialist is reviewing your flight logs.')
+      VALUES (?, ?, 'agent', 'SkyNav Flight Ground Ops', 'We have received your ticket. An aviation operations specialist is reviewing your flight logs.')
     `, [`msg_${Date.now()}_2`, ticketId]);
 
     const created = queryOne<any>('SELECT * FROM support_tickets WHERE id = ?', [ticketId]);

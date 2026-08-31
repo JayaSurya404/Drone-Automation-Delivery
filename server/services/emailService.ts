@@ -39,7 +39,7 @@ export const sendVerificationEmail = async (
   customerName: string,
   code: string
 ): Promise<EmailSendResult> => {
-  const from = process.env.EMAIL_FROM || 'SkyLink Aero Store <no-reply@skylink-aero.com>';
+  const from = process.env.EMAIL_FROM || 'SkyNav Aero Store <no-reply@skynav-aero.com>';
 
   if (!isSmtpConfigured()) {
     console.error(`[EMAIL SERVICE] Failed: SMTP credentials missing in .env for sending to ${toEmail}`);
@@ -54,12 +54,12 @@ export const sendVerificationEmail = async (
     const info = await transporter.sendMail({
       from,
       to: toEmail,
-      subject: `Verify Your SkyLink Account - Code ${code}`,
-      text: `Hello ${customerName},\n\nYour SkyLink verification code is: ${code}\n\nThis code will expire in 10 minutes.\n\nThank you for choosing SkyLink Autonomous Drone Delivery!`,
+      subject: `Verify Your SkyNav Account - Code ${code}`,
+      text: `Hello ${customerName},\n\nYour SkyNav verification code is: ${code}\n\nThis code will expire in 10 minutes.\n\nThank you for choosing SkyNav Autonomous Drone Delivery!`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="color: #0f172a; font-size: 22px; font-weight: 800; margin: 0;">SkyLink Aero Delivery</h1>
+            <h1 style="color: #0f172a; font-size: 22px; font-weight: 800; margin: 0;">SkyNav Aero Delivery</h1>
             <p style="color: #64748b; font-size: 14px; margin: 4px 0 0;">Autonomous Drone Logistics & Instant Store</p>
           </div>
           <div style="padding: 20px; background: #f8fafc; border-radius: 8px; text-align: center;">
@@ -95,7 +95,7 @@ export const sendPasswordResetEmail = async (
   customerName: string,
   code: string
 ): Promise<EmailSendResult> => {
-  const from = process.env.EMAIL_FROM || 'SkyLink Aero Store <no-reply@skylink-aero.com>';
+  const from = process.env.EMAIL_FROM || 'SkyNav Aero Store <no-reply@skynav-aero.com>';
 
   if (!isSmtpConfigured()) {
     console.error(`[EMAIL SERVICE] Failed: SMTP credentials missing in .env for password reset to ${toEmail}`);
@@ -110,12 +110,12 @@ export const sendPasswordResetEmail = async (
     const info = await transporter.sendMail({
       from,
       to: toEmail,
-      subject: `Reset Your SkyLink Password - Code ${code}`,
+      subject: `Reset Your SkyNav Password - Code ${code}`,
       text: `Hello ${customerName},\n\nYour password reset code is: ${code}\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please secure your account immediately.`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="color: #0f172a; font-size: 22px; font-weight: 800; margin: 0;">SkyLink Aero Delivery</h1>
+            <h1 style="color: #0f172a; font-size: 22px; font-weight: 800; margin: 0;">SkyNav Aero Delivery</h1>
             <p style="color: #64748b; font-size: 14px; margin: 4px 0 0;">Password Recovery Request</p>
           </div>
           <div style="padding: 20px; background: #f8fafc; border-radius: 8px; text-align: center;">

@@ -32,7 +32,7 @@ import {
   Compass,
 } from 'lucide-react';
 
-const RECENTLY_VIEWED_KEY = 'skylink_recently_viewed';
+const RECENTLY_VIEWED_KEY = 'skynav_recently_viewed';
 
 // High-resolution image-based category cards
 const ECOM_CATEGORIES = [
@@ -110,7 +110,7 @@ const TESTIMONIALS = [
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     rating: 5,
     title: 'Emergency GaN charger saved my presentation',
-    content: 'My charger died 20 mins before a major executive pitch. Ordered on SkyLink and the drone was at our office rooftop landing pad in 11 minutes.',
+    content: 'My charger died 20 mins before a major executive pitch. Ordered on SkyNav and the drone was at our office rooftop landing pad in 11 minutes.',
   },
   {
     id: 't_3',
@@ -642,7 +642,7 @@ export const DashboardPage: React.FC = () => {
           <div className="newsletter-image-side">
             <img
               src="https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80"
-              alt="Join SkyLink"
+              alt="Join SkyNav"
               className="newsletter-cover-img"
             />
           </div>
@@ -655,7 +655,7 @@ export const DashboardPage: React.FC = () => {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                alert('Thank you for subscribing to SkyLink Flight Updates!');
+                alert('Thank you for subscribing to SkyNav Flight Updates!');
               }}
               className="newsletter-form"
             >

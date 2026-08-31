@@ -36,7 +36,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-const RECENTLY_VIEWED_KEY = 'skylink_recently_viewed';
+const RECENTLY_VIEWED_KEY = 'skynav_recently_viewed';
 
 export const ProductDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -268,7 +268,7 @@ export const ProductDetailsPage: React.FC = () => {
         <div className="product-info-col">
           {/* Brand & Category */}
           <div className="product-brand-row">
-            <span className="product-brand-link">{product.brand || 'SkyLink Verified'}</span>
+            <span className="product-brand-link">{product.brand || 'SkyNav Verified'}</span>
             <span className="verified-badge">
               <CheckCircle2 size={13} color="#10b981" /> Verified Drone Stock
             </span>

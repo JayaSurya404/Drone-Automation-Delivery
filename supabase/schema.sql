@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SKYLINK AUTONOMOUS DRONE DELIVERY — SUPABASE POSTGRESQL DATABASE SCHEMA
+-- SKYNAV AUTONOMOUS DRONE DELIVERY — SUPABASE POSTGRESQL DATABASE SCHEMA
 -- ==============================================================================
 
 -- 1. ENABLE EXTENSIONS
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   short_description TEXT,
   tagline TEXT,
   description TEXT NOT NULL,
-  brand TEXT DEFAULT 'SkyLink Essentials',
+  brand TEXT DEFAULT 'SkyNav Essentials',
   sku TEXT,
   price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
   original_price NUMERIC(10, 2),
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS public.products (
 -- Ensure all columns exist even if products table pre-existed
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS short_description TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS tagline TEXT;
-ALTER TABLE public.products ADD COLUMN IF NOT EXISTS brand TEXT DEFAULT 'SkyLink Essentials';
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS brand TEXT DEFAULT 'SkyNav Essentials';
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS sku TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS original_price NUMERIC(10, 2);
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS discount_percentage NUMERIC(5, 2) DEFAULT 0;

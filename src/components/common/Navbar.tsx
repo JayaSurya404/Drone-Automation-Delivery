@@ -169,7 +169,7 @@ export const Navbar: React.FC = () => {
                 <Plane size={20} className="plane-icon" />
               </div>
               <div className="clean-brand-text">
-                <span className="brand-name">SkyLink</span>
+                <span className="brand-name">SkyNav</span>
                 <span className="brand-badge">DRONE STORE</span>
               </div>
             </Link>
@@ -432,7 +432,7 @@ export const Navbar: React.FC = () => {
                   <Plane size={18} />
                 </div>
                 <div>
-                  <div className="drawer-brand-name">SkyLink</div>
+                  <div className="drawer-brand-name">SkyNav</div>
                   <span className="drawer-brand-sub">AERIAL MARKETPLACE</span>
                 </div>
               </div>

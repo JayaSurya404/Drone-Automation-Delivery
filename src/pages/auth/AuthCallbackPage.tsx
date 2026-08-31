@@ -55,7 +55,7 @@ export const AuthCallbackPage: React.FC = () => {
 
     const processVerifiedSession = async () => {
       setStatus('success');
-      showToast('Email Verified! 🎉', 'Welcome to SkyLink Autonomous Drone Delivery.', 'success');
+      showToast('Email Verified! 🎉', 'Welcome to SkyNav Autonomous Drone Delivery.', 'success');
 
       // Execute pending action if customer was adding an item
       if (pendingAction) {
@@ -118,7 +118,7 @@ export const AuthCallbackPage: React.FC = () => {
             <Loader2 size={48} className="spin" style={{ color: 'var(--accent-cyan)', margin: '0 auto 1.25rem' }} />
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Verifying Your Account...</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-              Confirming your email with SkyLink. You will be redirected shortly.
+              Confirming your email with SkyNav. You will be redirected shortly.
             </p>
           </div>
         )}
@@ -128,7 +128,7 @@ export const AuthCallbackPage: React.FC = () => {
             <CheckCircle2 size={48} style={{ color: 'var(--accent-emerald)', margin: '0 auto 1.25rem' }} />
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Email Verified! 🎉</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-              Redirecting you to the SkyLink Drone Store...
+              Redirecting you to the SkyNav Drone Store...
             </p>
           </div>
         )}
