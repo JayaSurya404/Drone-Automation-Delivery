@@ -42,7 +42,13 @@ import {
   aiMaintenancePredictionRequestSchema,
   aiDemandForecastRequestSchema,
   deterministicSafetyGateResultSchema,
-  missionPlanEvaluationResponseSchema
+  missionPlanEvaluationResponseSchema,
+  visionFrameAnalysisRequestSchema,
+  visionFrameAnalysisResponseSchema,
+  assessLandingZoneRequestSchema,
+  verifyDestinationRequestSchema,
+  detectHazardsRequestSchema,
+  perceptionEventSchema
 } from "./index.js";
 
 describe("Contracts / Authentication & RBAC Schemas", () => {
@@ -596,6 +602,127 @@ describe("Contracts / AI Advisory & Safety Gate Schemas", () => {
 
     const parsedPlan = missionPlanEvaluationResponseSchema.parse(evalPlan);
     assert.ok(parsedPlan.isMissionAuthorized);
+  });
+});
+
+describe("Contracts / Computer Vision & Perception Schemas", () => {
+  it("validates valid vision frame analysis request and response", () => {
+    const frameReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      frameId: "frame-001",
+      cameraSource: "DOWNWARD_NAV_CAM",
+      imageWidth: 1920,
+      imageHeight: 1080,
+      telemetry: {
+        latitude: 37.7749,
+        longitude: -122.4194,
+        altitudeMeters: 15.0,
+        headingDegrees: 90.0,
+        pitchDegrees: -1.2,
+        rollDegrees: 0.5
+      }
+    };
+    const parsedReq = visionFrameAnalysisRequestSchema.parse(frameReq);
+    assert.equal(parsedReq.frameId, "frame-001");
+    assert.equal(parsedReq.cameraSource, "DOWNWARD_NAV_CAM");
+
+    const frameRes = {
+      frameId: "frame-001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      timestamp: new Date().toISOString(),
+      processedAt: new Date().toISOString(),
+      modelVersion: "vision-baseline-v1.0.0",
+      inferenceLatencyMs: 42.5,
+      cameraSource: "DOWNWARD_NAV_CAM",
+      sceneClassification: {
+        sceneType: "SUBURBAN",
+        confidence: 0.94,
+        secondaryScenes: ["OPEN_FIELD"],
+        description: "Residential driveway with concrete surface and minimal tree overhang."
+      },
+      detections: [
+        {
+          id: "det-1",
+          label: "Landing Pad Marker",
+          category: "LANDING_PAD",
+          confidence: 0.96,
+          boundingBox: { xMin: 0.42, yMin: 0.45, xMax: 0.58, yMax: 0.62 },
+          severity: "LOW",
+          approximateDistanceMeters: 14.8,
+          details: "Standard SkyNav concentric landing square."
+        }
+      ],
+      landingZoneAssessment: {
+        suitability: "SAFE",
+        confidence: 0.92,
+        usableAreaSquareMeters: 16.5,
+        surfaceType: "CONCRETE",
+        obstructionsDetected: [],
+        peopleDetectedCount: 0,
+        vehiclesDetectedCount: 0,
+        slopeDegrees: 1.2,
+        reasons: ["Clear concrete landing pad detected with zero dynamic hazards."],
+        recommendations: ["Cleared for controlled descent."]
+      },
+      destinationVerification: {
+        status: "VERIFIED",
+        isTargetVisible: true,
+        targetPadDetected: true,
+        confidence: 0.95,
+        offsetMeters: { dxMeters: 0.15, dyMeters: -0.22 },
+        reasons: ["Visual fiducial matches target drop coordinates."]
+      },
+      advisorySafetyStatus: "CLEAR",
+      advisoryDisclaimer: "Vision perception is advisory. Deterministic safety rules remain authoritative."
+    };
+
+    const parsedRes = visionFrameAnalysisResponseSchema.parse(frameRes);
+    assert.equal(parsedRes.sceneClassification.sceneType, "SUBURBAN");
+    assert.equal(parsedRes.landingZoneAssessment.suitability, "SAFE");
+    assert.equal(parsedRes.destinationVerification.status, "VERIFIED");
+  });
+
+  it("validates standalone landing zone, destination, and hazard schemas", () => {
+    const landReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      telemetry: { latitude: 37.7749, longitude: -122.4194 }
+    };
+    const parsedLand = assessLandingZoneRequestSchema.parse(landReq);
+    assert.equal(parsedLand.cameraSource, "DOWNWARD_NAV_CAM");
+
+    const destReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      destination: { latitude: 37.7845, longitude: -122.4082 },
+      telemetry: { latitude: 37.7845, longitude: -122.4082 }
+    };
+    const parsedDest = verifyDestinationRequestSchema.parse(destReq);
+    assert.equal(parsedDest.destination.latitude, 37.7845);
+
+    const hazardReq = {
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      telemetry: { latitude: 37.7749, longitude: -122.4194 }
+    };
+    const parsedHazard = detectHazardsRequestSchema.parse(hazardReq);
+    assert.equal(parsedHazard.minimumConfidence, 0.5);
+
+    const perceptionEvt = {
+      type: "PERCEPTION_UPDATE",
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      droneId: "00000000-0000-0000-0000-000000000011",
+      timestamp: new Date().toISOString(),
+      cameraSource: "DOWNWARD_NAV_CAM",
+      landingSuitability: "SAFE",
+      hazardsDetectedCount: 0,
+      isTargetVerified: true,
+      advisorySafetyStatus: "CLEAR",
+      summary: "Landing zone verified clear."
+    };
+    const parsedEvt = perceptionEventSchema.parse(perceptionEvt);
+    assert.equal(parsedEvt.type, "PERCEPTION_UPDATE");
   });
 });
 

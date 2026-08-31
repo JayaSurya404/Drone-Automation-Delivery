@@ -13,6 +13,7 @@ export * from "./config.js";
 export * from "./state-machine.js";
 export * from "./drone.js";
 export * from "./fleet.js";
+export * from "./perception.js";
 
 // Backward-compatibility aliases
 export type SimulationState = import("./types.js").DroneSimState;

@@ -6,7 +6,11 @@ import {
   aiMaintenancePredictionRequestSchema,
   aiWeatherRiskRequestSchema,
   aiDemandForecastRequestSchema,
-  missionPlanEvaluationRequestSchema
+  missionPlanEvaluationRequestSchema,
+  visionFrameAnalysisRequestSchema,
+  assessLandingZoneRequestSchema,
+  verifyDestinationRequestSchema,
+  detectHazardsRequestSchema
 } from "@skynav/contracts";
 import type { AiService } from "./ai.service.js";
 import { requireAuthenticated, requireRole } from "../auth/rbac.js";
@@ -129,6 +133,90 @@ export function createAiRoutes(aiService: AiService): FastifyPluginAsync {
         const payload = missionPlanEvaluationRequestSchema.parse(request.body);
         const result = await aiService.evaluateMissionPlan(request.user!, payload);
         return reply.status(200).send(result);
+      }
+    );
+
+    // 8. Vision Frame Analysis
+    fastify.post(
+      "/api/v1/ai/vision/analyze-frame",
+      {
+        preHandler: [
+          requireAuthenticated,
+          requireTenantIsolation,
+          requireRole(["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"])
+        ]
+      },
+      async (request, reply) => {
+        const payload = visionFrameAnalysisRequestSchema.omit({ organizationId: true }).parse(request.body);
+        const result = await aiService.analyzeVisionFrame(request.user!, payload);
+        return reply.status(200).send(result);
+      }
+    );
+
+    // 9. Vision Landing Zone Assessment
+    fastify.post(
+      "/api/v1/ai/vision/assess-landing",
+      {
+        preHandler: [
+          requireAuthenticated,
+          requireTenantIsolation,
+          requireRole(["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"])
+        ]
+      },
+      async (request, reply) => {
+        const payload = assessLandingZoneRequestSchema.omit({ organizationId: true }).parse(request.body);
+        const result = await aiService.assessLandingZone(request.user!, payload);
+        return reply.status(200).send(result);
+      }
+    );
+
+    // 10. Vision Destination Verification
+    fastify.post(
+      "/api/v1/ai/vision/verify-destination",
+      {
+        preHandler: [
+          requireAuthenticated,
+          requireTenantIsolation,
+          requireRole(["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"])
+        ]
+      },
+      async (request, reply) => {
+        const payload = verifyDestinationRequestSchema.omit({ organizationId: true }).parse(request.body);
+        const result = await aiService.verifyDestination(request.user!, payload);
+        return reply.status(200).send(result);
+      }
+    );
+
+    // 11. Vision Hazard Detection
+    fastify.post(
+      "/api/v1/ai/vision/detect-hazards",
+      {
+        preHandler: [
+          requireAuthenticated,
+          requireTenantIsolation,
+          requireRole(["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"])
+        ]
+      },
+      async (request, reply) => {
+        const payload = detectHazardsRequestSchema.omit({ organizationId: true }).parse(request.body);
+        const result = await aiService.detectHazards(request.user!, payload);
+        return reply.status(200).send(result);
+      }
+    );
+
+    // 12. Latest Drone Perception Telemetry
+    fastify.get<{ Params: { droneId: string } }>(
+      "/api/v1/ai/vision/drones/:droneId/latest",
+      {
+        preHandler: [
+          requireAuthenticated,
+          requireTenantIsolation,
+          requireRole(["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"])
+        ]
+      },
+      async (request, reply) => {
+        const result = await aiService.getLatestPerception(request.user!, request.params.droneId);
+        return reply.status(200).send({ perception: result });
       }
     );
   };
