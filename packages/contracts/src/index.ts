@@ -162,7 +162,7 @@ export const registerRequestSchema = z.object({
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 
 export const loginRequestSchema = z.object({
-  email: z.string().trim().email("Must be a valid email address"),
+  email: z.string().trim().min(1, "Email or username is required"),
   password: z.string().min(1, "Password is required"),
   organizationId: uuidSchema.optional()
 });

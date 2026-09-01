@@ -108,7 +108,22 @@ describe("Tenant Isolation / Security Boundary", () => {
         organizationName: "Tenant A"
       }
     });
-    const tokenA = JSON.parse(resA.body).accessToken;
+    const bodyA = JSON.parse(resA.body);
+    // Server-side elevate User A in mock repo to ADMIN to test audit:read permission
+    await authRepo.addUserToOrganization({
+      organization_id: bodyA.organization.id,
+      user_id: bodyA.user.id,
+      role: "ADMIN"
+    });
+    const loginA = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        email: "admin_a@tenant-a.test",
+        password: "Password123!"
+      }
+    });
+    const tokenA = JSON.parse(loginA.body).accessToken;
 
     // Register User B (Org B)
     await app.inject({

@@ -17,7 +17,7 @@ function createMockAuditService(): AuditService {
 }
 
 describe("Auth / HTTP Integration & Lifecycle", () => {
-  it("registers a new user and organization successfully", async () => {
+  it("registers a new customer successfully with CUSTOMER role", async () => {
     const authRepo = createMockAuthRepository();
     const auditService = createMockAuditService();
     const app = buildApp({ authRepo, auditService });
@@ -26,24 +26,64 @@ describe("Auth / HTTP Integration & Lifecycle", () => {
       method: "POST",
       url: "/api/v1/auth/register",
       payload: {
-        email: "operator@skynav.test",
+        email: "customer@skynav.test",
         password: "Password123!",
-        name: "SkyNav Operator",
-        organizationName: "SkyNav Alpha Fleet"
+        name: "SkyNav Customer",
+        organizationName: "SkyNav Alpha Workspace"
       }
     });
 
     assert.equal(response.statusCode, 201);
     const body = JSON.parse(response.body);
-    assert.equal(body.user.email, "operator@skynav.test");
-    assert.equal(body.user.name, "SkyNav Operator");
-    assert.equal(body.organization.name, "SkyNav Alpha Fleet");
-    assert.equal(body.organization.role, "ADMIN");
+    assert.equal(body.user.email, "customer@skynav.test");
+    assert.equal(body.user.name, "SkyNav Customer");
+    assert.equal(body.organization.name, "SkyNav Alpha Workspace");
+    assert.equal(body.organization.role, "CUSTOMER");
     assert.ok(body.accessToken, "Access token must be returned");
     assert.ok(body.refreshToken, "Refresh token must be returned");
     assert.equal(body.tokenType, "Bearer");
     assert.equal(body.expiresIn, 900);
-    assert.ok(body.permissions.includes("missions:authorize"));
+    // Customer must NOT have admin/operator permissions
+    assert.ok(!body.permissions.includes("missions:authorize"));
+    assert.ok(body.permissions.includes("orders:create"));
+  });
+
+  it("rejects attempt to register with reserved administrator email", async () => {
+    const authRepo = createMockAuthRepository();
+    const app = buildApp({ authRepo, auditService: createMockAuditService() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      payload: {
+        email: "admin@skynav.test",
+        password: "Password123!"
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    const body = JSON.parse(response.body);
+    assert.equal(body.code, "RESERVED_IDENTIFIER");
+  });
+
+  it("rejects attempt to elevate role to ADMIN via registration payload", async () => {
+    const authRepo = createMockAuthRepository();
+    const app = buildApp({ authRepo, auditService: createMockAuditService() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      payload: {
+        email: "hacker@skynav.test",
+        password: "Password123!",
+        role: "ADMIN"
+      }
+    });
+
+    assert.equal(response.statusCode, 201);
+    const body = JSON.parse(response.body);
+    assert.equal(body.organization.role, "CUSTOMER");
+    assert.ok(!body.permissions.includes("missions:authorize"));
   });
 
   it("rejects duplicate email registration with 409 Conflict", async () => {
@@ -94,25 +134,13 @@ describe("Auth / HTTP Integration & Lifecycle", () => {
     assert.equal(body.code, "SCHEMA_VALIDATION_ERROR");
   });
 
-  it("logs in with valid credentials and rejects invalid credentials", async () => {
+  it("authenticates configured single administrator and rejects invalid admin password", async () => {
     const authRepo = createMockAuthRepository();
     const auditService = createMockAuditService();
     const app = buildApp({ authRepo, auditService });
 
-    // Register user
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/auth/register",
-      payload: {
-        email: "admin@skynav.test",
-        password: "Password123!",
-        name: "Admin User",
-        organizationName: "SkyNav Fleet"
-      }
-    });
-
-    // Valid login
-    const validLogin = await app.inject({
+    // Valid admin login via server-configured credentials
+    const validAdmin = await app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
       payload: {
@@ -120,17 +148,72 @@ describe("Auth / HTTP Integration & Lifecycle", () => {
         password: "Password123!"
       }
     });
+    assert.equal(validAdmin.statusCode, 200);
+    const adminBody = JSON.parse(validAdmin.body);
+    assert.equal(adminBody.organization.role, "ADMIN");
+    assert.ok(adminBody.permissions.includes("missions:authorize"));
+    assert.ok(adminBody.permissions.includes("audit:read"));
+
+    // Also supports "admin" username
+    const validAdminUsername = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        email: "admin",
+        password: "Password123!"
+      }
+    });
+    assert.equal(validAdminUsername.statusCode, 200);
+
+    // Invalid admin password
+    const badAdminPassword = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        email: "admin@skynav.test",
+        password: "WrongPassword!"
+      }
+    });
+    assert.equal(badAdminPassword.statusCode, 401);
+    assert.equal(JSON.parse(badAdminPassword.body).code, "INVALID_CREDENTIALS");
+  });
+
+  it("authenticates customer credentials and rejects invalid customer password", async () => {
+    const authRepo = createMockAuthRepository();
+    const auditService = createMockAuditService();
+    const app = buildApp({ authRepo, auditService });
+
+    // Register customer
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      payload: {
+        email: "client@skynav.test",
+        password: "Password123!",
+        name: "Client User"
+      }
+    });
+
+    // Valid customer login
+    const validLogin = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        email: "client@skynav.test",
+        password: "Password123!"
+      }
+    });
     assert.equal(validLogin.statusCode, 200);
     const loginBody = JSON.parse(validLogin.body);
-    assert.ok(loginBody.accessToken);
-    assert.ok(loginBody.refreshToken);
+    assert.equal(loginBody.organization.role, "CUSTOMER");
+    assert.ok(!loginBody.permissions.includes("missions:authorize"));
 
     // Invalid password
     const badPassword = await app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
       payload: {
-        email: "admin@skynav.test",
+        email: "client@skynav.test",
         password: "WrongPassword!"
       }
     });

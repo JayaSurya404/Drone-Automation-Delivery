@@ -86,6 +86,12 @@ export function createAuthService(
   return {
     async register(input: RegisterRequest): Promise<AuthResponse> {
       const email = input.email.toLowerCase().trim();
+      const configuredAdmin = (process.env.ADMIN_USERNAME || "admin@skynav.test").toLowerCase().trim();
+
+      if (email === configuredAdmin || email === "admin" || email.startsWith("admin@")) {
+        throw new AuthError(400, "RESERVED_IDENTIFIER", "Cannot register using the reserved system administrator address.");
+      }
+
       const passwordValidation = validatePasswordPolicy(input.password);
       if (!passwordValidation.valid) {
         throw new AuthError(400, "WEAK_PASSWORD", passwordValidation.error ?? "Password does not meet security requirements.");
@@ -98,7 +104,7 @@ export function createAuthService(
 
       const passwordHash = await hashPassword(input.password);
       const userId = crypto.randomUUID();
-      const userName = input.name?.trim() || email.split("@")[0] || "User";
+      const userName = input.name?.trim() || email.split("@")[0] || "Customer";
 
       const user = await repo.createUser({
         id: userId,
@@ -108,13 +114,14 @@ export function createAuthService(
       });
 
       const orgId = crypto.randomUUID();
-      const orgName = input.organizationName?.trim() || `${userName}'s Fleet`;
+      const orgName = input.organizationName?.trim() || `${userName}'s Workspace`;
       const org = await repo.createOrganization({
         id: orgId,
         name: orgName
       });
 
-      const role: UserRole = "ADMIN";
+      // Customer signup strictly creates CUSTOMER role. No way to register an administrator.
+      const role: UserRole = "CUSTOMER";
       await repo.addUserToOrganization({
         organization_id: org.id,
         user_id: user.id,
@@ -154,8 +161,91 @@ export function createAuthService(
 
     async login(input: LoginRequest): Promise<AuthResponse> {
       const email = input.email.toLowerCase().trim();
-      const user = await repo.findUserByEmail(email);
+      const configuredAdminUsername = (process.env.ADMIN_USERNAME || "admin@skynav.test").toLowerCase().trim();
+      const configuredAdminPassword = process.env.ADMIN_PASSWORD || "Password123!";
 
+      const isAdminAttempt =
+        email === configuredAdminUsername ||
+        email === "admin" ||
+        (configuredAdminUsername.includes("@") && email === configuredAdminUsername.split("@")[0]);
+
+      if (isAdminAttempt) {
+        // Authenticate administrator strictly against server-side configuration
+        let user = await repo.findUserByEmail(configuredAdminUsername);
+        let passwordMatches = input.password === configuredAdminPassword;
+
+        if (!passwordMatches && user) {
+          passwordMatches = await verifyPassword(user.password_hash, input.password);
+        }
+
+        if (!passwordMatches) {
+          throw new AuthError(401, "INVALID_CREDENTIALS", "Invalid email or password.");
+        }
+
+        // Ensure administrator record and organization exist in repository
+        if (!user) {
+          const org =
+            (await repo.findOrganizationById("00000000-0000-0000-0000-000000000001")) ||
+            (await repo.createOrganization({
+              id: "00000000-0000-0000-0000-000000000001",
+              name: "SkyNav Operations"
+            }));
+          const passwordHash = await hashPassword(configuredAdminPassword);
+          user = await repo.createUser({
+            id: "00000000-0000-0000-0000-000000000011",
+            email: configuredAdminUsername,
+            name: "SkyNav Administrator",
+            password_hash: passwordHash
+          });
+          await repo.addUserToOrganization({
+            organization_id: org.id,
+            user_id: user.id,
+            role: "ADMIN"
+          });
+        }
+
+        const memberships = await repo.getUserMemberships(user.id);
+        const adminMembership = memberships.find((m) => m.role === "ADMIN") || memberships[0];
+
+        if (!adminMembership) {
+          throw new AuthError(403, "NO_ORGANIZATION_MEMBERSHIP", "Admin user has no active organization.");
+        }
+
+        const tokens = await issueTokenPair(
+          user.id,
+          user.email,
+          user.name,
+          adminMembership.organization_id,
+          adminMembership.organization_name,
+          "ADMIN"
+        );
+
+        await auditService.log({
+          organizationId: adminMembership.organization_id,
+          actorUserId: user.id,
+          action: "USER_LOGGED_IN",
+          resourceType: "user",
+          resourceId: user.id,
+          metadata: { role: "ADMIN" }
+        });
+
+        return {
+          user: { id: user.id, email: user.email, name: user.name },
+          organization: {
+            id: adminMembership.organization_id,
+            name: adminMembership.organization_name,
+            role: "ADMIN"
+          },
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          tokenType: "Bearer",
+          expiresIn: tokens.expiresIn,
+          permissions: tokens.permissions
+        };
+      }
+
+      // Customer / Standard User Authentication
+      const user = await repo.findUserByEmail(email);
       if (!user) {
         throw new AuthError(401, "INVALID_CREDENTIALS", "Invalid email or password.");
       }
