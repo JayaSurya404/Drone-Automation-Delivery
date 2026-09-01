@@ -242,6 +242,75 @@ export interface SchemaMigrationsTable {
   applied_at: ColumnType<Date, string | undefined, never>;
 }
 
+
+export interface ProductTable {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  price_cents: number;
+  currency: string;
+  image_url: string;
+  stock_quantity: number;
+  weight_grams: number;
+  length_cm: number | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  is_drone_eligible: boolean;
+  is_featured: boolean;
+  is_active: boolean;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string | undefined>;
+}
+
+export interface CartItemTable {
+  id: string;
+  user_id: string;
+  product_id: string;
+  quantity: number;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string | undefined>;
+}
+
+export interface WishlistItemTable {
+  id: string;
+  user_id: string;
+  product_id: string;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+}
+
+export interface CustomerAddressTable {
+  id: string;
+  user_id: string;
+  recipient_name: string;
+  phone: string;
+  address_line1: string;
+  address_line2: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  latitude: number;
+  longitude: number;
+  delivery_instructions: string | null;
+  is_default: boolean;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string | undefined>;
+}
+
+export interface OrderItemTable {
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  product_name: string;
+  unit_price_cents: number;
+  quantity: number;
+  total_price_cents: number;
+  weight_grams: number;
+  image_url: string | null;
+  created_at: ColumnType<Date, Date | string | undefined, never>;
+}
+
 export interface Database {
   organizations: OrganizationTable;
   users: UserTable;
@@ -252,6 +321,7 @@ export interface Database {
   drones: DroneTable;
   batteries: BatteryTable;
   orders: OrderTable;
+  order_items: OrderItemTable;
   packages: PackageTable;
   missions: MissionTable;
   mission_waypoints: MissionWaypointTable;
@@ -264,5 +334,9 @@ export interface Database {
   incidents: IncidentTable;
   notifications: NotificationTable;
   outbox_events: OutboxEventTable;
+  products: ProductTable;
+  cart_items: CartItemTable;
+  wishlist_items: WishlistItemTable;
+  customer_addresses: CustomerAddressTable;
   _schema_migrations: SchemaMigrationsTable;
 }

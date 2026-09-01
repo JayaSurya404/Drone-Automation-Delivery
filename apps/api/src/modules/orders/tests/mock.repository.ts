@@ -117,6 +117,14 @@ export function createMockOrderRepository(initialOrders: OrderRecord[] = []): Or
         orders: paginated.map((o) => ({ ...o })),
         total
       };
+    },
+
+    async getItemsForOrder(_orderId: string) {
+      return [];
+    },
+
+    async getItemsForOrders(_orderIds: string[]) {
+      return new Map();
     }
   };
 }

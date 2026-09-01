@@ -41,6 +41,19 @@ import { createAiService, type AiService } from "./modules/ai/ai.service.js";
 import { createAiRoutes } from "./modules/ai/ai.routes.js";
 import { createDigitalTwinService, type DigitalTwinService } from "./modules/digital-twin/digital-twin.service.js";
 import { createDigitalTwinRoutes } from "./modules/digital-twin/digital-twin.routes.js";
+import { createCatalogRepository, type CatalogRepository } from "./modules/catalog/catalog.repository.js";
+import { createCatalogService, type CatalogService } from "./modules/catalog/catalog.service.js";
+import { createCatalogRoutes } from "./modules/catalog/catalog.routes.js";
+import { createCartRepository, type CartRepository } from "./modules/cart/cart.repository.js";
+import { createCartService, type CartService } from "./modules/cart/cart.service.js";
+import { createCartRoutes } from "./modules/cart/cart.routes.js";
+import { createWishlistRepository, type WishlistRepository } from "./modules/wishlist/wishlist.repository.js";
+import { createWishlistService, type WishlistService } from "./modules/wishlist/wishlist.service.js";
+import { createWishlistRoutes } from "./modules/wishlist/wishlist.routes.js";
+import { createAddressRepository, type AddressRepository } from "./modules/addresses/address.repository.js";
+import { createAddressService, type AddressService } from "./modules/addresses/address.service.js";
+import { createAddressRoutes } from "./modules/addresses/address.routes.js";
+
 import { createObservabilityRoutes } from "./modules/observability/observability.routes.js";
 import { setupCorrelation } from "./plugins/correlation.js";
 import { setupSecurityHeaders } from "./plugins/security-headers.js";
@@ -74,6 +87,14 @@ export interface AppOptions {
   aiClient?: AiClient;
   safetyGate?: DeterministicSafetyGate;
   digitalTwinService?: DigitalTwinService;
+  catalogRepo?: CatalogRepository;
+  catalogService?: CatalogService;
+  cartRepo?: CartRepository;
+  cartService?: CartService;
+  wishlistRepo?: WishlistRepository;
+  wishlistService?: WishlistService;
+  addressRepo?: AddressRepository;
+  addressService?: AddressService;
   logger?: boolean;
 }
 
@@ -100,6 +121,10 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const missionRepo = options.missionRepo ?? (db ? createMissionRepository(db) : undefined as any);
   const outboxRepo = options.outboxRepo ?? (db ? createOutboxRepository(db) : undefined);
   const notificationRepo = options.notificationRepo ?? (db ? createNotificationRepository(db) : undefined as any);
+  const catalogRepo = options.catalogRepo ?? (db ? createCatalogRepository(db) : undefined as any);
+  const cartRepo = options.cartRepo ?? (db ? createCartRepository(db) : undefined as any);
+  const wishlistRepo = options.wishlistRepo ?? (db ? createWishlistRepository(db) : undefined as any);
+  const addressRepo = options.addressRepo ?? (db ? createAddressRepository(db) : undefined as any);
   const eventPublisher = options.eventPublisher ?? (process.env.REDIS_URL ? new RedisEventPublisher() : new InMemoryEventPublisher());
 
   // Core Request Tracing & Security Plugins
@@ -242,6 +267,11 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       auditService
     });
 
+  const catalogService = options.catalogService ?? (catalogRepo ? createCatalogService(catalogRepo) : undefined as any);
+  const cartService = options.cartService ?? (cartRepo && catalogRepo ? createCartService(cartRepo, catalogRepo) : undefined as any);
+  const wishlistService = options.wishlistService ?? (wishlistRepo && catalogRepo ? createWishlistService(wishlistRepo, catalogRepo) : undefined as any);
+  const addressService = options.addressService ?? (addressRepo ? createAddressService(addressRepo) : undefined as any);
+
   // Pre-handler hook to authenticate requests with Bearer tokens
   app.addHook("onRequest", async (request) => {
     try {
@@ -299,7 +329,11 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     "audit",
     "ai",
     "digital-twin",
-    "observability"
+    "observability",
+    "products",
+    "cart",
+    "wishlist",
+    "addresses"
   ];
   app.get("/api/v1/modules", async () => ({ modules }));
 
@@ -314,6 +348,10 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   if (deliveryOrchestrator) app.register(createDispatchRoutes(deliveryOrchestrator, simulatorSyncService));
   if (aiService) app.register(createAiRoutes(aiService));
   if (digitalTwinService) app.register(createDigitalTwinRoutes(digitalTwinService));
+  if (catalogService) app.register(createCatalogRoutes(catalogService));
+  if (cartService) app.register(createCartRoutes(cartService));
+  if (wishlistService) app.register(createWishlistRoutes(wishlistService));
+  if (addressService) app.register(createAddressRoutes(addressService));
 
   return app;
 }

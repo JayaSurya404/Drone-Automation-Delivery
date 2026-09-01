@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  productResponseSchema,
+  productListResponseSchema,
+  cartResponseSchema,
+  wishlistResponseSchema,
+  customerAddressResponseSchema,
   registerRequestSchema,
   loginRequestSchema,
   ROLE_PERMISSIONS,
@@ -867,3 +872,112 @@ describe("Contracts / Computer Vision & Perception Schemas", () => {
   });
 });
 
+
+describe("Contracts / Ecommerce Domain Schemas", () => {
+  it("validates Product and ProductList contracts", () => {
+    const sampleProduct = {
+      id: "11111111-1111-1111-1111-111111111111",
+      name: "Organic Honeycrisp Apples (1kg)",
+      slug: "organic-honeycrisp-apples-1kg",
+      description: "Farm-fresh organic crisp apples packed in shock-absorbing eco pouch.",
+      category: "Groceries",
+      priceCents: 699,
+      currency: "USD",
+      imageUrl: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6",
+      stockQuantity: 45,
+      weightGrams: 1050,
+      isDroneEligible: true,
+      isFeatured: true,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const parsed = productResponseSchema.parse(sampleProduct);
+    assert.equal(parsed.slug, "organic-honeycrisp-apples-1kg");
+    assert.equal(parsed.priceCents, 699);
+
+    const sampleList = {
+      data: [sampleProduct],
+      pagination: { total: 1, limit: 50, offset: 0 }
+    };
+    const parsedList = productListResponseSchema.parse(sampleList);
+    assert.equal(parsedList.data.length, 1);
+  });
+
+  it("validates Cart and Wishlist contracts", () => {
+    const sampleCart = {
+      items: [
+        {
+          id: "22222222-2222-2222-2222-222222222222",
+          productId: "11111111-1111-1111-1111-111111111111",
+          product: {
+            id: "11111111-1111-1111-1111-111111111111",
+            name: "Emergency First Aid Trauma Pack",
+            slug: "emergency-first-aid-trauma-pack",
+            description: "Sterile gauze, tourniquet, antiseptic wipes.",
+            category: "Emergency Supplies",
+            priceCents: 3499,
+            currency: "USD",
+            imageUrl: "https://images.unsplash.com/photo-1603398938378-e54eab446dde",
+            stockQuantity: 20,
+            weightGrams: 650,
+            isDroneEligible: true,
+            isFeatured: true,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          quantity: 2,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ],
+      itemCount: 2,
+      totalWeightGrams: 1300,
+      subtotalCents: 6998,
+      deliveryFeeCents: 0,
+      totalCents: 6998,
+      currency: "USD",
+      isDronePayloadCompliant: true
+    };
+    const parsedCart = cartResponseSchema.parse(sampleCart);
+    assert.equal(parsedCart.itemCount, 2);
+    assert.equal(parsedCart.totalCents, 6998);
+
+    const sampleWishlist = {
+      items: [
+        {
+          id: "33333333-3333-3333-3333-333333333333",
+          productId: "11111111-1111-1111-1111-111111111111",
+          product: sampleCart.items[0].product,
+          createdAt: new Date().toISOString()
+        }
+      ],
+      total: 1
+    };
+    const parsedWishlist = wishlistResponseSchema.parse(sampleWishlist);
+    assert.equal(parsedWishlist.total, 1);
+  });
+
+  it("validates Customer Address contracts", () => {
+    const sampleAddress = {
+      id: "44444444-4444-4444-4444-444444444444",
+      userId: "55555555-5555-5555-5555-555555555555",
+      recipientName: "Dr. Evelyn Reed",
+      phone: "+1-415-555-0199",
+      addressLine1: "500 Parnassus Ave",
+      city: "San Francisco",
+      state: "CA",
+      postalCode: "94143",
+      latitude: 37.7631,
+      longitude: -122.4586,
+      deliveryInstructions: "Place package directly inside rooftop fiducial landing marker #4.",
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const parsed = customerAddressResponseSchema.parse(sampleAddress);
+    assert.equal(parsed.recipientName, "Dr. Evelyn Reed");
+    assert.equal(parsed.latitude, 37.7631);
+  });
+});

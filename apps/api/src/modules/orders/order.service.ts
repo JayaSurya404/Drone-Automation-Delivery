@@ -50,7 +50,7 @@ export interface OrderService {
   listOrders(user: AuthenticatedUser, query: OrderListQuery): Promise<OrderListResponse>;
 }
 
-export function mapOrderRecordToResponse(record: OrderRecord): OrderResponse {
+export function mapOrderRecordToResponse(record: OrderRecord, items?: any[]): OrderResponse & { items?: any[] } {
   return {
     id: record.id,
     orderNumber: record.order_number,
@@ -87,7 +87,23 @@ export function mapOrderRecordToResponse(record: OrderRecord): OrderResponse {
     assignedAt: record.assigned_at ? new Date(record.assigned_at).toISOString() : null,
     deliveredAt: record.delivered_at ? new Date(record.delivered_at).toISOString() : null,
     createdAt: new Date(record.created_at).toISOString(),
-    updatedAt: new Date(record.updated_at).toISOString()
+    updatedAt: new Date(record.updated_at).toISOString(),
+    ...(items && items.length > 0
+      ? {
+          items: items.map((i) => ({
+            id: i.id,
+            orderId: i.order_id,
+            productId: i.product_id,
+            productName: i.product_name,
+            unitPriceCents: Number(i.unit_price_cents),
+            quantity: Number(i.quantity),
+            totalPriceCents: Number(i.total_price_cents),
+            weightGrams: Number(i.weight_grams),
+            imageUrl: i.image_url,
+            createdAt: i.created_at instanceof Date ? i.created_at.toISOString() : String(i.created_at)
+          }))
+        }
+      : {})
   };
 }
 
@@ -109,36 +125,49 @@ export function createOrderService(
       const orderId = crypto.randomUUID();
       const orderNumber = generateOrderNumber();
 
-      const newOrder = await repo.create({
-        id: orderId,
-        order_number: orderNumber,
-        organization_id: user.organizationId,
-        customer_id: user.id, // Strictly bound to authenticated identity
-        status: "CREATED",
-        priority: input.priority ?? "STANDARD",
-        pickup_latitude: input.pickup.latitude,
-        pickup_longitude: input.pickup.longitude,
-        pickup_altitude_meters: input.pickup.altitudeMeters ?? 0,
-        pickup_address: input.pickup.address ?? null,
-        delivery_latitude: input.delivery.latitude,
-        delivery_longitude: input.delivery.longitude,
-        delivery_altitude_meters: input.delivery.altitudeMeters ?? 0,
-        delivery_address: input.delivery.address ?? null,
-        package_weight_grams: input.package.weightGrams,
-        package_length_cm: input.package.lengthCm ?? null,
-        package_width_cm: input.package.widthCm ?? null,
-        package_height_cm: input.package.heightCm ?? null,
-        package_description: input.package.description ?? null,
-        delivery_notes: input.deliveryNotes ?? null,
-        cancellation_reason: null,
-        cancelled_at: null,
-        cancelled_by_user_id: null,
-        failure_reason: null,
-        failed_at: null,
-        confirmed_at: null,
-        assigned_at: null,
-        delivered_at: null
-      });
+            const newOrder = await repo.create(
+        {
+          id: orderId,
+          order_number: orderNumber,
+          organization_id: user.organizationId,
+          customer_id: user.id, // Strictly bound to authenticated identity
+          status: "CREATED",
+          priority: input.priority ?? "STANDARD",
+          pickup_latitude: input.pickup.latitude,
+          pickup_longitude: input.pickup.longitude,
+          pickup_altitude_meters: input.pickup.altitudeMeters ?? 0,
+          pickup_address: input.pickup.address ?? null,
+          delivery_latitude: input.delivery.latitude,
+          delivery_longitude: input.delivery.longitude,
+          delivery_altitude_meters: input.delivery.altitudeMeters ?? 0,
+          delivery_address: input.delivery.address ?? null,
+          package_weight_grams: input.package.weightGrams,
+          package_length_cm: input.package.lengthCm ?? null,
+          package_width_cm: input.package.widthCm ?? null,
+          package_height_cm: input.package.heightCm ?? null,
+          package_description: input.package.description ?? null,
+          delivery_notes: input.deliveryNotes ?? null,
+          cancellation_reason: null,
+          cancelled_at: null,
+          cancelled_by_user_id: null,
+          failure_reason: null,
+          failed_at: null,
+          confirmed_at: null,
+          assigned_at: null,
+          delivered_at: null
+        },
+        (input as any).items
+          ? (input as any).items.map((it: any) => ({
+              product_id: it.productId,
+              product_name: it.productName || "Package Item",
+              unit_price_cents: it.unitPriceCents || 0,
+              quantity: it.quantity || 1,
+              total_price_cents: (it.unitPriceCents || 0) * (it.quantity || 1),
+              weight_grams: it.weightGrams || 100,
+              image_url: it.imageUrl || null
+            }))
+          : undefined
+      );
 
       if (outboxRepo) {
         await outboxRepo.insert({
@@ -172,7 +201,8 @@ export function createOrderService(
         }
       });
 
-      return mapOrderRecordToResponse(newOrder);
+      const items = (input as any).items ? await repo.getItemsForOrder(newOrder.id) : [];
+      return mapOrderRecordToResponse(newOrder, items);
     },
 
     async getOrder(user: AuthenticatedUser, orderId: string): Promise<OrderResponse> {
@@ -186,7 +216,8 @@ export function createOrderService(
         throw new OrderForbiddenError("You are not authorized to view this order.");
       }
 
-      return mapOrderRecordToResponse(order);
+      const items = await repo.getItemsForOrder(order.id);
+      return mapOrderRecordToResponse(order, items);
     },
 
     async updateOrderStatus(
@@ -360,7 +391,7 @@ export function createOrderService(
       });
 
       return {
-        data: orders.map(mapOrderRecordToResponse),
+        data: orders.map((o) => mapOrderRecordToResponse(o)),
         pagination: {
           total,
           limit: query.limit,

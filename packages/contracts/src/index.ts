@@ -45,7 +45,11 @@ export const permissionSchema = z.enum([
   "users:manage",
   "org:manage",
   "digital-twin:read",
-  "digital-twin:manage"
+  "digital-twin:manage",
+  "products:read",
+  "cart:manage",
+  "wishlist:manage",
+  "addresses:manage"
 ]);
 export type Permission = z.infer<typeof permissionSchema>;
 
@@ -75,7 +79,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "users:manage",
     "org:manage",
     "digital-twin:read",
-    "digital-twin:manage"
+    "digital-twin:manage",
+    "products:read",
+    "cart:manage",
+    "wishlist:manage",
+    "addresses:manage"
   ],
   OPERATOR: [
     "orders:read",
@@ -131,7 +139,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "orders:read",
     "orders:create",
     "orders:cancel",
-    "notifications:read"
+    "notifications:read",
+    "products:read",
+    "cart:manage",
+    "wishlist:manage",
+    "addresses:manage"
   ]
 } as const;
 
@@ -372,12 +384,23 @@ export type PackageDetails = z.infer<typeof packageDetailsSchema>;
 // Order Requests & Responses
 // ============================================================================
 
+export const orderItemInputSchema = z.object({
+  productId: z.string().uuid().optional(),
+  productName: z.string().min(1).max(255),
+  unitPriceCents: z.number().int().nonnegative(),
+  quantity: z.number().int().positive(),
+  weightGrams: z.number().int().positive().optional(),
+  imageUrl: z.string().url().nullable().optional()
+});
+export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
+
 export const createOrderRequestSchema = z.object({
   pickup: orderLocationSchema,
   delivery: orderLocationSchema,
   package: packageDetailsSchema,
   priority: orderPrioritySchema.default("STANDARD"),
-  deliveryNotes: z.string().trim().max(1000).optional()
+  deliveryNotes: z.string().trim().max(1000).optional(),
+  items: z.array(orderItemInputSchema).optional()
 });
 export type CreateOrderRequest = z.infer<typeof createOrderRequestSchema>;
 
@@ -957,3 +980,191 @@ export * from "./vision.js";
 // ============================================================================
 export * from "./digital-twin.js";
 
+
+// ============================================================================
+// Ecommerce Domain Schemas & Contracts
+// ============================================================================
+
+export const productCategorySchema = z.enum([
+  "Groceries",
+  "Pharmacy",
+  "Food & Beverages",
+  "Electronics",
+  "Essentials",
+  "Emergency Supplies",
+  "Documents",
+  "Popular Near You"
+]);
+export type ProductCategory = z.infer<typeof productCategorySchema>;
+
+export const productResponseSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  slug: z.string(),
+  description: z.string(),
+  category: z.string(),
+  priceCents: z.number().int().nonnegative(),
+  currency: z.string().default("USD"),
+  imageUrl: z.string(),
+  stockQuantity: z.number().int().nonnegative(),
+  weightGrams: z.number().int().positive(),
+  lengthCm: z.number().nullable().optional(),
+  widthCm: z.number().nullable().optional(),
+  heightCm: z.number().nullable().optional(),
+  isDroneEligible: z.boolean(),
+  isFeatured: z.boolean(),
+  isActive: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type ProductResponse = z.infer<typeof productResponseSchema>;
+
+export const productListQuerySchema = z.object({
+  category: z.string().optional(),
+  search: z.string().optional(),
+  featured: z.coerce.boolean().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+export type ProductListQuery = z.infer<typeof productListQuerySchema>;
+
+export const productListResponseSchema = z.object({
+  data: z.array(productResponseSchema),
+  pagination: z.object({
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative()
+  })
+});
+export type ProductListResponse = z.infer<typeof productListResponseSchema>;
+
+// Cart
+export const cartItemResponseSchema = z.object({
+  id: uuidSchema,
+  productId: uuidSchema,
+  product: productResponseSchema,
+  quantity: z.number().int().positive(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type CartItemResponse = z.infer<typeof cartItemResponseSchema>;
+
+export const addToCartRequestSchema = z.object({
+  productId: uuidSchema,
+  quantity: z.number().int().positive().max(50).default(1)
+});
+export type AddToCartRequest = z.infer<typeof addToCartRequestSchema>;
+
+export const updateCartItemRequestSchema = z.object({
+  quantity: z.number().int().nonnegative().max(50)
+});
+export type UpdateCartItemRequest = z.infer<typeof updateCartItemRequestSchema>;
+
+export const cartResponseSchema = z.object({
+  items: z.array(cartItemResponseSchema),
+  itemCount: z.number().int().nonnegative(),
+  totalWeightGrams: z.number().int().nonnegative(),
+  subtotalCents: z.number().int().nonnegative(),
+  deliveryFeeCents: z.number().int().nonnegative(),
+  totalCents: z.number().int().nonnegative(),
+  currency: z.string().default("USD"),
+  isDronePayloadCompliant: z.boolean().default(true)
+});
+export type CartResponse = z.infer<typeof cartResponseSchema>;
+
+// Wishlist
+export const wishlistItemResponseSchema = z.object({
+  id: uuidSchema,
+  productId: uuidSchema,
+  product: productResponseSchema,
+  createdAt: z.string().datetime()
+});
+export type WishlistItemResponse = z.infer<typeof wishlistItemResponseSchema>;
+
+export const addWishlistRequestSchema = z.object({
+  productId: uuidSchema
+});
+export type AddWishlistRequest = z.infer<typeof addWishlistRequestSchema>;
+
+export const wishlistResponseSchema = z.object({
+  items: z.array(wishlistItemResponseSchema),
+  total: z.number().int().nonnegative()
+});
+export type WishlistResponse = z.infer<typeof wishlistResponseSchema>;
+
+// Customer Addresses
+export const customerAddressResponseSchema = z.object({
+  id: uuidSchema,
+  userId: uuidSchema,
+  recipientName: z.string(),
+  phone: z.string(),
+  addressLine1: z.string(),
+  addressLine2: z.string().nullable().optional(),
+  city: z.string(),
+  state: z.string(),
+  postalCode: z.string(),
+  latitude: z.number().gte(-90).lte(90),
+  longitude: z.number().gte(-180).lte(180),
+  deliveryInstructions: z.string().nullable().optional(),
+  isDefault: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+export type CustomerAddressResponse = z.infer<typeof customerAddressResponseSchema>;
+
+export const createCustomerAddressRequestSchema = z.object({
+  recipientName: z.string().trim().min(1).max(100),
+  phone: z.string().trim().min(5).max(30),
+  addressLine1: z.string().trim().min(3).max(255),
+  addressLine2: z.string().trim().max(255).optional(),
+  city: z.string().trim().min(1).max(100),
+  state: z.string().trim().min(1).max(100),
+  postalCode: z.string().trim().min(1).max(20),
+  latitude: z.number().gte(-90).lte(90),
+  longitude: z.number().gte(-180).lte(180),
+  deliveryInstructions: z.string().trim().max(500).optional(),
+  isDefault: z.boolean().optional().default(false)
+});
+export type CreateCustomerAddressRequest = z.infer<typeof createCustomerAddressRequestSchema>;
+
+export const updateCustomerAddressRequestSchema = createCustomerAddressRequestSchema.partial();
+export type UpdateCustomerAddressRequest = z.infer<typeof updateCustomerAddressRequestSchema>;
+
+export const customerAddressListResponseSchema = z.object({
+  data: z.array(customerAddressResponseSchema)
+});
+export type CustomerAddressListResponse = z.infer<typeof customerAddressListResponseSchema>;
+
+// Order Items & Commerce Order
+export const orderItemResponseSchema = z.object({
+  id: uuidSchema,
+  orderId: uuidSchema,
+  productId: uuidSchema.nullable().optional(),
+  productName: z.string(),
+  unitPriceCents: z.number().int().nonnegative(),
+  quantity: z.number().int().positive(),
+  totalPriceCents: z.number().int().nonnegative(),
+  weightGrams: z.number().int().positive(),
+  imageUrl: z.string().nullable().optional(),
+  createdAt: z.string().datetime()
+});
+export type OrderItemResponse = z.infer<typeof orderItemResponseSchema>;
+
+export const createCommerceOrderRequestSchema = z.object({
+  deliveryAddressId: uuidSchema.optional(),
+  deliveryAddress: z.object({
+    recipientName: z.string().min(1),
+    phone: z.string().min(5),
+    address: z.string().min(3),
+    latitude: z.number().gte(-90).lte(90),
+    longitude: z.number().gte(-180).lte(180),
+    instructions: z.string().optional()
+  }).optional(),
+  items: z.array(z.object({
+    productId: uuidSchema,
+    quantity: z.number().int().positive()
+  })).optional(),
+  priority: orderPrioritySchema.default("STANDARD"),
+  deliveryNotes: z.string().max(1000).optional()
+});
+export type CreateCommerceOrderRequest = z.infer<typeof createCommerceOrderRequestSchema>;
