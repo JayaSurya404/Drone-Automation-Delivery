@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import type { ProductResponse } from "@skynav/contracts";
-import { useCart } from "../../features/commerce/cart-context";
+import { useCart, formatINR } from "../../features/commerce/cart-context";
 import { HeartIcon, ShoppingCartIcon, PlusIcon, MinusIcon, ZapIcon } from "@skynav/ui";
 
 interface ProductCardProps {
@@ -67,7 +67,11 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   };
 
-  const formattedPrice = `$${(product.priceCents / 100).toFixed(2)}`;
+  const priceFormatted = formatINR(product.pricePaise || product.priceCents || 0);
+  const mrpFormatted = product.mrpPaise ? formatINR(product.mrpPaise) : null;
+  const discountPercent = product.discountPercent || (product.mrpPaise && product.mrpPaise > (product.pricePaise || 0)
+    ? Math.round(((product.mrpPaise - (product.pricePaise || 0)) / product.mrpPaise) * 100)
+    : 0);
 
   return (
     <div className="group relative flex flex-col justify-between bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-brand-500/50 dark:hover:border-brand-500/50 rounded-2xl p-4 shadow-sm hover:shadow-xl transition duration-300 overflow-hidden">
@@ -94,6 +98,13 @@ export function ProductCard({ product }: ProductCardProps) {
             <HeartIcon size={16} />
           </button>
 
+          {/* Discount Badge */}
+          {discountPercent > 0 && (
+            <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow">
+              {discountPercent}% OFF
+            </div>
+          )}
+
           {/* Delivery ETA Badge */}
           <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 px-2 py-1 rounded-md bg-slate-950/80 backdrop-blur-md text-[11px] font-medium text-emerald-400 shadow">
             <ZapIcon size={12} className="text-amber-400" />
@@ -106,12 +117,14 @@ export function ProductCard({ product }: ProductCardProps) {
           <span className="font-medium text-brand-600 dark:text-brand-400 uppercase tracking-wider text-[10px]">
             {product.category}
           </span>
-          <span>{product.weightGrams >= 1000 ? `${(product.weightGrams / 1000).toFixed(1)}kg` : `${product.weightGrams}g`}</span>
+          <span className="font-medium bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">
+            {product.weightGrams >= 1000 ? `${(product.weightGrams / 1000).toFixed(1)}kg` : `${product.weightGrams}g`}
+          </span>
         </div>
 
         {/* Title */}
         <Link href={`/customer/products/${product.id}`} className="block">
-          <h4 className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition text-sm">
+          <h4 className="font-bold text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition text-sm">
             {product.name}
           </h4>
           <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 min-h-[32px]">
@@ -122,8 +135,13 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Pricing & Cart Action */}
       <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 dark:border-slate-800">
-        <div>
-          <span className="text-base font-bold text-slate-900 dark:text-slate-100">{formattedPrice}</span>
+        <div className="flex flex-col">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-base font-black text-slate-900 dark:text-slate-100">{priceFormatted}</span>
+            {mrpFormatted && mrpFormatted !== priceFormatted && (
+              <span className="text-xs text-slate-400 line-through">{mrpFormatted}</span>
+            )}
+          </div>
         </div>
 
         {quantity > 0 ? (
@@ -153,7 +171,7 @@ export function ProductCard({ product }: ProductCardProps) {
             type="button"
             disabled={isUpdating}
             onClick={handleAddToCart}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
           >
             <ShoppingCartIcon size={14} />
             <span>Add</span>

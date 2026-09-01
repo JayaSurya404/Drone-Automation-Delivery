@@ -982,18 +982,27 @@ export * from "./digital-twin.js";
 
 
 // ============================================================================
-// Ecommerce Domain Schemas & Contracts
+// Ecommerce Domain Schemas & Contracts (Indian Market & Drone Delivery)
 // ============================================================================
+
+export const COMMERCE_CONFIG = {
+  OPERATIONAL_PAYLOAD_LIMIT_GRAMS: 4000, // 4.0 kg platform operational delivery limit
+  PACKAGING_ALLOWANCE_GRAMS: 200,        // Standard safety packaging weight
+  MAX_AIRCRAFT_PAYLOAD_GRAMS: 6000,      // Maximum physical UAV payload limit
+  FREE_DELIVERY_THRESHOLD_PAISE: 49900,  // ₹499.00
+  STANDARD_DELIVERY_FEE_PAISE: 3900,     // ₹39.00
+  EXPRESS_DELIVERY_FEE_PAISE: 6900       // ₹69.00
+} as const;
 
 export const productCategorySchema = z.enum([
   "Groceries",
-  "Pharmacy",
-  "Food & Beverages",
-  "Electronics",
-  "Essentials",
-  "Emergency Supplies",
-  "Documents",
-  "Popular Near You"
+  "Daily Essentials",
+  "Snacks & Beverages",
+  "Personal Care",
+  "Pharmacy & Wellness",
+  "Household Essentials",
+  "Small Electronics",
+  "Documents"
 ]);
 export type ProductCategory = z.infer<typeof productCategorySchema>;
 
@@ -1003,8 +1012,11 @@ export const productResponseSchema = z.object({
   slug: z.string(),
   description: z.string(),
   category: z.string(),
-  priceCents: z.number().int().nonnegative(),
-  currency: z.string().default("USD"),
+  pricePaise: z.number().int().nonnegative(),
+  mrpPaise: z.number().int().nonnegative().optional(),
+  discountPercent: z.number().int().min(0).max(100).optional(),
+  priceCents: z.number().int().nonnegative().optional(), // Backwards compatibility alias
+  currency: z.string().default("INR"),
   imageUrl: z.string(),
   stockQuantity: z.number().int().nonnegative(),
   weightGrams: z.number().int().positive(),
@@ -1064,10 +1076,19 @@ export const cartResponseSchema = z.object({
   items: z.array(cartItemResponseSchema),
   itemCount: z.number().int().nonnegative(),
   totalWeightGrams: z.number().int().nonnegative(),
-  subtotalCents: z.number().int().nonnegative(),
-  deliveryFeeCents: z.number().int().nonnegative(),
-  totalCents: z.number().int().nonnegative(),
-  currency: z.string().default("USD"),
+  packagingWeightGrams: z.number().int().nonnegative().default(200),
+  grossWeightGrams: z.number().int().nonnegative(),
+  operationalPayloadLimitGrams: z.number().int().nonnegative().default(4000),
+  remainingCapacityGrams: z.number().int(),
+  isPayloadExceeded: z.boolean().default(false),
+  subtotalPaise: z.number().int().nonnegative(),
+  deliveryFeePaise: z.number().int().nonnegative(),
+  totalPaise: z.number().int().nonnegative(),
+  savingsPaise: z.number().int().nonnegative().default(0),
+  subtotalCents: z.number().int().nonnegative().optional(), // Compatibility
+  deliveryFeeCents: z.number().int().nonnegative().optional(),
+  totalCents: z.number().int().nonnegative().optional(),
+  currency: z.string().default("INR"),
   isDronePayloadCompliant: z.boolean().default(true)
 });
 export type CartResponse = z.infer<typeof cartResponseSchema>;
@@ -1141,9 +1162,11 @@ export const orderItemResponseSchema = z.object({
   orderId: uuidSchema,
   productId: uuidSchema.nullable().optional(),
   productName: z.string(),
-  unitPriceCents: z.number().int().nonnegative(),
+  unitPricePaise: z.number().int().nonnegative().optional(),
+  totalPricePaise: z.number().int().nonnegative().optional(),
+  unitPriceCents: z.number().int().nonnegative().optional(), // Compatibility
+  totalPriceCents: z.number().int().nonnegative().optional(),
   quantity: z.number().int().positive(),
-  totalPriceCents: z.number().int().nonnegative(),
   weightGrams: z.number().int().positive(),
   imageUrl: z.string().nullable().optional(),
   createdAt: z.string().datetime()
@@ -1160,10 +1183,6 @@ export const createCommerceOrderRequestSchema = z.object({
     longitude: z.number().gte(-180).lte(180),
     instructions: z.string().optional()
   }).optional(),
-  items: z.array(z.object({
-    productId: uuidSchema,
-    quantity: z.number().int().positive()
-  })).optional(),
   priority: orderPrioritySchema.default("STANDARD"),
   deliveryNotes: z.string().max(1000).optional()
 });

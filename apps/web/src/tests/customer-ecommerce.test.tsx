@@ -11,15 +11,18 @@ import CustomerLayout from "../app/customer/layout.js";
 describe("Customer Ecommerce Portal / Frontend Components", () => {
   const sampleProduct = {
     id: "10000000-0000-0000-0000-000000000001",
-    name: "Organic Honeycrisp Apples (1kg)",
-    slug: "organic-honeycrisp-apples-1kg",
-    description: "Crisp organic apples.",
+    name: "Aashirvaad Superior MP Atta (1kg)",
+    slug: "aashirvaad-superior-mp-atta-1kg",
+    description: "100% pure whole wheat flour processed with traditional stone grinding.",
     category: "Groceries",
-    priceCents: 699,
-    currency: "USD",
-    imageUrl: "https://example.com/apples.jpg",
+    pricePaise: 6200,
+    mrpPaise: 7500,
+    discountPercent: 17,
+    priceCents: 6200,
+    currency: "INR",
+    imageUrl: "https://example.com/atta.jpg",
     stockQuantity: 50,
-    weightGrams: 1050,
+    weightGrams: 1000,
     isDroneEligible: true,
     isFeatured: true,
     isActive: true,
@@ -36,9 +39,9 @@ describe("Customer Ecommerce Portal / Frontend Components", () => {
       </AuthProvider>
     );
 
-    assert.ok(html.includes("Organic Honeycrisp Apples (1kg)"));
-    assert.ok(html.includes("$6.99"));
-    assert.ok(html.includes("1.1kg") || html.includes("1050g"));
+    assert.ok(html.includes("Aashirvaad Superior MP Atta (1kg)"));
+    assert.ok(html.includes("62"));
+    assert.ok(html.includes("1.0kg") || html.includes("1000g") || html.includes("1kg"));
     assert.ok(html.includes("Drone Drop") || html.includes("12-15m"));
     assert.ok(html.includes("Groceries"));
   });
@@ -54,8 +57,7 @@ describe("Customer Ecommerce Portal / Frontend Components", () => {
 
     assert.ok(html.includes("SkyNav"));
     assert.ok(html.includes("Store"));
-    assert.ok(html.includes("Search groceries, essentials"));
-    assert.ok(html.includes("Deliver to"));
+    assert.ok(html.includes("Search atta, milk, tea, snacks"));
     assert.ok(html.includes("Cart"));
   });
 

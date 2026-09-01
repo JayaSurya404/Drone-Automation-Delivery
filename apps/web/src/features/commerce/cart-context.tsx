@@ -31,11 +31,21 @@ interface CartContextType {
   selectAddress: (address: CustomerAddressResponse) => void;
   createAddress: (data: CreateCustomerAddressRequest) => Promise<CustomerAddressResponse | null>;
   deleteAddress: (id: string) => Promise<boolean>;
+  formatINR: (paise?: number) => string;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+export function formatINR(paise: number = 0): string {
+  const rupees = paise / 100;
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: rupees % 1 === 0 ? 0 : 2
+  }).format(rupees);
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { token, isAuthenticated } = useAuth();
@@ -317,7 +327,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         isInWishlist,
         selectAddress,
         createAddress,
-        deleteAddress
+        deleteAddress,
+        formatINR
       }}
     >
       {children}

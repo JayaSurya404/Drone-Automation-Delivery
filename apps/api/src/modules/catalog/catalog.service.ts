@@ -10,14 +10,21 @@ export interface CatalogService {
 
 export function createCatalogService(repo: CatalogRepository): CatalogService {
   function mapProduct(p: any): ProductResponse {
+    const pricePaise = p.price_cents || 0;
+    const mrpPaise = p.mrp_cents || Math.round(pricePaise * 1.15);
+    const discountPercent = mrpPaise > pricePaise ? Math.round(((mrpPaise - pricePaise) / mrpPaise) * 100) : 0;
+
     return {
       id: p.id,
       name: p.name,
       slug: p.slug,
       description: p.description,
       category: p.category,
-      priceCents: p.price_cents,
-      currency: p.currency || "USD",
+      pricePaise,
+      mrpPaise,
+      discountPercent,
+      priceCents: pricePaise, // Compatibility alias
+      currency: p.currency || "INR",
       imageUrl: p.image_url,
       stockQuantity: p.stock_quantity,
       weightGrams: p.weight_grams,
@@ -46,7 +53,6 @@ export function createCatalogService(repo: CatalogRepository): CatalogService {
     },
 
     async getProduct(idOrSlug) {
-      // UUID regex test
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
       const product = isUuid ? await repo.findById(idOrSlug) : await repo.findBySlug(idOrSlug);
       if (!product) {

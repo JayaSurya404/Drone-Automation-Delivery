@@ -250,6 +250,7 @@ export interface ProductTable {
   description: string;
   category: string;
   price_cents: number;
+  mrp_cents?: number | null;
   currency: string;
   image_url: string;
   stock_quantity: number;

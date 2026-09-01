@@ -96,8 +96,8 @@ describe("Cart / Customer Cart Management & Calculations", () => {
     const res = await service.addToCart(user, { productId: product.id, quantity: 2 });
     assert.equal(res.itemCount, 2);
     assert.equal(res.subtotalCents, 1398); // 699 * 2
-    assert.equal(res.deliveryFeeCents, 499); // below 3500 cents promo threshold
-    assert.equal(res.totalCents, 1897);
+    assert.equal(res.deliveryFeeCents, 3900); // below 3500 cents promo threshold
+    assert.equal(res.totalCents, 5298);
     assert.equal(res.isDronePayloadCompliant, true);
   });
 

@@ -1,42 +1,51 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../../features/auth/auth-context";
-import { useCart } from "../../../features/commerce/cart-context";
+import Link from "next/link";
+import { useCart, formatINR } from "../../../features/commerce/cart-context";
 import { AddressModal } from "../../../components/commerce/address-modal";
 import {
   DroneIcon,
   MapPinIcon,
   CheckIcon,
   ZapIcon,
-  ShieldIcon,
-  CreditCardIcon,
-  PlusIcon,
-  ChevronLeftIcon
+  ArrowLeftIcon,
+  AlertTriangleIcon
 } from "@skynav/ui";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-export default function CustomerCheckoutPage() {
+export default function CheckoutPage() {
   let router: any = { push: () => {}, replace: () => {} };
-  try { router = useRouter(); } catch {}
-  const { token, user } = useAuth();
+  try {
+    router = useRouter();
+  } catch {}
+
   const { cart, selectedAddress, clearCart } = useCart();
 
-  const [priority, setPriority] = useState<"STANDARD" | "EXPRESS" | "URGENT">("STANDARD");
-  const [deliveryNotes, setDeliveryNotes] = useState<string>("");
-  const [isAddressModalOpen, setIsAddressModalOpen] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [priority, setPriority] = useState<"STANDARD" | "EXPRESS">("STANDARD");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!cart || cart.items.length === 0) {
+  const items = cart?.items || [];
+  const itemCount = cart?.itemCount || 0;
+  const subtotalPaise = cart?.subtotalPaise || cart?.subtotalCents || 0;
+  const deliveryFeePaise = cart?.deliveryFeePaise || cart?.deliveryFeeCents || 0;
+  const totalPaise = cart?.totalPaise || cart?.totalCents || 0;
+  const grossWeightGrams = cart?.grossWeightGrams || cart?.totalWeightGrams || 0;
+
+  if (items.length === 0) {
     return (
-      <div className="text-center py-20">
-        <h2 className="text-lg font-bold">Your cart is empty</h2>
-        <Link href="/customer" className="mt-4 inline-block px-4 py-2 text-sm font-semibold text-white bg-brand-600 rounded-xl">
-          Browse Store
+      <div className="max-w-md mx-auto py-16 text-center space-y-4">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your cart is empty</h2>
+        <Link
+          href="/customer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-xs font-bold shadow-md hover:bg-brand-500 transition"
+        >
+          <ArrowLeftIcon size={14} /> Back to Store
         </Link>
       </div>
     );
@@ -44,231 +53,233 @@ export default function CustomerCheckoutPage() {
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress) {
-      setError("Please select or add a designated drone landing address.");
+      setIsAddressModalOpen(true);
       return;
     }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Hub origin default in SF
-      const hubOrigin = {
-        latitude: 37.7749,
-        longitude: -122.4194,
-        altitudeMeters: 10,
-        address: "SkyNav Launch Hub Alpha (Downtown SF)"
-      };
-
-      const dropLocation = {
-        latitude: selectedAddress.latitude,
-        longitude: selectedAddress.longitude,
-        altitudeMeters: 0,
-        address: `${selectedAddress.addressLine1}, ${selectedAddress.city}`
-      };
-
       const orderPayload = {
-        pickup: hubOrigin,
-        delivery: dropLocation,
-        package: {
-          weightGrams: cart.totalWeightGrams || 500,
-          description: cart.items.map((i) => `${i.quantity}x ${i.product.name}`).join(", ")
-        },
         priority,
-        deliveryNotes: deliveryNotes || selectedAddress.deliveryInstructions || "Autonomous precision drop on landing pad.",
-        items: cart.items.map((i) => ({
-          productId: i.productId,
-          productName: i.product.name,
-          unitPriceCents: i.product.priceCents,
-          quantity: i.quantity,
-          weightGrams: i.product.weightGrams,
-          imageUrl: i.product.imageUrl
+        deliveryNotes,
+        originLatitude: 12.9716, // SkyNav Bengaluru Central Launch Hub
+        originLongitude: 77.5946,
+        originAddress: "SkyNav Metro Air Hub #1, Bengaluru Central",
+        destinationLatitude: selectedAddress.latitude,
+        destinationLongitude: selectedAddress.longitude,
+        destinationAddress: `${selectedAddress.addressLine1}, ${selectedAddress.addressLine2 ? selectedAddress.addressLine2 + ", " : ""}${selectedAddress.city}, ${selectedAddress.state} - ${selectedAddress.postalCode}`,
+        recipientName: selectedAddress.recipientName,
+        recipientPhone: selectedAddress.phone,
+        recipientEmail: "customer@skynav.delivery",
+        package: {
+          weightGrams: grossWeightGrams,
+          declaredValueCents: totalPaise,
+          requiresRefrigeration: false,
+          hazardousMaterial: false
+        },
+        items: items.map((item) => ({
+          productId: item.productId,
+          productName: item.product.name,
+          unitPricePaise: item.product.pricePaise || item.product.priceCents || 0,
+          totalPricePaise: (item.product.pricePaise || item.product.priceCents || 0) * item.quantity,
+          quantity: item.quantity,
+          weightGrams: item.product.weightGrams,
+          imageUrl: item.product.imageUrl
         }))
       };
 
+      const token = localStorage.getItem("skynav_token");
       const res = await fetch(`${API_BASE_URL}/api/v1/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify(orderPayload)
       });
 
       if (!res.ok) {
-        const errorJson = await res.json();
-        throw new Error(errorJson.detail || "Failed to place order.");
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || errJson.message || "Failed to create order");
       }
 
-      const json = await res.json();
-      const createdOrder = json.data;
-
-      // Clear cart on successful order placement
+      const created = await res.json();
       await clearCart();
-
-      // Redirect to Order Detail
-      router.push(`/customer/orders/${createdOrder.id}`);
+      router.push(`/customer/orders/${created.id || created.orderNumber}`);
     } catch (err: any) {
-      setError(err.message || "Failed to create order. Please try again.");
+      setError(err.message || "Order placement failed");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Link href="/customer/cart" className="hover:text-brand-600 flex items-center gap-1">
-          <ChevronLeftIcon size={14} /> Back to Cart
-        </Link>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+      <Link
+        href="/customer/cart"
+        className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-brand-600 transition"
+      >
+        <ArrowLeftIcon size={14} /> Back to Cart
+      </Link>
 
-      <div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Checkout & Drone Dispatch</h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Confirm landing pad coordinates and flight priority
+      <div className="space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          Drone AirDrop Checkout
+        </h1>
+        <p className="text-xs text-slate-500">
+          Verify landing pad marker and dispatch flight path
         </p>
       </div>
 
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-xs font-semibold text-rose-600 dark:text-rose-400">
-          {error}
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 flex items-center gap-3">
+          <AlertTriangleIcon size={18} className="text-rose-600 flex-shrink-0" />
+          <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Config Steps */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Step 1: Landing Pad Address */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-2 space-y-6">
+          {/* Landing Address Card */}
           <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs">1</span>
-                <span>Designated Landing Pad Address</span>
-              </h3>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                  <MapPinIcon size={18} />
+                </div>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                  1. Delivery Landing Pad
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsAddressModalOpen(true)}
-                className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+                className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline"
               >
                 {selectedAddress ? "Change" : "Select Address"}
               </button>
             </div>
 
             {selectedAddress ? (
-              <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 flex items-start justify-between">
-                <div className="space-y-1 text-xs">
-                  <p className="font-bold text-slate-900 dark:text-slate-100">{selectedAddress.recipientName} ({selectedAddress.phone})</p>
-                  <p className="text-slate-600 dark:text-slate-300">{selectedAddress.addressLine1} {selectedAddress.addressLine2}</p>
-                  <p className="text-slate-500">{selectedAddress.city}, {selectedAddress.state} {selectedAddress.postalCode}</p>
-                  <p className="text-[11px] font-mono text-brand-600 dark:text-brand-400 flex items-center gap-1 mt-1">
-                    <MapPinIcon size={12} /> {selectedAddress.latitude.toFixed(4)}°N, {selectedAddress.longitude.toFixed(4)}°W
-                  </p>
-                </div>
-                <span className="p-1 bg-brand-600 text-white rounded-full">
-                  <CheckIcon size={12} />
-                </span>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-1">
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {selectedAddress.recipientName} ({selectedAddress.phone})
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  {selectedAddress.addressLine1} {selectedAddress.addressLine2}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.postalCode}
+                </p>
+                <p className="text-[11px] font-mono text-brand-600 dark:text-brand-400 mt-1">
+                  📍 Coordinates: {selectedAddress.latitude.toFixed(4)}°N, {selectedAddress.longitude.toFixed(4)}°E
+                </p>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setIsAddressModalOpen(true)}
-                className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-brand-500 hover:text-brand-600 transition flex items-center justify-center gap-2"
-              >
-                <PlusIcon size={16} /> Choose or Add Landing Coordinates
-              </button>
+              <div className="p-6 text-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl">
+                <p className="text-xs text-slate-500 mb-3">No landing address selected.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddressModalOpen(true)}
+                  className="px-4 py-2 text-xs font-bold text-white bg-brand-600 rounded-xl shadow hover:bg-brand-500 transition"
+                >
+                  + Add / Select Landing Pad
+                </button>
+              </div>
             )}
           </div>
 
-          {/* Step 2: Flight Priority */}
+          {/* Delivery Zone Instructions */}
           <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs">2</span>
-              <span>Flight Dispatch Priority</span>
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div
-                onClick={() => setPriority("STANDARD")}
-                className={`p-4 rounded-2xl border cursor-pointer transition ${
-                  priority === "STANDARD"
-                    ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/30"
-                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-slate-900 dark:text-slate-100">⚡ Standard AirDrop</span>
-                  {priority === "STANDARD" && <CheckIcon size={14} className="text-brand-600" />}
-                </div>
-                <p className="text-xs text-slate-500">Autonomous 15-20 min window</p>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-2">Free Promo</p>
-              </div>
-
-              <div
-                onClick={() => setPriority("EXPRESS")}
-                className={`p-4 rounded-2xl border cursor-pointer transition ${
-                  priority === "EXPRESS"
-                    ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/30"
-                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-slate-900 dark:text-slate-100">🚀 Express Priority Flight</span>
-                  {priority === "EXPRESS" && <CheckIcon size={14} className="text-brand-600" />}
-                </div>
-                <p className="text-xs text-slate-500">Immediate launch, 10-12 mins</p>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-2">Priority Corridor</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Step 3: Delivery Instructions */}
-          <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs">3</span>
-              <span>Landing Zone Notes & Instructions</span>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+              2. Landing Pad Drop Instructions
             </h3>
             <textarea
               rows={2}
               value={deliveryNotes}
               onChange={(e) => setDeliveryNotes(e.target.value)}
-              placeholder="e.g. Leave package inside the patio landing square marker. Keep dog indoors."
-              className="w-full px-4 py-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="e.g. Center marker on rooftop terrace. Ring apartment 402 upon touchdown."
+              className="w-full px-4 py-3 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
+          </div>
+
+          {/* Flight Priority Option */}
+          <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+              3. Dispatch Priority
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setPriority("STANDARD")}
+                className={`p-4 rounded-2xl border text-left transition ${
+                  priority === "STANDARD"
+                    ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-slate-900 dark:text-slate-100"
+                    : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs">Standard AirDrop</span>
+                  {priority === "STANDARD" && <CheckIcon size={14} className="text-brand-600" />}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">12–15 min corridor flight</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPriority("EXPRESS")}
+                className={`p-4 rounded-2xl border text-left transition ${
+                  priority === "EXPRESS"
+                    ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-slate-900 dark:text-slate-100"
+                    : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs flex items-center gap-1">
+                    <ZapIcon size={12} className="text-amber-400" /> Express AirDrop
+                  </span>
+                  {priority === "EXPRESS" && <CheckIcon size={14} className="text-brand-600" />}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Direct priority UAV launch</p>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Summary & Place Order */}
-        <div className="space-y-4">
+        {/* Order Review & Dispatch Button */}
+        <div className="space-y-6">
           <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">Package Contents</h3>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Order Items ({itemCount})</h3>
 
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {cart.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600 dark:text-slate-400 line-clamp-1 flex-1 pr-2">
-                    {item.quantity}x {item.product.name}
+              {items.map((i) => (
+                <div key={i.id} className="flex justify-between text-xs py-1">
+                  <span className="text-slate-600 dark:text-slate-400 truncate max-w-[160px]">
+                    {i.quantity}x {i.product.name}
                   </span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
-                    ${((item.product.priceCents * item.quantity) / 100).toFixed(2)}
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {formatINR((i.product.pricePaise || i.product.priceCents || 0) * i.quantity)}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between text-slate-500">
-                <span>Subtotal</span>
-                <span>${(cart.subtotalCents / 100).toFixed(2)}</span>
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs text-slate-600 dark:text-slate-400">
+              <div className="flex justify-between">
+                <span>Items Subtotal</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">{formatINR(subtotalPaise)}</span>
               </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Drone Delivery</span>
-                <span className="text-emerald-500 font-semibold">
-                  {cart.deliveryFeeCents === 0 ? "FREE" : `$${(cart.deliveryFeeCents / 100).toFixed(2)}`}
+              <div className="flex justify-between">
+                <span>AirDrop Delivery</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
+                  {deliveryFeePaise === 0 ? <span className="text-emerald-500">FREE</span> : formatINR(deliveryFeePaise)}
                 </span>
               </div>
-              <div className="flex justify-between font-extrabold text-sm text-slate-900 dark:text-slate-100 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span>Total</span>
-                <span>${(cart.totalCents / 100).toFixed(2)}</span>
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-base font-black text-slate-900 dark:text-slate-100">
+                <span>Total Amount</span>
+                <span className="text-brand-600 dark:text-brand-400">{formatINR(totalPaise)}</span>
               </div>
             </div>
 
@@ -276,10 +287,10 @@ export default function CustomerCheckoutPage() {
               type="button"
               disabled={isSubmitting || !selectedAddress}
               onClick={handlePlaceOrder}
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] text-white text-sm font-bold shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50"
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-brand-500/25 flex items-center justify-center gap-2 transition active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <DroneIcon size={20} />
-              <span>{isSubmitting ? "Dispatching Flight..." : "Confirm & Dispatch Drone"}</span>
+              <DroneIcon size={18} />
+              <span>{isSubmitting ? "Dispatching Flight..." : "Confirm & Dispatch Drone AirDrop"}</span>
             </button>
           </div>
         </div>

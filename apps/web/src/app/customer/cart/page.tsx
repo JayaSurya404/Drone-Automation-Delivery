@@ -1,126 +1,174 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCart } from "../../../features/commerce/cart-context";
+import { useCart, formatINR } from "../../../features/commerce/cart-context";
 import {
+  DroneIcon,
   ShoppingCartIcon,
   TrashIcon,
   PlusIcon,
   MinusIcon,
-  DroneIcon,
-  ZapIcon,
-  ShieldIcon,
-  ChevronRightIcon
+  ArrowRightIcon,
+  AlertTriangleIcon,
+  CheckIcon,
+  ZapIcon
 } from "@skynav/ui";
 
-export default function CustomerCartPage() {
+export default function CartPage() {
   let router: any = { push: () => {}, replace: () => {} };
-  try { router = useRouter(); } catch {}
+  try {
+    router = useRouter();
+  } catch {}
+
   const { cart, updateCartQuantity, removeCartItem, clearCart, isLoadingCart } = useCart();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (isLoadingCart) {
-    return (
-      <div className="py-16 flex justify-center">
-        <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const items = cart?.items || [];
+  const itemCount = cart?.itemCount || 0;
+  const grossWeightGrams = cart?.grossWeightGrams || cart?.totalWeightGrams || 0;
+  const operationalPayloadLimitGrams = cart?.operationalPayloadLimitGrams || 4000;
+  const isPayloadExceeded = cart?.isPayloadExceeded || grossWeightGrams > operationalPayloadLimitGrams;
+  const remainingCapacityGrams = Math.max(0, operationalPayloadLimitGrams - grossWeightGrams);
 
-  if (!cart || cart.items.length === 0) {
+  const subtotalPaise = cart?.subtotalPaise || cart?.subtotalCents || 0;
+  const deliveryFeePaise = cart?.deliveryFeePaise || cart?.deliveryFeeCents || 0;
+  const totalPaise = cart?.totalPaise || cart?.totalCents || 0;
+  const savingsPaise = cart?.savingsPaise || 0;
+
+  const freeDeliveryThreshold = 49900; // ₹499
+  const amountNeededForFreeDelivery = Math.max(0, freeDeliveryThreshold - subtotalPaise);
+
+  if (items.length === 0 && !isLoadingCart) {
     return (
-      <div className="text-center py-20 bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm animate-in fade-in duration-300">
-        <div className="w-20 h-20 mx-auto mb-4 rounded-3xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center">
-          <ShoppingCartIcon size={40} />
+      <div className="max-w-md mx-auto py-16 text-center space-y-4">
+        <div className="w-20 h-20 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+          <ShoppingCartIcon size={36} />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Cart is Empty</h2>
-        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2">
-          Discover farm-fresh groceries, rapid pharmacy essentials, and electronics ready for 15-minute autonomous drone delivery.
+        <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100">Your Drone Cart is Empty</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Add fresh groceries, daily milk, or tech essentials to experience 15-minute drone airdrop.
         </p>
         <Link
           href="/customer"
-          className="mt-6 inline-flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-2xl shadow-lg shadow-brand-500/25 transition"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md transition"
         >
-          <span>Explore Store</span>
-          <ChevronRightIcon size={16} />
+          Explore Catalog & Start Shopping
         </Link>
       </div>
     );
   }
 
-  const weightProgress = Math.min(100, (cart.totalWeightGrams / 5000) * 100);
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-6xl mx-auto space-y-8 pb-16">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Your Drone Delivery Cart</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {cart.itemCount} items ready for packing at regional launch hub
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+            Drone Delivery Cart
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {itemCount} {itemCount === 1 ? "item" : "items"} ready for autonomous packaging & flight dispatch
           </p>
         </div>
-        <button
-          type="button"
-          onClick={clearCart}
-          className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
-        >
-          Clear Cart
-        </button>
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => clearCart()}
+            className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
+          >
+            Clear all items
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Item List */}
+        {/* Items List */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 divide-y divide-slate-100 dark:divide-slate-800 shadow-sm">
-            {cart.items.map((item) => {
-              const formattedItemTotal = `$${((item.product.priceCents * item.quantity) / 100).toFixed(2)}`;
+          {/* Free Delivery Banner */}
+          <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-600 text-white">
+              <ZapIcon size={16} />
+            </div>
+            <div className="flex-1 text-xs">
+              {amountNeededForFreeDelivery > 0 ? (
+                <p className="text-emerald-800 dark:text-emerald-300 font-medium">
+                  Add <strong className="font-bold">{formatINR(amountNeededForFreeDelivery)}</strong> more for <strong>FREE Drone AirDrop</strong>!
+                </p>
+              ) : (
+                <p className="text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-1">
+                  <CheckIcon size={14} /> Congratulations! You unlocked FREE Autonomous Drone AirDrop.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
+            {items.map((item) => {
+              const p = item.product;
+              const unitPrice = p.pricePaise || p.priceCents || 0;
+              const lineTotal = unitPrice * item.quantity;
+
               return (
-                <div key={item.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-4 py-4 border-b border-slate-100 dark:border-slate-800 last:border-0"
+                >
                   <div className="flex items-center gap-4">
                     <img
-                      src={item.product.imageUrl}
-                      alt={item.product.name}
-                      className="w-16 h-16 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      src={p.imageUrl}
+                      alt={p.name}
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 flex-shrink-0"
                     />
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{item.product.name}</h4>
+                    <div className="space-y-1">
+                      <Link
+                        href={`/customer/products/${p.id}`}
+                        className="font-bold text-sm text-slate-900 dark:text-slate-100 hover:text-brand-600 transition line-clamp-1"
+                      >
+                        {p.name}
+                      </Link>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        ${(item.product.priceCents / 100).toFixed(2)} each • {item.product.weightGrams}g
+                        {p.weightGrams >= 1000 ? `${(p.weightGrams / 1000).toFixed(1)}kg` : `${p.weightGrams}g`} • {formatINR(unitPrice)} each
+                      </p>
+                      <p className="text-xs font-black text-slate-900 dark:text-slate-100">
+                        Total: {formatINR(lineTotal)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    {/* Quantity Selector */}
-                    <div className="flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 rounded-xl p-1 bg-white dark:bg-slate-800">
+                  {/* Quantity Controller & Delete */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 p-1">
                       <button
                         type="button"
-                        onClick={() =>
-                          item.quantity === 1 ? removeCartItem(item.id) : updateCartQuantity(item.id, item.quantity - 1)
-                        }
-                        className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        onClick={() => {
+                          if (item.quantity === 1) {
+                            removeCartItem(item.id);
+                          } else {
+                            updateCartQuantity(item.id, item.quantity - 1);
+                          }
+                        }}
+                        className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                       >
-                        <MinusIcon size={12} />
+                        <MinusIcon size={14} />
                       </button>
-                      <span className="w-6 text-center text-xs font-bold">{item.quantity}</span>
+                      <span className="w-7 text-center text-xs font-bold text-slate-900 dark:text-slate-100">
+                        {item.quantity}
+                      </span>
                       <button
                         type="button"
                         onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                        className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                       >
-                        <PlusIcon size={12} />
+                        <PlusIcon size={14} />
                       </button>
                     </div>
-
-                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100 w-16 text-right">
-                      {formattedItemTotal}
-                    </span>
 
                     <button
                       type="button"
                       onClick={() => removeCartItem(item.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-500 transition"
+                      className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
                       aria-label="Remove item"
                     >
                       <TrashIcon size={16} />
@@ -130,89 +178,93 @@ export default function CustomerCartPage() {
               );
             })}
           </div>
-
-          {/* Drone Payload Meter */}
-          <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <DroneIcon size={16} className="text-brand-500" /> Total Drone Payload
-              </span>
-              <span className="font-bold text-slate-900 dark:text-slate-100">
-                {cart.totalWeightGrams}g / 5,000g max
-              </span>
-            </div>
-            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-500 rounded-full ${
-                  cart.isDronePayloadCompliant ? "bg-emerald-500" : "bg-rose-500"
-                }`}
-                style={{ width: `${weightProgress}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-500">
-              {cart.isDronePayloadCompliant
-                ? "✓ Optimal cargo weight for single autonomous flight dispatch."
-                : "⚠️ Exceeds hexacopter payload safety threshold."}
-            </p>
-          </div>
         </div>
 
-        {/* Right Summary & Checkout Box */}
-        <div className="space-y-4">
+        {/* Payload Meter & Price Summary */}
+        <div className="space-y-6">
+          {/* Drone Payload Meter Card */}
           <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">Order Summary</h3>
-
-            <div className="space-y-2.5 text-xs">
-              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                <span>Items Subtotal</span>
-                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                  ${(cart.subtotalCents / 100).toFixed(2)}
-                </span>
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                <DroneIcon size={20} />
               </div>
-              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                <span className="flex items-center gap-1">
-                  <span>Drone AirDrop Fee</span>
-                  {cart.deliveryFeeCents === 0 && (
-                    <span className="px-1.5 py-0.2 text-[9px] font-bold bg-emerald-500/10 text-emerald-600 rounded">
-                      FREE PROMO
-                    </span>
-                  )}
-                </span>
-                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                  {cart.deliveryFeeCents === 0 ? "$0.00" : `$${(cart.deliveryFeeCents / 100).toFixed(2)}`}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                <span>Flight Corridor Insurance</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Included (Free)</span>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Drone Payload Capacity</h3>
+                <p className="text-[11px] text-slate-500">Operational flight delivery limit: 4.0 kg</p>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-baseline justify-between">
-              <div>
-                <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Total Price</span>
-                <p className="text-[10px] text-slate-400">Taxes calculated</p>
+            {/* Capacity Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-600 dark:text-slate-400">
+                  Gross: {(grossWeightGrams / 1000).toFixed(2)} kg
+                </span>
+                <span className={isPayloadExceeded ? "text-rose-600 font-bold" : "text-slate-500"}>
+                  Limit: 4.00 kg
+                </span>
               </div>
-              <span className="text-2xl font-black text-slate-900 dark:text-slate-100">
-                ${(cart.totalCents / 100).toFixed(2)}
-              </span>
+              <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    isPayloadExceeded
+                      ? "bg-rose-500"
+                      : grossWeightGrams > 3000
+                      ? "bg-amber-500"
+                      : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(100, (grossWeightGrams / 4000) * 100)}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {isPayloadExceeded ? (
+                  <span className="text-rose-500 font-bold flex items-center gap-1 mt-1">
+                    <AlertTriangleIcon size={12} />
+                    Payload exceeds 4.0 kg by {(grossWeightGrams - 4000)}g. Please decrease quantities to proceed.
+                  </span>
+                ) : (
+                  <span>Remaining payload room: <strong>{(remainingCapacityGrams / 1000).toFixed(2)} kg</strong></span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Bill Summary */}
+          <div className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Payment Summary</h3>
+
+            <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
+              <div className="flex justify-between">
+                <span>Items Subtotal</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">{formatINR(subtotalPaise)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Drone Flight Delivery Fee</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
+                  {deliveryFeePaise === 0 ? <span className="text-emerald-500">FREE</span> : formatINR(deliveryFeePaise)}
+                </span>
+              </div>
+              {savingsPaise > 0 && (
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span>Total Discount Savings</span>
+                  <span>- {formatINR(savingsPaise)}</span>
+                </div>
+              )}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between text-base font-black text-slate-900 dark:text-slate-100">
+                <span>Total Payable</span>
+                <span className="text-brand-600 dark:text-brand-400">{formatINR(totalPaise)}</span>
+              </div>
             </div>
 
             <button
               type="button"
+              disabled={isPayloadExceeded || items.length === 0}
               onClick={() => router.push("/customer/checkout")}
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 active:scale-[0.98] text-white text-sm font-bold shadow-xl shadow-brand-500/25 flex items-center justify-center gap-2 transition"
+              className="w-full py-4 rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-[0.99] text-white text-sm font-bold shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ZapIcon size={18} />
               <span>Proceed to Drone Checkout</span>
+              <ArrowRightIcon size={16} />
             </button>
-
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-500 space-y-1">
-              <p className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                <ShieldIcon size={12} className="text-emerald-500" /> SkyNav Delivery Guarantee
-              </p>
-              <p>Autonomous high-altitude corridor with tethered drop or soft precision touchdown.</p>
-            </div>
           </div>
         </div>
       </div>

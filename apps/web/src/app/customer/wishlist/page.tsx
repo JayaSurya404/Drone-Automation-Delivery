@@ -2,94 +2,90 @@
 
 import React from "react";
 import Link from "next/link";
-import { useCart } from "../../../features/commerce/cart-context";
-import { HeartIcon, ShoppingCartIcon, TrashIcon, ChevronRightIcon } from "@skynav/ui";
+import { useCart, formatINR } from "../../../features/commerce/cart-context";
+import { HeartIcon, ShoppingCartIcon, TrashIcon, ArrowLeftIcon } from "@skynav/ui";
 
-export default function CustomerWishlistPage() {
-  const { wishlist, addToCart, removeFromWishlist, isLoadingWishlist } = useCart();
+export default function WishlistPage() {
+  const { wishlist, removeFromWishlist, addToCart, isLoadingWishlist } = useCart();
+  const items = wishlist?.items || [];
 
-  if (isLoadingWishlist) {
+  if (items.length === 0 && !isLoadingWishlist) {
     return (
-      <div className="py-16 flex justify-center">
-        <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!wishlist || wishlist.items.length === 0) {
-    return (
-      <div className="text-center py-20 bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm animate-in fade-in duration-300">
-        <div className="w-20 h-20 mx-auto mb-4 rounded-3xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
-          <HeartIcon size={40} />
+      <div className="max-w-md mx-auto py-16 text-center space-y-4">
+        <div className="w-16 h-16 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+          <HeartIcon size={32} />
         </div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Wishlist is Empty</h2>
-        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2">
-          Save your favorite groceries, medical essentials, and snacks for fast 1-click drone delivery later.
+        <p className="text-xs text-slate-500">
+          Save your favorite Indian groceries and snacks to order anytime with 1-click drone delivery.
         </p>
         <Link
           href="/customer"
-          className="mt-6 inline-flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-2xl shadow-lg shadow-brand-500/25 transition"
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md transition"
         >
-          <span>Browse Products</span>
-          <ChevronRightIcon size={16} />
+          Explore Catalog
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Saved Wishlist</h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          {wishlist.total} saved items ready for instant drone ordering
-        </p>
+    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+      <Link
+        href="/customer"
+        className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-brand-600 transition"
+      >
+        <ArrowLeftIcon size={14} /> Back to Store
+      </Link>
+
+      <div className="space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          Saved Wishlist ({items.length})
+        </h1>
+        <p className="text-xs text-slate-500">Your bookmarked products</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {wishlist.items.map((item) => (
-          <div
-            key={item.id}
-            className="flex flex-col justify-between bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-md transition"
-          >
-            <div>
-              <Link href={`/customer/products/${item.product.id}`} className="block relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-3">
-                <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover" />
-              </Link>
-              <div className="text-[10px] font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider mb-1">
-                {item.product.category}
-              </div>
-              <h4 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-1">
-                {item.product.name}
-              </h4>
-              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1">
-                ${(item.product.priceCents / 100).toFixed(2)}
-              </p>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {items.map((item) => {
+          const p = item.product;
+          const price = formatINR(p.pricePaise || p.priceCents || 0);
 
-            <div className="flex items-center gap-2 pt-3 mt-3 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={async () => {
-                  await addToCart(item.product, 1);
-                  await removeFromWishlist(item.product.id);
-                }}
-                className="flex-1 py-2 px-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-              >
-                <ShoppingCartIcon size={14} />
-                <span>Move to Cart</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => removeFromWishlist(item.product.id)}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-500 transition"
-                aria-label="Remove"
-              >
-                <TrashIcon size={16} />
-              </button>
+          return (
+            <div
+              key={item.id}
+              className="bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3"
+            >
+              <img
+                src={p.imageUrl}
+                alt={p.name}
+                className="w-full aspect-square object-cover rounded-xl bg-slate-100 dark:bg-slate-800"
+              />
+              <div>
+                <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400 uppercase">{p.category}</span>
+                <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-1">{p.name}</h4>
+                <p className="text-sm font-black text-slate-900 dark:text-slate-100 mt-1">{price}</p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => addToCart(p, 1)}
+                  className="flex-1 py-2 px-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition"
+                >
+                  <ShoppingCartIcon size={14} /> Add to Cart
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeFromWishlist(p.id)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
+                  aria-label="Remove"
+                >
+                  <TrashIcon size={16} />
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

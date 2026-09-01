@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  COMMERCE_CONFIG,
   productResponseSchema,
   productListResponseSchema,
   cartResponseSchema,
@@ -873,19 +874,23 @@ describe("Contracts / Computer Vision & Perception Schemas", () => {
 });
 
 
+
 describe("Contracts / Ecommerce Domain Schemas", () => {
-  it("validates Product and ProductList contracts", () => {
+  it("validates Product and ProductList contracts in Indian market format (INR paise, MRP, discounts)", () => {
     const sampleProduct = {
       id: "11111111-1111-1111-1111-111111111111",
-      name: "Organic Honeycrisp Apples (1kg)",
-      slug: "organic-honeycrisp-apples-1kg",
-      description: "Farm-fresh organic crisp apples packed in shock-absorbing eco pouch.",
+      name: "Aashirvaad Superior MP Atta (1kg)",
+      slug: "aashirvaad-superior-mp-atta-1kg",
+      description: "100% pure whole wheat flour processed with traditional stone grinding.",
       category: "Groceries",
-      priceCents: 699,
-      currency: "USD",
-      imageUrl: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6",
+      pricePaise: 6200,
+      mrpPaise: 7500,
+      discountPercent: 17,
+      priceCents: 6200,
+      currency: "INR",
+      imageUrl: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b",
       stockQuantity: 45,
-      weightGrams: 1050,
+      weightGrams: 1000,
       isDroneEligible: true,
       isFeatured: true,
       isActive: true,
@@ -893,8 +898,10 @@ describe("Contracts / Ecommerce Domain Schemas", () => {
       updatedAt: new Date().toISOString()
     };
     const parsed = productResponseSchema.parse(sampleProduct);
-    assert.equal(parsed.slug, "organic-honeycrisp-apples-1kg");
-    assert.equal(parsed.priceCents, 699);
+    assert.equal(parsed.slug, "aashirvaad-superior-mp-atta-1kg");
+    assert.equal(parsed.pricePaise, 6200);
+    assert.equal(parsed.mrpPaise, 7500);
+    assert.equal(parsed.currency, "INR");
 
     const sampleList = {
       data: [sampleProduct],
@@ -904,7 +911,7 @@ describe("Contracts / Ecommerce Domain Schemas", () => {
     assert.equal(parsedList.data.length, 1);
   });
 
-  it("validates Cart and Wishlist contracts", () => {
+  it("validates Cart and Wishlist contracts with configurable payload and INR totals", () => {
     const sampleCart = {
       items: [
         {
@@ -912,15 +919,17 @@ describe("Contracts / Ecommerce Domain Schemas", () => {
           productId: "11111111-1111-1111-1111-111111111111",
           product: {
             id: "11111111-1111-1111-1111-111111111111",
-            name: "Emergency First Aid Trauma Pack",
-            slug: "emergency-first-aid-trauma-pack",
-            description: "Sterile gauze, tourniquet, antiseptic wipes.",
-            category: "Emergency Supplies",
-            priceCents: 3499,
-            currency: "USD",
-            imageUrl: "https://images.unsplash.com/photo-1603398938378-e54eab446dde",
-            stockQuantity: 20,
-            weightGrams: 650,
+            name: "Tata Tea Gold Premium Blend (250g)",
+            slug: "tata-tea-gold-premium-blend-250g",
+            description: "Exquisite tea leaves infused with aromatic long leaves.",
+            category: "Snacks & Beverages",
+            pricePaise: 14000,
+            mrpPaise: 16000,
+            discountPercent: 13,
+            currency: "INR",
+            imageUrl: "https://images.unsplash.com/photo-1576092768241-dec231879fc3",
+            stockQuantity: 30,
+            weightGrams: 250,
             isDroneEligible: true,
             isFeatured: true,
             isActive: true,
@@ -933,16 +942,25 @@ describe("Contracts / Ecommerce Domain Schemas", () => {
         }
       ],
       itemCount: 2,
-      totalWeightGrams: 1300,
-      subtotalCents: 6998,
-      deliveryFeeCents: 0,
-      totalCents: 6998,
-      currency: "USD",
+      totalWeightGrams: 500,
+      packagingWeightGrams: 200,
+      grossWeightGrams: 700,
+      operationalPayloadLimitGrams: COMMERCE_CONFIG.OPERATIONAL_PAYLOAD_LIMIT_GRAMS,
+      remainingCapacityGrams: 3300,
+      isPayloadExceeded: false,
+      subtotalPaise: 28000,
+      deliveryFeePaise: 3900,
+      totalPaise: 31900,
+      savingsPaise: 4000,
+      currency: "INR",
       isDronePayloadCompliant: true
     };
     const parsedCart = cartResponseSchema.parse(sampleCart);
     assert.equal(parsedCart.itemCount, 2);
-    assert.equal(parsedCart.totalCents, 6998);
+    assert.equal(parsedCart.grossWeightGrams, 700);
+    assert.equal(parsedCart.totalPaise, 31900);
+    assert.equal(parsedCart.operationalPayloadLimitGrams, 4000);
+    assert.equal(parsedCart.isPayloadExceeded, false);
 
     const sampleWishlist = {
       items: [
@@ -959,25 +977,27 @@ describe("Contracts / Ecommerce Domain Schemas", () => {
     assert.equal(parsedWishlist.total, 1);
   });
 
-  it("validates Customer Address contracts", () => {
+  it("validates Indian Customer Address contracts with coordinates", () => {
     const sampleAddress = {
       id: "44444444-4444-4444-4444-444444444444",
       userId: "55555555-5555-5555-5555-555555555555",
-      recipientName: "Dr. Evelyn Reed",
-      phone: "+1-415-555-0199",
-      addressLine1: "500 Parnassus Ave",
-      city: "San Francisco",
-      state: "CA",
-      postalCode: "94143",
-      latitude: 37.7631,
-      longitude: -122.4586,
-      deliveryInstructions: "Place package directly inside rooftop fiducial landing marker #4.",
+      recipientName: "Aarav Sharma",
+      phone: "+91-9876543210",
+      addressLine1: "Flat 402, Prestige Tower, 12th Main Road",
+      addressLine2: "HAL 2nd Stage, Indiranagar",
+      city: "Bengaluru",
+      state: "Karnataka",
+      postalCode: "560038",
+      latitude: 12.9716,
+      longitude: 77.5946,
+      deliveryInstructions: "Place package directly on the rooftop drone landing marker #2.",
       isDefault: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     const parsed = customerAddressResponseSchema.parse(sampleAddress);
-    assert.equal(parsed.recipientName, "Dr. Evelyn Reed");
-    assert.equal(parsed.latitude, 37.7631);
+    assert.equal(parsed.recipientName, "Aarav Sharma");
+    assert.equal(parsed.city, "Bengaluru");
+    assert.equal(parsed.latitude, 12.9716);
   });
 });

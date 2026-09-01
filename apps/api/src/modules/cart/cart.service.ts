@@ -1,5 +1,11 @@
 import type { CartRepository } from "./cart.repository.js";
-import type { AuthenticatedUser, CartResponse, AddToCartRequest, UpdateCartItemRequest } from "@skynav/contracts";
+import {
+  COMMERCE_CONFIG,
+  type AuthenticatedUser,
+  type CartResponse,
+  type AddToCartRequest,
+  type UpdateCartItemRequest
+} from "@skynav/contracts";
 import type { CatalogRepository } from "../catalog/catalog.repository.js";
 import { AuthError } from "../auth/auth.service.js";
 
@@ -14,15 +20,23 @@ export interface CartService {
 export function createCartService(cartRepo: CartRepository, catalogRepo: CatalogRepository): CartService {
   async function computeCartResponse(userId: string): Promise<CartResponse> {
     const rows = await cartRepo.getCart(userId);
-    let subtotalCents = 0;
+    let subtotalPaise = 0;
+    let mrpTotalPaise = 0;
     let totalWeightGrams = 0;
     let itemCount = 0;
 
     const items = rows.map((r) => {
       const qty = r.quantity;
-      const itemSubtotal = r.price_cents * qty;
+      const pricePaise = r.price_cents || 0;
+      const mrpPaise = r.mrp_cents || Math.round(pricePaise * 1.15);
+      const discountPercent = mrpPaise > pricePaise ? Math.round(((mrpPaise - pricePaise) / mrpPaise) * 100) : 0;
+
+      const itemSubtotal = pricePaise * qty;
+      const itemMrpTotal = mrpPaise * qty;
       const itemWeight = r.weight_grams * qty;
-      subtotalCents += itemSubtotal;
+
+      subtotalPaise += itemSubtotal;
+      mrpTotalPaise += itemMrpTotal;
       totalWeightGrams += itemWeight;
       itemCount += qty;
 
@@ -35,8 +49,11 @@ export function createCartService(cartRepo: CartRepository, catalogRepo: Catalog
           slug: r.slug,
           description: r.description,
           category: r.category,
-          priceCents: r.price_cents,
-          currency: r.currency || "USD",
+          pricePaise,
+          mrpPaise,
+          discountPercent,
+          priceCents: pricePaise,
+          currency: r.currency || "INR",
           imageUrl: r.image_url,
           stockQuantity: r.stock_quantity,
           weightGrams: r.weight_grams,
@@ -55,19 +72,38 @@ export function createCartService(cartRepo: CartRepository, catalogRepo: Catalog
       };
     });
 
-    // Free drone delivery promo if subtotal > $35 (3500 cents), else standard $4.99 (499 cents)
-    const deliveryFeeCents = itemCount > 0 && subtotalCents < 3500 ? 499 : 0;
-    const totalCents = subtotalCents + deliveryFeeCents;
-    const isDronePayloadCompliant = totalWeightGrams <= 5000;
+    const packagingWeightGrams = itemCount > 0 ? COMMERCE_CONFIG.PACKAGING_ALLOWANCE_GRAMS : 0;
+    const grossWeightGrams = totalWeightGrams + packagingWeightGrams;
+    const operationalPayloadLimitGrams = COMMERCE_CONFIG.OPERATIONAL_PAYLOAD_LIMIT_GRAMS;
+    const isPayloadExceeded = grossWeightGrams > operationalPayloadLimitGrams;
+    const remainingCapacityGrams = Math.max(0, operationalPayloadLimitGrams - grossWeightGrams);
+    const isDronePayloadCompliant = !isPayloadExceeded;
+
+    // Free drone delivery on orders >= ₹499 (49900 paise), else ₹39 (3900 paise)
+    const deliveryFeePaise =
+      itemCount > 0 && subtotalPaise < COMMERCE_CONFIG.FREE_DELIVERY_THRESHOLD_PAISE
+        ? COMMERCE_CONFIG.STANDARD_DELIVERY_FEE_PAISE
+        : 0;
+    const totalPaise = subtotalPaise + deliveryFeePaise;
+    const savingsPaise = Math.max(0, mrpTotalPaise - subtotalPaise);
 
     return {
       items,
       itemCount,
       totalWeightGrams,
-      subtotalCents,
-      deliveryFeeCents,
-      totalCents,
-      currency: "USD",
+      packagingWeightGrams,
+      grossWeightGrams,
+      operationalPayloadLimitGrams,
+      remainingCapacityGrams,
+      isPayloadExceeded,
+      subtotalPaise,
+      deliveryFeePaise,
+      totalPaise,
+      savingsPaise,
+      subtotalCents: subtotalPaise,
+      deliveryFeeCents: deliveryFeePaise,
+      totalCents: totalPaise,
+      currency: "INR",
       isDronePayloadCompliant
     };
   }
@@ -87,7 +123,11 @@ export function createCartService(cartRepo: CartRepository, catalogRepo: Catalog
     },
 
     async updateCartItem(user, itemId, input) {
-      await cartRepo.updateQuantity(user.id, itemId, input.quantity);
+      if (input.quantity <= 0) {
+        await cartRepo.removeItem(user.id, itemId);
+      } else {
+        await cartRepo.updateQuantity(user.id, itemId, input.quantity);
+      }
       return computeCartResponse(user.id);
     },
 

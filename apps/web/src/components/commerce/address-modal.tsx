@@ -14,14 +14,14 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({
     recipientName: "",
-    phone: "",
+    phone: "+91-",
     addressLine1: "",
     addressLine2: "",
-    city: "San Francisco",
-    state: "CA",
-    postalCode: "94105",
-    latitude: 37.7749,
-    longitude: -122.4194,
+    city: "Bengaluru",
+    state: "Karnataka",
+    postalCode: "560038",
+    latitude: 12.9716,
+    longitude: 77.5946,
     deliveryInstructions: "",
     isDefault: true
   });
@@ -53,10 +53,11 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
             </div>
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-slate-100">Drone Landing Locations</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Select or add your rooftop / backyard drop zone</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Select rooftop, balcony or open yard landing pad</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
@@ -74,7 +75,9 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
                     <MapPinIcon size={24} />
                   </div>
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No saved landing addresses</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Add your rooftop pad or front lawn landing coordinates for autonomous delivery.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Add your rooftop pad or lawn marker in Bengaluru, Mumbai or Delhi NCR for instant drone delivery.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -100,12 +103,12 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
                             )}
                           </div>
                           <p className="text-xs text-slate-600 dark:text-slate-300">{addr.addressLine1} {addr.addressLine2}</p>
-                          <p className="text-xs text-slate-500">{addr.city}, {addr.state} {addr.postalCode} • {addr.phone}</p>
+                          <p className="text-xs text-slate-500">{addr.city}, {addr.state} - {addr.postalCode} • {addr.phone}</p>
                           <p className="text-[11px] font-mono text-brand-600 dark:text-brand-400 flex items-center gap-1 mt-1">
-                            <MapPinIcon size={12} /> {addr.latitude.toFixed(4)}°N, {addr.longitude.toFixed(4)}°W
+                            <MapPinIcon size={12} /> {addr.latitude.toFixed(4)}°N, {addr.longitude.toFixed(4)}°E
                           </p>
                           {addr.deliveryInstructions && (
-                            <p className="text-xs text-slate-500 italic mt-1">Note: {addr.deliveryInstructions}</p>
+                            <p className="text-xs text-slate-500 italic mt-1">Drop Guide: {addr.deliveryInstructions}</p>
                           )}
                         </div>
                         <div className="flex flex-col items-end gap-2">
@@ -136,7 +139,7 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
                 onClick={() => setIsAdding(true)}
                 className="w-full py-3 flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-brand-500 hover:text-brand-600 transition"
               >
-                <PlusIcon size={16} /> Add New Drone Landing Address
+                <PlusIcon size={16} /> + Add New Landing Address (India)
               </button>
             </>
           ) : (
@@ -150,31 +153,42 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
                     value={formData.recipientName}
                     onChange={(e) => setFormData({ ...formData, recipientName: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="Jane Doe"
+                    placeholder="Aarav Sharma"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Phone</label>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Mobile Number</label>
                   <input
                     type="tel"
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="+1 (555) 019-2834"
+                    placeholder="+91-9876543210"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Street Address</label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Flat / House No., Apartment Name</label>
                 <input
                   type="text"
                   required
                   value={formData.addressLine1}
                   onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  placeholder="500 Market St, Apt 4B"
+                  placeholder="Flat 402, Prestige Tower, 12th Main Road"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Area / Locality / Street</label>
+                <input
+                  type="text"
+                  value={formData.addressLine2}
+                  onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="HAL 2nd Stage, Indiranagar"
                 />
               </div>
 
@@ -200,7 +214,7 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">ZIP Code</label>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">PIN Code</label>
                   <input
                     type="text"
                     required
@@ -213,7 +227,7 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Latitude</label>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Landing Latitude</label>
                   <input
                     type="number"
                     step="any"
@@ -224,7 +238,7 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Longitude</label>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Landing Longitude</label>
                   <input
                     type="number"
                     step="any"
@@ -237,13 +251,13 @@ export function AddressModal({ isOpen, onClose }: AddressModalProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Landing Pad Instructions</label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Landing Pad Drop Instructions</label>
                 <textarea
                   rows={2}
                   value={formData.deliveryInstructions}
                   onChange={(e) => setFormData({ ...formData, deliveryInstructions: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  placeholder="e.g. Center landing marker on rooftop deck. Keep clear of overhead wires."
+                  placeholder="e.g. Center marker on rooftop terrace. Keep clear of clotheslines."
                 />
               </div>
 

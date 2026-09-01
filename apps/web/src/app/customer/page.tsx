@@ -1,197 +1,290 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import React, { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { ProductResponse } from "@skynav/contracts";
 import { ProductCard } from "../../components/commerce/product-card";
-import { DroneIcon, SparklesIcon, ZapIcon, FilterIcon, RefreshIcon } from "@skynav/ui";
+import { DroneIcon, SearchIcon, ZapIcon, CheckIcon } from "@skynav/ui";
 
 const CATEGORIES = [
   "All",
   "Groceries",
-  "Pharmacy",
-  "Food & Beverages",
-  "Electronics",
-  "Essentials",
-  "Emergency Supplies",
-  "Documents"
+  "Daily Essentials",
+  "Snacks & Beverages",
+  "Personal Care",
+  "Household Essentials",
+  "Pharmacy & Wellness",
+  "Small Electronics"
 ];
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-export default function CustomerStorefrontPage() {
+export default function CustomerStorePage() {
   let searchParamQuery = "";
   try {
-    const searchParams = useSearchParams();
-    searchParamQuery = searchParams.get("search") || "";
+    const sp = useSearchParams();
+    if (sp) searchParamQuery = sp.get("search") || "";
   } catch {}
-  let router: any = { push: () => {}, replace: () => {} };
-  try { router = useRouter(); } catch {}
 
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [localSearch, setLocalSearch] = useState<string>(searchParamQuery);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProducts = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const url = new URL(`${API_BASE_URL}/api/v1/products`);
-      if (selectedCategory !== "All") {
-        url.searchParams.set("category", selectedCategory);
-      }
-      if (searchParamQuery) {
-        url.searchParams.set("search", searchParamQuery);
-      }
-      url.searchParams.set("limit", "50");
+  useEffect(() => {
+    setLocalSearch(searchParamQuery);
+  }, [searchParamQuery]);
 
-      const res = await fetch(url.toString());
-      if (res.ok) {
-        const json = await res.json();
-        setProducts(json.data || []);
-      } else {
-        setError("Failed to load products from store database.");
-      }
+  const loadProducts = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await fetch(`${API_BASE_URL}/api/v1/products?limit=100`);
+      if (!res.ok) throw new Error("Failed to load products");
+      const json = await res.json();
+      setProducts(json.data || []);
     } catch (err: any) {
-      setError(err.message || "Network error loading store catalog.");
+      setError(err.message || "Failed to load product catalog");
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategory, searchParamQuery]);
+  };
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    loadProducts();
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchesCat = selectedCategory === "All" || p.category.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesSearch =
+        !localSearch.trim() ||
+        p.name.toLowerCase().includes(localSearch.toLowerCase()) ||
+        p.description.toLowerCase().includes(localSearch.toLowerCase()) ||
+        p.category.toLowerCase().includes(localSearch.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [products, selectedCategory, localSearch]);
+
+  const dailyEssentials = useMemo(
+    () => products.filter((p) => p.category === "Daily Essentials"),
+    [products]
+  );
+  const groceries = useMemo(
+    () => products.filter((p) => p.category === "Groceries"),
+    [products]
+  );
+  const snacks = useMemo(
+    () => products.filter((p) => p.category === "Snacks & Beverages"),
+    [products]
+  );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Hero Delivery Banner */}
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-brand-950 to-indigo-950 text-white p-6 sm:p-10 border border-slate-800 shadow-2xl">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent pointer-events-none" />
+    <div className="space-y-8 pb-16">
+      {/* Quick-Commerce Hero Banner */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-10 shadow-2xl border border-indigo-900/50">
         <div className="relative z-10 max-w-2xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 border border-brand-500/30 text-xs font-semibold text-cyan-300">
-            <SparklesIcon size={14} />
-            <span>Autonomous Aerial Logistics</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 border border-brand-500/40 text-brand-300 text-xs font-bold tracking-wide">
+            <ZapIcon size={14} className="text-amber-400" />
+            <span>INSTANT AUTONOMOUS AIRDROP • BENGALURU & METRO CORRIDORS</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
-            Order Groceries, Pharmacy & Essentials Dropped by Drone in 15 Mins
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight">
+            Daily Essentials Delivered in{" "}
+            <span className="bg-gradient-to-r from-amber-300 via-emerald-300 to-cyan-300 bg-clip-text text-transparent">
+              12–15 Minutes
+            </span>
           </h1>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-            Ultra-fast precision delivery straight to your designated rooftop or landing pad marker. Zero traffic delays, 100% electric.
+            Fresh milk, atta, tea, medicines, and snacks dropped smoothly directly onto your rooftop or garden landing marker.
           </p>
 
-          <div className="flex flex-wrap items-center gap-4 pt-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-200">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Fleet Active in San Francisco Corridor</span>
+          <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-slate-300">
+            <div className="flex items-center gap-1.5 font-medium">
+              <span className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                <CheckIcon size={12} />
+              </span>
+              ₹0 Delivery on ₹499+
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-amber-300 font-semibold">
-              <ZapIcon size={14} />
-              <span>Free Delivery on Orders Over $35</span>
+            <div className="flex items-center gap-1.5 font-medium">
+              <span className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                <CheckIcon size={12} />
+              </span>
+              Precision Landing Guarantee
+            </div>
+            <div className="flex items-center gap-1.5 font-medium">
+              <span className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                <CheckIcon size={12} />
+              </span>
+              Up to 4.0 kg Flight Capacity
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Category Pills Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {CATEGORIES.map((cat) => {
-          const isSelected = selectedCategory === cat;
-          return (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition duration-200 ${
-                isSelected
-                  ? "bg-brand-600 text-white shadow-md shadow-brand-500/20"
-                  : "bg-surface-card dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-brand-400 hover:text-brand-600"
-              }`}
-            >
-              {cat}
-            </button>
-          );
-        })}
-      </div>
+        <div className="absolute -right-10 -bottom-10 w-96 h-96 bg-brand-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden lg:flex items-center justify-center w-48 h-48 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+          <DroneIcon size={80} className="text-brand-400 animate-pulse" />
+        </div>
+      </section>
 
-      {/* Store Catalog Content */}
-      <div className="space-y-4">
+      {/* Category Navigation Pills */}
+      <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <span>{selectedCategory === "All" ? "Featured Products" : selectedCategory}</span>
-              {searchParamQuery && (
-                <span className="text-xs font-normal text-slate-500">
-                  matching &quot;{searchParamQuery}&quot;
-                </span>
-              )}
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Verified drone-payload compliant products ready for instant flight dispatch
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={fetchProducts}
-            className="p-2 text-slate-500 hover:text-brand-600 dark:text-slate-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-            title="Refresh Products"
-          >
-            <RefreshIcon size={16} />
-          </button>
+          <h2 className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
+            Shop by Category
+          </h2>
+          {localSearch && (
+            <button
+              onClick={() => {
+                setLocalSearch("");
+                setSelectedCategory("All");
+              }}
+              className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
 
-        {/* Loading / Error / Products Grid */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {CATEGORIES.map((cat) => {
+            const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition shadow-sm ${
+                  isSelected
+                    ? "bg-brand-600 text-white shadow-brand-500/25"
+                    : "bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Dynamic Products Grid */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <span>{selectedCategory === "All" ? "All Products" : selectedCategory}</span>
+            <span className="text-xs font-normal text-slate-400">({filteredProducts.length} items)</span>
+          </h3>
+        </div>
+
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="h-72 rounded-2xl bg-slate-200 dark:bg-slate-800/60 animate-pulse border border-slate-100 dark:border-slate-800"
-              />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="h-64 rounded-2xl bg-slate-200 dark:bg-slate-800 animate-pulse" />
             ))}
           </div>
         ) : error ? (
-          <div className="p-8 text-center bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 rounded-2xl">
+          <div className="p-8 text-center bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 rounded-2xl">
             <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">{error}</p>
             <button
               type="button"
-              onClick={fetchProducts}
-              className="mt-3 px-4 py-1.5 text-xs font-semibold text-white bg-rose-600 rounded-lg shadow"
+              onClick={loadProducts}
+              className="mt-3 px-4 py-1.5 text-xs font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition"
             >
-              Try Again
+              Retry
             </button>
           </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-16 bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center">
-              <DroneIcon size={32} />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">No products found</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
-              {searchParamQuery
-                ? `We couldn't find any products matching "${searchParamQuery}". Try adjusting your search or category.`
-                : "No products are currently available in this category."}
-            </p>
-            {searchParamQuery && (
-              <button
-                type="button"
-                onClick={() => router.push("/customer")}
-                className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-xl transition"
-              >
-                Clear Search Filter
-              </button>
-            )}
+        ) : filteredProducts.length === 0 ? (
+          <div className="py-12 text-center bg-surface-card dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+            <p className="text-base font-semibold text-slate-700 dark:text-slate-300">No products found</p>
+            <p className="text-xs text-slate-500 mt-1">Try searching for other groceries, beverages or essentials.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {products.map((product) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
-      </div>
+      </section>
+
+      {/* Featured Section: Popular Daily Essentials */}
+      {!localSearch && selectedCategory === "All" && dailyEssentials.length > 0 && (
+        <section className="space-y-4 pt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <span>⚡ Popular Daily Essentials</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Fresh milk, bread, eggs, curd & mineral water</p>
+            </div>
+            <button
+              onClick={() => setSelectedCategory("Daily Essentials")}
+              className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline"
+            >
+              View All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {dailyEssentials.slice(0, 6).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Featured Section: Fresh Groceries & Staples */}
+      {!localSearch && selectedCategory === "All" && groceries.length > 0 && (
+        <section className="space-y-4 pt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
+                🌾 Kitchen Groceries & Staples
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Atta, Basmati rice, pulses, cooking oils and salts</p>
+            </div>
+            <button
+              onClick={() => setSelectedCategory("Groceries")}
+              className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline"
+            >
+              View All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {groceries.slice(0, 6).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Featured Section: Snacks & Beverages */}
+      {!localSearch && selectedCategory === "All" && snacks.length > 0 && (
+        <section className="space-y-4 pt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
+                ☕ Snacks, Tea & Quick Bites
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Tata Tea Gold, Nescafe, Maggi, Haldiram's Bhujia & chocolates</p>
+            </div>
+            <button
+              onClick={() => setSelectedCategory("Snacks & Beverages")}
+              className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline"
+            >
+              View All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {snacks.slice(0, 6).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
