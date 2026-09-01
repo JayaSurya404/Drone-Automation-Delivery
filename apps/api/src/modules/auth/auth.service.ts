@@ -86,7 +86,7 @@ export function createAuthService(
   return {
     async register(input: RegisterRequest): Promise<AuthResponse> {
       const email = input.email.toLowerCase().trim();
-      const configuredAdmin = (process.env.ADMIN_USERNAME || "admin@skynav.test").toLowerCase().trim();
+      const configuredAdmin = (process.env.ADMIN_USERNAME || "drone@gmail.com").toLowerCase().trim();
 
       if (email === configuredAdmin || email === "admin" || email.startsWith("admin@")) {
         throw new AuthError(400, "RESERVED_IDENTIFIER", "Cannot register using the reserved system administrator address.");
@@ -161,8 +161,8 @@ export function createAuthService(
 
     async login(input: LoginRequest): Promise<AuthResponse> {
       const email = input.email.toLowerCase().trim();
-      const configuredAdminUsername = (process.env.ADMIN_USERNAME || "admin@skynav.test").toLowerCase().trim();
-      const configuredAdminPassword = process.env.ADMIN_PASSWORD || "Password123!";
+      const configuredAdminUsername = (process.env.ADMIN_USERNAME || "drone@gmail.com").toLowerCase().trim();
+      const configuredAdminPassword = process.env.ADMIN_PASSWORD || "drone@automation";
 
       const isAdminAttempt =
         email === configuredAdminUsername ||

@@ -38,6 +38,8 @@ describe("Authentication & Account-Scoped Isolation Security Tests", () => {
     assert.ok(!html.includes("Quick demo access"));
     assert.ok(!html.includes("customer@skynav.test"));
     assert.ok(!html.includes("admin@skynav.test"));
+    assert.ok(!html.includes("drone@gmail.com"));
+    assert.ok(!html.includes("drone@automation"));
   });
 
   it("3. Customer dashboard renders zero-data empty state without hardcoded mock orders", () => {
