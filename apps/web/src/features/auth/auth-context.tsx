@@ -44,8 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const router = useRouter();
-  const pathname = usePathname();
+  let router: any = { push: () => {}, replace: () => {} };
+  try {
+    router = useRouter();
+  } catch {}
+  let pathname = "";
+  try {
+    pathname = usePathname() || "";
+  } catch {}
 
   // Restore session from localStorage/cookies on mount
   useEffect(() => {

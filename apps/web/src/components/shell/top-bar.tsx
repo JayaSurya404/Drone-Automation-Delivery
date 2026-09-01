@@ -7,12 +7,9 @@ import {
   SearchIcon,
   SunIcon,
   MoonIcon,
-  UserIcon,
-  SettingsIcon,
   SignalIcon,
   CloseIcon
 } from "@skynav/ui";
-import { DEMO_NOTIFICATIONS } from "@/lib/demo-data";
 import { useTheme } from "@/components/theme/theme-provider";
 import { useAuth } from "@/features/auth/auth-context";
 
@@ -26,6 +23,7 @@ export function TopBar({
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [timeStr, setTimeStr] = useState<string>("");
 
   useEffect(() => {
@@ -38,7 +36,29 @@ export function TopBar({
     return () => clearInterval(interval);
   }, []);
 
-  const unreadCount = DEMO_NOTIFICATIONS.filter((n) => !n.read).length;
+  useEffect(() => {
+    async function loadNotifs() {
+      if (!user) return;
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("skynav_token") : null;
+        const res = await fetch("/api/v1/notifications", {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setNotifications(json.data || []);
+        }
+      } catch {
+        // quiet fallback
+      }
+    }
+    loadNotifs();
+  }, [user]);
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const displayName = user?.name || (role === "customer" ? "Customer User" : "SkyNav Admin");
   const displayRole = user?.role ? (user.role === "ADMIN" ? "Administrator" : "Customer") : `${role} Account`;
@@ -119,22 +139,28 @@ export function TopBar({
               </div>
 
               <div className="space-y-2.5 max-h-72 overflow-y-auto">
-                {DEMO_NOTIFICATIONS.map((n) => (
-                  <div
-                    key={n.id}
-                    className={`p-2.5 rounded-xl border text-xs flex flex-col gap-1 transition-colors ${
-                      n.read
-                        ? "bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800/60"
-                        : "bg-blue-50/60 dark:bg-blue-950/20 border-cyan-500/30"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <span className="font-semibold text-slate-900 dark:text-slate-200">{n.title}</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{n.timestamp}</span>
+                {notifications.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-4">No notifications</p>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`p-2.5 rounded-xl border text-xs flex flex-col gap-1 transition-colors ${
+                        n.isRead
+                          ? "bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800/60"
+                          : "bg-blue-50/60 dark:bg-blue-950/20 border-cyan-500/30"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-semibold text-slate-900 dark:text-slate-200">{n.title}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                          {new Date(n.createdAt).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-[11px]">{n.message}</p>
                     </div>
-                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-[11px]">{n.message}</p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
 
               <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-800 text-center">
@@ -143,7 +169,7 @@ export function TopBar({
                   onClick={() => setShowNotifications(false)}
                   className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline font-medium"
                 >
-                  View All Alerts & Activity →
+                  View All Activity →
                 </Link>
               </div>
             </div>

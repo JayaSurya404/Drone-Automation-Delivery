@@ -109,10 +109,11 @@ describe("SkyNav Phase 1 / Landing, Authentication & Theme System Tests", () => 
       assert.ok(!html.includes("Choose role"));
     });
 
-    it("provides quick demo fill helpers without embedding server credentials into client bundle", () => {
+    it("provides admin quick fill helper and strictly omits customer demo shortcuts", () => {
       const html = renderToString(<LoginPage />);
       assert.ok(html.includes("Fill Admin"));
-      assert.ok(html.includes("Fill Customer"));
+      assert.ok(!html.includes("Fill Customer"));
+      assert.ok(!html.includes("Demo Customer"));
       assert.ok(html.includes("Create SkyNav Account"));
     });
   });

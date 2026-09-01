@@ -251,20 +251,13 @@ export default function LoginPage() {
                 <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                   <span>Quick demo access:</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div>
                   <button
                     type="button"
                     onClick={handleFillAdmin}
-                    className="py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium text-center transition-colors"
+                    className="w-full py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium text-center transition-colors"
                   >
-                    Fill Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFillCustomer}
-                    className="py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium text-center transition-colors"
-                  >
-                    Fill Customer
+                    Fill Admin Account (admin@skynav.test)
                   </button>
                 </div>
               </div>
