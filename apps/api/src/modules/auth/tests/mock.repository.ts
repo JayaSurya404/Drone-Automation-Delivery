@@ -45,11 +45,18 @@ export function createMockAuthRepository(): AuthRepository {
     },
 
     async addUserToOrganization(params) {
-      memberships.push({
-        organization_id: params.organization_id,
-        user_id: params.user_id,
-        role: params.role
-      });
+      const existing = memberships.find(
+        (m) => m.organization_id === params.organization_id && m.user_id === params.user_id
+      );
+      if (existing) {
+        existing.role = params.role;
+      } else {
+        memberships.push({
+          organization_id: params.organization_id,
+          user_id: params.user_id,
+          role: params.role
+        });
+      }
     },
 
     async getUserMemberships(userId: string): Promise<OrgMembershipRecord[]> {

@@ -30,7 +30,10 @@ export const envSchema = z
       .string()
       .optional()
       .transform((val) => val !== "false")
-      .pipe(z.boolean())
+      .pipe(z.boolean()),
+    // Server-Side Administrator Configuration (Exactly ONE Admin Account)
+    ADMIN_USERNAME: z.string().default("admin@skynav.test"),
+    ADMIN_PASSWORD: z.string().min(8).default("Password123!")
   })
   .superRefine((data, ctx) => {
     // Validate Redis URL protocol

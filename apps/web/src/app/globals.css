@@ -7,7 +7,7 @@
    High-density, dark operational HUD aesthetic with light mode support.
    ========================================================================== */
 
-:root {
+:root, [data-theme="dark"], html.dark {
   --bg-primary: #070b14;
   --bg-surface: #0f172a;
   --bg-panel: #131e36;
@@ -34,14 +34,14 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-[data-theme="light"] {
+[data-theme="light"], html.light {
   --bg-primary: #f8fafc;
   --bg-surface: #ffffff;
   --bg-panel: #f1f5f9;
-  --bg-card: rgba(255, 255, 255, 0.9);
-  --bg-glass: rgba(255, 255, 255, 0.7);
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-glass: rgba(255, 255, 255, 0.75);
 
-  --border-subtle: rgba(226, 232, 240, 0.8);
+  --border-subtle: rgba(226, 232, 240, 0.9);
   --border-prominent: rgba(203, 213, 225, 1);
   --border-accent: rgba(14, 140, 233, 0.4);
 

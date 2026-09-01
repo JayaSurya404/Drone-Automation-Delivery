@@ -62,18 +62,18 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${sizeClasses} rounded-2xl bg-slate-900 border border-slate-750 shadow-2xl shadow-black/80 flex flex-col max-h-[90vh] overflow-hidden z-10 transition-all transform animate-scale-up ${className}`}
+        className={`relative w-full ${sizeClasses} rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-750 shadow-2xl shadow-slate-400/50 dark:shadow-black/80 flex flex-col max-h-[90vh] overflow-hidden z-10 transition-all transform animate-scale-up ${className}`}
       >
         {/* Header */}
         {(title || description) && (
-          <div className="p-5 pb-4 border-b border-slate-800 flex items-start justify-between gap-4">
+          <div className="p-5 pb-4 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
-              {title && <h2 className="text-lg font-semibold text-slate-100 tracking-tight">{title}</h2>}
-              {description && <p className="text-xs text-slate-400">{description}</p>}
+              {title && <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 tracking-tight">{title}</h2>}
+              {description && <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>}
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+              className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="Close dialog"
             >
               <CloseIcon size={18} />
@@ -82,11 +82,11 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1">{children}</div>
+        <div className="p-6 overflow-y-auto flex-1 text-slate-800 dark:text-slate-200">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="p-4 px-6 border-t border-slate-800 bg-slate-950/40 flex items-center justify-end gap-3">
+          <div className="p-4 px-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 flex items-center justify-end gap-3">
             {footer}
           </div>
         )}
