@@ -56,7 +56,7 @@ describe("Auth / HTTP Integration & Lifecycle", () => {
       method: "POST",
       url: "/api/v1/auth/register",
       payload: {
-        email: "admin@skynav.test",
+        email: "drone@gmail.com",
         password: "Password123!"
       }
     });
@@ -144,8 +144,8 @@ describe("Auth / HTTP Integration & Lifecycle", () => {
       method: "POST",
       url: "/api/v1/auth/login",
       payload: {
-        email: "admin@skynav.test",
-        password: "Password123!"
+        email: "drone@gmail.com",
+        password: "drone@automation"
       }
     });
     assert.equal(validAdmin.statusCode, 200);
@@ -160,7 +160,7 @@ describe("Auth / HTTP Integration & Lifecycle", () => {
       url: "/api/v1/auth/login",
       payload: {
         email: "admin",
-        password: "Password123!"
+        password: "drone@automation"
       }
     });
     assert.equal(validAdminUsername.statusCode, 200);
@@ -170,7 +170,7 @@ describe("Auth / HTTP Integration & Lifecycle", () => {
       method: "POST",
       url: "/api/v1/auth/login",
       payload: {
-        email: "admin@skynav.test",
+        email: "drone@gmail.com",
         password: "WrongPassword!"
       }
     });

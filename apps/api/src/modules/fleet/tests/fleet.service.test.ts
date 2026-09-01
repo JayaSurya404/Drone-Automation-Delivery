@@ -25,7 +25,7 @@ function createMockAuditService(): AuditService & { logs: any[] } {
 
 const adminUser: AuthenticatedUser = {
   id: "11111111-1111-1111-1111-111111111111",
-  email: "admin@skynav.test",
+  email: "drone@gmail.com",
   name: "Admin User",
   organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   organizationName: "Alpha Logistics",

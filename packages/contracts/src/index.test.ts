@@ -74,8 +74,8 @@ describe("Contracts / Authentication & RBAC Schemas", () => {
 
   it("validates login request with optional orgId", () => {
     const login = {
-      email: "admin@skynav.test",
-      password: "Password123!",
+      email: "drone@gmail.com",
+      password: "drone@automation",
       organizationId: "11111111-1111-1111-1111-111111111111"
     };
     const parsed = loginRequestSchema.parse(login);
