@@ -1,147 +1,90 @@
 "use client";
 
-import React, { useState } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from "react";
 import {
-  Card,
-  Button,
-  Tabs,
-  Badge,
   BellIcon,
-  ChevronRightIcon
+  PackageIcon,
+  CheckCircleIcon
 } from "@skynav/ui";
-import { DEMO_NOTIFICATIONS } from "@/lib/demo-data";
-import { useRealtimeNotifications } from "@/lib/notifications";
-import type { NotificationResponse } from "@skynav/contracts";
 
 export default function CustomerNotificationsPage() {
-  const [activeTab, setActiveTab] = useState("ALL");
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Initial seed from demo data formatted as NotificationResponse
-  const initialItems: NotificationResponse[] = DEMO_NOTIFICATIONS.map((n) => ({
-    id: n.id,
-    organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    userId: "11111111-1111-1111-1111-111111111111",
-    type: (n.category === "DELIVERY" ? "DELIVERY_UPDATE" : "SYSTEM") as any,
-    severity: "INFO" as const,
-    title: n.title,
-    message: n.message,
-    isRead: n.read,
-    readAt: n.read ? n.timestamp : null,
-    createdAt: n.timestamp,
-    metadata: { link: n.link }
-  }));
-
-  const {
-    notifications,
-    unreadCount,
-    isConnected,
-    markReadLocal,
-    markAllReadLocal
-  } = useRealtimeNotifications({
-    channel: "notifications:user",
-    initialNotifications: initialItems
-  });
-
-  const filtered = notifications.filter((n) => {
-    if (activeTab === "ALL") return true;
-    if (activeTab === "DELIVERY") return n.type === "DELIVERY_UPDATE" || n.type === "ORDER_UPDATE";
-    if (activeTab === "SYSTEM") return n.type === "SYSTEM" || n.type === "DRONE_UPDATE" || n.type === "EMERGENCY";
-    return true;
-  });
-
-  const tabs = [
-    { id: "ALL", label: "All Activity", count: notifications.length },
-    {
-      id: "DELIVERY",
-      label: "Deliveries",
-      count: notifications.filter((n) => n.type === "DELIVERY_UPDATE" || n.type === "ORDER_UPDATE").length
-    },
-    {
-      id: "SYSTEM",
-      label: "System",
-      count: notifications.filter((n) => n.type === "SYSTEM" || n.type === "DRONE_UPDATE" || n.type === "EMERGENCY").length
+  useEffect(() => {
+    async function loadNotifs() {
+      setLoading(true);
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("skynav_token") : null;
+        const res = await fetch("/api/v1/notifications", {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setNotifications(json.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load notifications:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    loadNotifs();
+  }, []);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-xl font-bold text-white tracking-tight">Notifications & Dispatch Updates</h2>
-            {isConnected && (
-              <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                LIVE
-              </span>
-            )}
-            {unreadCount > 0 && (
-              <Badge variant="primary" size="sm">
-                {unreadCount} Unread
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Real-time flight alerts, touchdown verifications, and account security notifications.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={markAllReadLocal}>
-          Mark All as Read
-        </Button>
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+      <div>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          Notifications
+        </h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Flight status, dispatch alerts, and delivery confirmations.
+        </p>
       </div>
 
-      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
-
-      <Card variant="glass" className="divide-y divide-slate-800/60 p-0 overflow-hidden">
-        {filtered.length > 0 ? (
-          filtered.map((item) => (
+      {loading ? (
+        <div className="space-y-3 py-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-16 bg-slate-200 dark:bg-slate-800 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      ) : notifications.length === 0 ? (
+        <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40 p-12 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mx-auto">
+            <BellIcon size={24} />
+          </div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">No Notifications</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            You're all caught up! When you place orders or missions are dispatched, flight alerts will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {notifications.map((n) => (
             <div
-              key={item.id}
-              onClick={() => markReadLocal(item.id)}
-              className={`p-5 flex items-start justify-between gap-4 transition-colors cursor-pointer ${
-                item.isRead ? "bg-slate-900/30 hover:bg-slate-800/20" : "bg-blue-950/20 hover:bg-blue-950/30"
-              }`}
+              key={n.id}
+              className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/60 flex items-start gap-3.5 text-xs shadow-sm"
             >
-              <div className="flex items-start gap-3.5">
-                <div
-                  className={`p-2.5 rounded-xl border mt-0.5 ${
-                    item.isRead
-                      ? "bg-slate-800 text-slate-400 border-slate-700"
-                      : "bg-blue-600/20 text-cyan-400 border-cyan-500/30"
-                  }`}
-                >
-                  <BellIcon size={18} />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-semibold text-white">{item.title}</h4>
-                    {!item.isRead && <Badge variant="primary" size="sm">New</Badge>}
-                    {item.severity === "CRITICAL" && <Badge variant="danger" size="sm">Critical</Badge>}
-                    {item.severity === "WARNING" && <Badge variant="warning" size="sm">Warning</Badge>}
-                  </div>
-                  <p className="text-xs text-slate-300 leading-relaxed max-w-xl">{item.message}</p>
-                  <span className="text-[10px] font-mono text-slate-400 block pt-1">
-                    {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <div className="w-8 h-8 rounded-xl bg-blue-600/10 text-blue-600 dark:text-cyan-400 flex items-center justify-center shrink-0 mt-0.5">
+                <BellIcon size={16} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 dark:text-white">{n.title}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {new Date(n.createdAt).toLocaleTimeString()}
                   </span>
                 </div>
+                <p className="text-slate-600 dark:text-slate-300 mt-1">{n.message}</p>
               </div>
-
-              {(item.metadata as any)?.link && (
-                <Link href={(item.metadata as any).link}>
-                  <Button variant="ghost" size="sm" rightIcon={<ChevronRightIcon size={14} />}>
-                    View
-                  </Button>
-                </Link>
-              )}
             </div>
-          ))
-        ) : (
-          <div className="p-12 text-center text-xs text-slate-400">
-            No notifications found in this category.
-          </div>
-        )}
-      </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

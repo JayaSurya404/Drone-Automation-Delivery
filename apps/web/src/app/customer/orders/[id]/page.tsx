@@ -1,211 +1,169 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
   CardContent,
-  CardFooter,
-  Button,
   DroneIcon,
   PackageIcon,
-  OrderStatusBadge,
-  Breadcrumb,
-  MapView,
-  MapPinIcon,
-  WarehouseIcon,
+  RadarIcon,
+  ChevronRightIcon,
   CheckCircleIcon,
-  ClockIcon
+  ShieldIcon
 } from "@skynav/ui";
-import { DEMO_ORDERS, DEMO_DRONES, DEMO_WAREHOUSE } from "@/lib/demo-data";
+import type { OrderResponse } from "@skynav/contracts";
 
-export default async function OrderDetailPage({
-  params
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const order = DEMO_ORDERS.find((o) => o.id === id) || DEMO_ORDERS[0];
-  const assignedDrone = DEMO_DRONES.find((d) => d.id === order.assignedDroneId);
+export default function CustomerOrderDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const orderId = params?.id as string;
 
-  const breadcrumbs = [
-    { label: "Dashboard", href: "/customer" },
-    { label: "My Orders", href: "/customer/orders" },
-    { label: order.orderNumber }
-  ];
+  const [order, setOrder] = useState<OrderResponse | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const mapMarkers = [
-    {
-      id: "depot",
-      type: "warehouse" as const,
-      latitude: DEMO_WAREHOUSE.latitude,
-      longitude: DEMO_WAREHOUSE.longitude,
-      title: "Depot Alpha"
-    },
-    {
-      id: "dest",
-      type: "destination" as const,
-      latitude: 37.7952,
-      longitude: -122.4028,
-      title: "Delivery Landing Zone"
-    },
-    ...(assignedDrone
-      ? [
-          {
-            id: assignedDrone.id,
-            type: "drone" as const,
-            latitude: assignedDrone.latitude,
-            longitude: assignedDrone.longitude,
-            headingDegrees: assignedDrone.headingDegrees,
-            altitudeMeters: assignedDrone.altitudeMeters,
-            batteryPercent: assignedDrone.batteryPercent,
-            title: assignedDrone.callsign,
-            status: assignedDrone.status
+  useEffect(() => {
+    async function loadOrder() {
+      if (!orderId) return;
+      setLoading(true);
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("skynav_token") : null;
+        const res = await fetch(`/api/v1/orders/${orderId}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
           }
-        ]
-      : [])
-  ];
-
-  const mapRoutes = [
-    {
-      id: "flight-corridor",
-      coordinates: [
-        { latitude: DEMO_WAREHOUSE.latitude, longitude: DEMO_WAREHOUSE.longitude },
-        { latitude: 37.785, longitude: -122.41 },
-        { latitude: 37.7952, longitude: -122.4028 }
-      ],
-      color: "#00f0ff"
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setOrder(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to load order:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    loadOrder();
+  }, [orderId]);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 animate-pulse space-y-4">
+        <div className="h-6 w-32 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+        <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="max-w-md mx-auto py-16 text-center space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-500 flex items-center justify-center mx-auto">
+          <PackageIcon size={24} />
+        </div>
+        <h2 className="text-base font-bold text-slate-900 dark:text-white">Order Not Found</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          The requested order does not exist or does not belong to your authenticated account.
+        </p>
+        <Link
+          href="/customer/orders"
+          className="inline-block px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold"
+        >
+          Back to Orders
+        </Link>
+      </div>
+    );
+  }
+
+  const isActive = ["CREATED", "CONFIRMED", "ASSIGNED", "IN_TRANSIT"].includes(order.status);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Breadcrumb items={breadcrumbs} />
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+      <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
+        <Link href="/customer/orders" className="hover:text-blue-600 dark:hover:text-cyan-400">
+          Orders
+        </Link>
+        <ChevronRightIcon size={12} />
+        <span className="text-slate-800 dark:text-slate-200">#{order.orderNumber}</span>
+      </div>
 
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-white tracking-tight">{order.orderNumber}</h2>
-            <OrderStatusBadge status={order.status} />
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold font-mono text-slate-900 dark:text-white">
+              Order #{order.orderNumber}
+            </h1>
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
+              {order.status}
+            </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Placed on {new Date(order.createdAt).toLocaleString()} • Recipient: {order.recipientName}
+          <p className="text-xs text-slate-500 mt-1">
+            Placed on {new Date(order.createdAt).toLocaleString()}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link href="/customer/tracking">
-            <Button variant="primary" size="md">
-              Open Fullscreen Radar
-            </Button>
+        {isActive && (
+          <Link
+            href="/customer/tracking"
+            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-sm flex items-center gap-2 self-start sm:self-auto"
+          >
+            <RadarIcon size={16} />
+            <span>Track Flight Radar</span>
           </Link>
-        </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Tactical Radar & Flight Timeline */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card variant="glass" className="overflow-hidden">
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>In-Flight Trajectory</CardTitle>
-              <span className="text-xs font-mono text-cyan-400">{order.etaTime}</span>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="h-80 w-full">
-                <MapView markers={mapMarkers} routes={mapRoutes} title="Active Mission Corridor" />
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {/* Package Specs */}
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle>Package & Payload Manifest</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5 text-xs font-mono">
+            <div className="flex justify-between text-slate-600 dark:text-slate-400">
+              <span>Description:</span>
+              <span className="text-slate-900 dark:text-white font-bold">{order.package.description || "N/A"}</span>
+            </div>
+            <div className="flex justify-between text-slate-600 dark:text-slate-400">
+              <span>Payload Mass:</span>
+              <span className="text-slate-900 dark:text-white">{order.package.weightGrams} grams</span>
+            </div>
+            <div className="flex justify-between text-slate-600 dark:text-slate-400">
+              <span>Priority Level:</span>
+              <span className="text-cyan-500 font-bold">{order.priority}</span>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Delivery Milestone Timeline */}
-          <Card variant="glass">
-            <CardHeader>
-              <CardTitle>Delivery Flight Milestones</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
-                <div className="relative">
-                  <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-slate-900" />
-                  <div className="flex justify-between">
-                    <span className="text-xs font-semibold text-white">Order Placed & Airspace Corridor Validated</span>
-                    <span className="text-[10px] font-mono text-slate-400">10:10 AM</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Airspace check passed. Geofences cleared.</p>
-                </div>
-
-                <div className="relative">
-                  <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-slate-900" />
-                  <div className="flex justify-between">
-                    <span className="text-xs font-semibold text-white">Payload Loaded onto {order.assignedDroneCallsign || "SKY-001"}</span>
-                    <span className="text-[10px] font-mono text-slate-400">10:12 AM</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Autonomous tether locked at Depot Alpha.</p>
-                </div>
-
-                <div className="relative">
-                  <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-cyan-400 ring-4 ring-slate-900 animate-pulse" />
-                  <div className="flex justify-between">
-                    <span className="text-xs font-semibold text-cyan-300">Ascended to Cruise Altitude (60m AGL)</span>
-                    <span className="text-[10px] font-mono text-cyan-400">10:15 AM</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">En route along Waypoint Path Alpha-4.</p>
-                </div>
-
-                <div className="relative opacity-50">
-                  <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-slate-700 ring-4 ring-slate-900" />
-                  <div className="flex justify-between">
-                    <span className="text-xs font-semibold text-slate-300">Precision Touchdown & Drop Verification</span>
-                    <span className="text-[10px] font-mono text-slate-500">Est. 10:42 AM</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">Will hold at 2m altitude for recipient OTP entry.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Col: Package Spec & Security OTP */}
-        <div className="space-y-6">
-          <Card variant="hud">
-            <CardHeader>
-              <CardTitle>Delivery Verification OTP</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs text-slate-300">
-              <p className="leading-relaxed">
-                Provide this secure 4-digit token to complete autonomous parcel drop.
+        {/* Drop Destination */}
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle>Landing Location</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5 text-xs">
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-white">Delivery Address:</span>
+              <p className="text-slate-500 mt-0.5">{order.delivery.address || "Rooftop / Yard Landing Pad"}</p>
+            </div>
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-white">Target Coordinates:</span>
+              <p className="text-slate-500 font-mono mt-0.5">
+                {order.delivery.latitude.toFixed(4)}° N, {order.delivery.longitude.toFixed(4)}° W
               </p>
-              <div className="p-5 rounded-2xl bg-slate-950/90 border border-cyan-500/30 text-center font-mono shadow-lg shadow-cyan-950/40">
-                <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Release Code</div>
-                <div className="text-4xl font-extrabold text-cyan-400 tracking-widest">{order.proofOfDeliveryCode}</div>
+            </div>
+            {order.deliveryNotes && (
+              <div>
+                <span className="font-semibold text-slate-900 dark:text-white">Drop Instructions:</span>
+                <p className="text-slate-500 mt-0.5">{order.deliveryNotes}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card variant="glass">
-            <CardHeader>
-              <CardTitle>Package Manifest</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs text-slate-300 font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Description</span>
-                <span className="text-white font-sans">{order.packageDescription}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Weight</span>
-                <span className="text-white">{order.weightKg.toFixed(1)} kg</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Recipient Phone</span>
-                <span className="text-white">{order.recipientPhone}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Address</span>
-                <span className="text-white font-sans text-right max-w-[180px]">{order.deliveryAddress}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

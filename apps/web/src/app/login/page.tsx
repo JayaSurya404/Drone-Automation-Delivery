@@ -69,17 +69,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleFillAdmin = () => {
-    setIdentifier("admin@skynav.test");
-    setPassword("Password123!");
-    setErrorMessage("");
-  };
 
-  const handleFillCustomer = () => {
-    setIdentifier("customer@skynav.test");
-    setPassword("Password123!");
-    setErrorMessage("");
-  };
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 transition-colors duration-200 relative overflow-hidden">
@@ -246,28 +236,7 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              {/* Demo Account Quick Fill Helpers */}
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <span>Quick demo access:</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={handleFillAdmin}
-                    className="py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium text-center transition-colors"
-                  >
-                    Fill Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFillCustomer}
-                    className="py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium text-center transition-colors"
-                  >
-                    Fill Customer
-                  </button>
-                </div>
-              </div>
+
 
               {/* Footer Switch to Signup */}
               <div className="text-center pt-2 text-xs text-slate-500 dark:text-slate-400">
