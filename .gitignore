@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+coverage/
+.env
+.env.local
+.env.*
+!.env.example
+*.tsbuildinfo
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+ml/models/*
+!ml/models/.gitkeep

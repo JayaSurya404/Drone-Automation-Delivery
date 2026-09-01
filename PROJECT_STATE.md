@@ -1,55 +1,281 @@
-# SKY NAV PROJECT STATE
+# SkyNav Project State
 
 ## Current milestone
-Milestone 1 — Foundation
+
+Milestone 8 — Production Deployment & Infrastructure (**COMPLETED**)
+
+## Foundation status
+
+- **Backend & Identity Foundation**: Argon2id password security, JWT refresh token rotation, RBAC, tenant isolation, and transactional audit logging completed.
+- **Simulator Foundation**: Deterministic 3D kinematic engine, state machine validator, battery failsafes, RTH without teleportation, and multi-drone fleet manager completed.
+- **Frontend & Design System Foundation**: Aviation operations design system (`@skynav/ui`), liquid glass & dark operational theme, application shells (Customer & Admin), tactical radar map abstraction, and Next.js 15 pages implemented.
+- **Orders Domain & API Foundation**: Centralized strict order state machine, WGS84 geographic location validation, package specifications, multi-tenant database scoping, customer ownership enforcement, RBAC hooks, and RFC 7807 Problem Details error envelopes implemented.
+- **Fleet Inventory & Mission Dispatch Foundation**: Centralized UAV operational state machine, fleet inventory management, mission planning state machine, atomic transactional drone-to-mission assignment with race condition protection, and decoupled simulator gateway adapter implemented.
+- **Realtime Telemetry & WebSocket Gateway**: High-throughput tenant-isolated Redis Pub/Sub transport, TelemetryWorker with schema validation and out-of-order frame tracking, authenticated Fastify WebSocket gateway (`/api/v1/ws/telemetry`), backpressure management, and Next.js realtime tactical radar hook completed and verified.
+- **Admin Fleet Operations & Emergency Controls**: Return-To-Home, Emergency Failsafe, and Clear Emergency endpoints, confirmation modals, and cockpits implemented.
+- **Production Geospatial Maps & Routing Foundation**: Production `MapView` with OpenStreetMap cartographic tiles and tactical aerospace overlay, true Spherical Web Mercator projection, real-time drone movement trails (`MAX_TRAIL_POINTS`), dynamic kinematic distance and ETA calculations, telemetry freshness indicators (`LIVE`, `DEGRADED`, `STALE`, `OFFLINE`), and privacy-safe customer tracking implemented.
+- **Advisory AI & Predictive Routing**: Explainable multi-factor route scoring, kinematic & statistical ETA prediction ($p_{50}, p_{90}, p_{99}$), battery discharge and reserve modeling, prognostic fleet maintenance diagnostics, weather operational risk assessment, and authoritative Deterministic Safety Gate validation implemented.
+- **Computer Vision & Perception Foundation**: Pluggable `VisionProvider` abstraction (`DevelopmentVisionProvider`, `SimulatorVisionProvider`), visual landing-zone assessment, obstacle & hazard detection, environmental scene classification (Urban, Suburban, Industrial, Rural, Open Field), destination fiducial verification ($dx, dy$ centering), and Fastify / WebSocket integration implemented.
+- **Digital Twin Foundation**: Synchronized software representation of drones, missions, fleet state, environment, and perception. Real-time telemetry reconciliation engine, discrepancy and anomaly detection, twin health evaluation (`HEALTHY`, `DEGRADED`, `CRITICAL`, `INCONSISTENT`, `OFFLINE`), out-of-order timestamp protection, Fastify REST APIs, and operations cockpit UI implemented.
+- **Production Hardening & Observability**: Configuration validation rejecting insecure production defaults, request correlation tracking (`x-correlation-id`), tiered rate limiting (Auth, Emergency, AI, Standard), structured JSON logging with sensitive data redaction, liveness (`/health`) and readiness (`/ready`) probes, in-memory metrics registry (`/metrics`), security headers, request body size protection (1MB), and worker resilience implemented.
+- **Production Deployment & Multi-Service Infrastructure**: Complete container architecture with multi-stage Dockerfiles (`api`, `web`, `ai`, `telemetry-worker`, `notification-worker`), non-root execution, 7-service Docker Compose topology, database migration and seed production safety, standalone worker entrypoints, and comprehensive operational disaster recovery documentation implemented.
+
+> **SAFETY NOTICE**: This is a deterministic software simulator and operational platform designed for development, testing, and operator training; it is NOT real flight-control software and does not interface with physical flight hardware (PX4, ArduPilot, MAVLink).
 
 ## Completed
 
-[ ] Repository bootstrap
-[ ] PNPM workspace
-[ ] Turbo
-[ ] Next.js web
-[ ] API
-[ ] PostgreSQL
-[ ] Redis
-[ ] Contracts
-[ ] Authentication
-[ ] RBAC
+### 1. Milestone 1A: Database + Identity Foundation
+- **Centralized Environment Configuration**: Schema validation via Zod in `@skynav/config` supporting `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `NODE_ENV`, `API_PORT`, `API_HOST`, `API_CORS_ORIGIN`, and `.env.example`.
+- **Database & Kysely Integration**: Typed Kysely database access with `pg.Pool` connection pooling, health checks, and lifecycle management in `apps/api/src/infrastructure/db/`.
+- **Transactional Migration Runner**: Deterministic migration tracking (`_schema_migrations`) in `db/scripts/migrate.mjs` applying `0001_foundation.sql`, `0002_identity_and_audit.sql`, `0003_orders.sql`, and `0004_fleet_and_missions.sql` safely within transactions.
+- **Idempotent Development Seeding**: Seed runner in `db/seeds/index.mjs` creating development organizations, Argon2id-hashed test accounts (Admin, Operator, Customer, Competitor Admin), and role memberships.
+- **Argon2id Password Security & Cryptography**: Memory-hardened Argon2id hashing, secure token generation, and SHA-256 token indexing in `apps/api/src/modules/auth/crypto.ts`.
+- **Authentication & Stateful Session Management**:
+  - `POST /api/v1/auth/register`: User & organization creation with initial admin role.
+  - `POST /api/v1/auth/login`: Credential verification with organization resolution.
+  - `POST /api/v1/auth/refresh`: Refresh token rotation with reuse detection / session revocation.
+  - `POST /api/v1/auth/logout`: Refresh token revocation and session clearance.
+  - `GET /api/v1/auth/me`: Authenticated profile, active organization, and permissions.
+- **RBAC & Permission Authorization**: Reusable authorization pre-handler hooks (`requireAuthenticated`, `requireRole`, `requirePermission`) with role-to-permission mapping (`ADMIN`, `OPERATOR`, `CUSTOMER`, `FLEET_MANAGER`, `DISPATCHER`).
+- **Tenant Isolation**: Mandatory server-side tenant scoping (`requireTenantIsolation`), ensuring zero cross-tenant access to resources or audit records.
+- **Structured Audit Logging**: Audit service and protected route (`GET /api/v1/audit-logs`) recording structured action events (`USER_REGISTERED`, `USER_LOGGED_IN`, `TOKEN_REFRESHED`, `ORGANIZATION_CREATED`, etc.).
+- **Shared Domain Contracts**: Expanded `@skynav/contracts` with auth schemas, RBAC enums, and RFC 7807 Problem Details error models.
 
-## In progress
+### 2. Milestone: Simulator Foundation
+- **Deterministic Simulation Core** (`services/simulator/src/`):
+  - Pure simulation clock progression (`tick(deltaSeconds)`), completely decoupled from wall-clock drift.
+  - State machine validator (`assertValidStateTransition`) enforcing legal flight state transitions (`IDLE -> ASSIGNED -> TAKEOFF -> EN_ROUTE -> ARRIVED -> DELIVERING -> RETURNING -> LANDED`).
+  - Emergency transitions supported from any in-flight state (`* -> EMERGENCY -> RETURNING -> LANDED`).
+- **Geospatial & Kinematic Model** (`geo.ts`):
+  - Spherical Earth Haversine distance, 3D Euclidean distance (with altitude delta), great-circle initial forward azimuth / bearing, and position projection calculations.
+  - Kinematic simulation updating horizontal speed, climb rate, descent rate, and heading.
+- **Automated Delivery Progression**:
+  - Autonomous delivery sequence at target waypoint: `ARRIVED` -> `DELIVERING` (controlled descent to drop altitude -> verification hold timer -> climb back to cruise altitude) -> `RETURNING` (reverse waypoint navigation to home base) -> `LANDED`.
+- **Battery Model & Safety Failsafes**:
+  - Configurable state-dependent discharge rates (idle, cruise, climb, descent).
+  - Low-battery advisory warning threshold ($25\%$).
+  - Critical battery threshold ($15\%$) triggering automatic Return-To-Home fail-safe.
+- **Deterministic Return-To-Home (RTH)**:
+  - Navigates back along calculated trajectory to stored warehouse origin without teleportation.
+- **Telemetry Frame Generation**:
+  - Structured telemetry conforming to `@skynav/contracts` `Telemetry` schema plus extended simulation diagnostic metadata.
+- **Multi-Drone Fleet Manager** (`fleet.ts`):
+  - Manages concurrent independent drones (`SKY-001`, `SKY-002`, `SKY-003`, etc.).
+  - Lockstep clock progression, pause, resume, reset, and fleet-wide telemetry/event aggregation.
+  - Optional real-time timer loop wrapper for local demonstrations.
+- **Automated Test Coverage**:
+  - 21 automated unit and scenario tests in `services/simulator/src/tests/` verifying geospatial math, state machine transitions, waypoint navigation, battery discharge, delivery sequence, RTH, emergency triggers, and multi-drone fleet orchestration.
 
-Developer 1:
-Frontend shell
+### 3. Milestone 2A: Frontend Application Shell + Design System
+- **Aviation Design Tokens & Theme Engine** (`packages/ui/src/tokens/`, `apps/web/src/app/globals.css`):
+  - High-density dark operational aesthetic with full support for light mode and `prefers-reduced-motion`.
+  - Coherent tokens for semantic colors, elevation, aviation cyan/blue accents, radius, and typography.
+  - Liquid glass and glassmorphism styling utilities (`.glass-panel`, `.glass-card`, `.hud-panel`).
+- **Design System Primitives** (`packages/ui/src/primitives/`):
+  - `Button`, `Input`, `Select`, `Textarea`, `Checkbox`, `Switch`, `Badge`, `StatusBadge`, `Card`, `GlassPanel`, `Modal`, `Dropdown`, `Tooltip`, `Tabs`, `Table`, `Pagination`, `Alert`, `Skeleton`, `Spinner`, `EmptyState`, `ErrorState`, `Breadcrumb`, `Avatar`.
+  - Comprehensive SVG icon set (`DroneIcon`, `RadarIcon`, `BatteryIcon`, `PackageIcon`, `RouteIcon`, `ShieldIcon`, `CompassIcon`, `WarehouseIcon`, `SlidersIcon`, etc.).
+- **Domain & Operational Components** (`packages/ui/src/domain/`):
+  - `StatCard`, `DroneCard`, `MissionCard`, `OrderCard`, `BatteryIndicator`, `ConnectionStatus`, `SystemHealthGrid`, `AlertCard`, `ActivityTimeline`, `TelemetrySummary`.
+- **Tactical Map Abstraction** (`packages/ui/src/map/`):
+  - `MapView` container with `MapProviderAdapter` interface.
+  - Native `SvgRadarMap` provider rendering concentric radar rings, crosshairs, drone markers with heading indicators, flight routes with waypoint nodes, and geofence danger zones.
+- **Application Shells** (`apps/web/src/components/shell/`):
+  - Responsive `AppShell` with persistent sidebar, mobile drawer, UTC tactical clock, quick search, notification dropdown, and profile selector.
+  - `CustomerNav` and `AdminNav` modules.
+- **Customer Experience Portal** (`apps/web/src/app/customer/`):
+  - `/customer`, `/customer/orders`, `/customer/orders/[id]`, `/customer/tracking`, `/customer/notifications`, `/customer/profile`.
+- **Admin Mission Control Center** (`apps/web/src/app/admin/`):
+  - `/admin`, `/admin/orders`, `/admin/fleet`, `/admin/missions`, `/admin/tracking`, `/admin/alerts`, `/admin/audit`, `/admin/settings`.
+- **Isolated Typed Demo Data** (`apps/web/src/lib/demo-data.ts`):
+  - Centralized typed datasets for drones, orders, missions, alerts, audit logs, and geofences.
 
-Developer 2:
-Auth/API
+### 4. Milestone 2B: Order Domain + Order API Foundation
+- **Centralized Strict Order State Machine** (`apps/api/src/modules/orders/order.state-machine.ts`):
+  - Legal transitions: `CREATED -> CONFIRMED -> ASSIGNED -> IN_TRANSIT -> DELIVERED`.
+  - Cancellation allowed from `CREATED`, `CONFIRMED`, and `ASSIGNED`; terminal states (`DELIVERED`, `CANCELLED`, `FAILED`) reject further transitions.
+- **Multi-Tenant Security & Customer Ownership Rules**:
+  - `organizationId` and `customerId` derived from authenticated server-side JWT session context.
+  - Customers restricted to viewing and managing only their own orders (`customer_id = user.id`).
+- **Fastify Order Endpoints** (`apps/api/src/modules/orders/order.routes.ts`):
+  - `POST /api/v1/orders`, `GET /api/v1/orders`, `GET /api/v1/orders/:orderId`, `PATCH /api/v1/orders/:orderId/status`, `POST /api/v1/orders/:orderId/cancel`.
 
-Developer 3:
-AI service skeleton
+### 5. Milestone 2C: Fleet Inventory + Mission Dispatch Foundation
+- **Centralized UAV Operational State Machine** (`apps/api/src/modules/fleet/drone.state-machine.ts`):
+  - Drone operational status model: `IDLE`, `AVAILABLE`, `ASSIGNED`, `TAKEOFF`, `EN_ROUTE`, `ARRIVED`, `DELIVERING`, `RETURNING`, `LANDED`, `MAINTENANCE`, `EMERGENCY`, `OFFLINE`.
+- **Fleet Inventory & Multi-Tenant Scoping** (`apps/api/src/modules/fleet/`):
+  - Server-side tenant isolation: Every drone query scoped by `organization_id`.
+  - Unique call sign constraint per organization (`idx_drones_org_call_sign`).
+  - Endpoints: `POST /api/v1/drones`, `GET /api/v1/drones`, `GET /api/v1/drones/:droneId`, `PATCH /api/v1/drones/:droneId`.
+- **Mission Lifecycle & State Machine** (`apps/api/src/modules/missions/mission.state-machine.ts`):
+  - Delivery mission progression: `PENDING -> ASSIGNED -> LAUNCHING -> IN_PROGRESS -> DELIVERING -> RETURNING -> COMPLETED`.
+  - Partial unique index preventing duplicate active missions for the same order (`idx_missions_order_active`).
+- **Atomic Transactional Drone Assignment** (`apps/api/src/modules/missions/mission.repository.ts`):
+  - Row-level lock (`forUpdate()`) on mission, drone, and order tables within a single database transaction.
 
-Developer 4:
-Simulator skeleton
+### 6. Milestone 2D: Telemetry Transport + Realtime Live Bridge
+- **Redis Pub/Sub Transport Topology** (`services/telemetry-worker/src/publisher.ts`):
+  - Tenant-isolated channel naming: `telemetry:org:${organizationId}` and `telemetry:drone:${organizationId}:${droneId}`.
+- **Telemetry Worker** (`services/telemetry-worker/src/worker.ts`):
+  - Reconnection with exponential backoff and pattern subscription (`telemetry:org:*`, `telemetry:drone:*`).
+  - Zod validation and out-of-order packet filtering.
+- **Fastify WebSocket Gateway** (`apps/api/src/modules/realtime/`):
+  - `/api/v1/ws/telemetry` with token authentication, customer and admin scoping.
 
-## Next tasks
+### 7. Milestone 3B: Admin Fleet Operations + Emergency Control
+- **Operational Command Endpoints & Auditing**:
+  - `POST /api/v1/drones/:droneId/rth`: Return-To-Home commanding with DB update, outbox events, and audit logging.
+  - `POST /api/v1/drones/:droneId/emergency`: Immediate emergency halt / landing failsafe with mandatory justification.
+  - `POST /api/v1/drones/:droneId/emergency/clear`: Safe operational clearance and reset to IDLE.
+  - `POST /api/v1/missions/:missionId/cancel`: Abort mission and order with automated UAV return-to-home.
+- **Cockpits & Modal Interfaces**:
+  - `ReturnToHomeModal`, `EmergencyHaltModal`, `EmergencyClearModal`, `CancelMissionModal`, `EmergencyBanner`.
+  - `/admin/fleet/[id]` (Drone Operations Cockpit) & `/admin/missions/[id]` (Mission Operations Cockpit).
 
-1. Complete authentication
-2. Complete drone registry
-3. Complete order creation
-4. Complete mission creation
-5. Connect simulator
+### 8. Milestone 4A: Production Maps + Geospatial Routing Foundation
+- **Shared Geospatial Core (`packages/contracts/src/geo.ts`)**:
+  - Single-source-of-truth mathematical formulas for Haversine distance, 3D distance, initial bearing azimuth, position projection, coordinate interpolation, polyline cumulative distance, remaining corridor distance, dynamic kinematic ETA, and bounding box computation.
+- **Production Interactive Map (`packages/ui/src/map/interactive-map.tsx`)**:
+  - True Spherical Web Mercator cartographic projection.
+  - Dual-layer rendering: OpenStreetMap background tile support with dark aerospace alpha blend + high-contrast SVG vector tactical overlay.
+  - Live drone markers with true heading rotation, status color coding, and telemetry freshness indicators (`LIVE`, `DEGRADED`, `STALE`, `OFFLINE`).
+  - Bounded recent movement trails (`MAX_TRAIL_POINTS`).
+  - Flight corridor visualizer with numbered waypoint fixes (`WP-0`, `WP-1`, `WP-2`) and altitude tags.
+  - Full pan/zoom interactivity via mouse drag, scroll wheel, touch pinch/drag, keyboard controls, and fullscreen toggle.
+  - Layer toggles (Tiles, Trails, Airspace Geofences, Waypoints) and coordinates HUD.
+- **Customer Tracking Portal (`apps/web/src/app/customer/tracking/page.tsx`)**:
+  - Upgraded to production map with customer privacy isolation, live drone tracking, corridor waypoints, remaining distance, dynamic ETA, and telemetry freshness.
+- **Admin Tracking & Operations Cockpits**:
+  - Upgraded `/admin/tracking`, `/admin/fleet/[id]`, and `/admin/missions/[id]` with production maps, breadcrumb trails, 3D HUD gauges, and operational action modals.
 
-## Current known issues
+### 9. Milestone 4: Advisory AI & Predictive Routing
+- **Shared Zod Contracts (`packages/contracts/src/ai.ts`)**:
+  - Request/response schemas for route scoring, ETA confidence intervals ($p_{50}, p_{90}, p_{99}$), battery discharge feasibility (`SAFE`, `CAUTION`, `HIGH_RISK`, `NOT_FEASIBLE`), predictive maintenance diagnostics, weather operational limits, and demand forecasting.
+- **Python AI Microservice (`services/ai/skynav_ai/`)**:
+  - Modular engines for route candidate scoring ($0\text{–}100$), kinematic ETA calculation with wind vector adjustments, battery landing reserve modeling, component health degradation diagnostics (Battery, Motors, Airframe, Avionics), and standard library REST server on port 8000.
+- **Authoritative Deterministic Safety Gate (`apps/api/src/modules/ai/safety-gate.ts`)**:
+  - Evaluates certified payload limits, minimum $20\%$ landing battery reserve, maximum altitude ceilings ($120\text{m}$), operational wind thresholds ($\le 15\text{m/s}$), and spatial no-fly zones. AI output is strictly advisory and cannot override safety gates.
+- **Fastify AI Domain Service & RBAC (`apps/api/src/modules/ai/`)**:
+  - Tenant-isolated endpoints with audit logging (`AI_ROUTE_SCORED`, `AI_SAFETY_GATE_EVALUATED`, `AI_MAINTENANCE_PREDICTED`, `AI_DEMAND_FORECASTED`).
+- **Web Operational Cockpits (`apps/web/src/features/admin/`)**:
+  - `AiRouteScoringCard` and `PredictiveMaintenanceCard` embedded into Admin Mission and Fleet Dispatch Boards.
 
-None
+### 10. Milestone 5: Computer Vision Foundation
+- **Shared Vision Contracts (`packages/contracts/src/vision.ts`)**:
+  - Strongly typed Zod schemas for normalized bounding boxes (`VisionBoundingBox`), detection categories (`LANDING_ZONE`, `LANDING_PAD`, `OBSTACLE`, `PERSON`, `VEHICLE`, `STRUCTURE`, `WATER`, `VEGETATION`, `UNKNOWN_HAZARD`), scene types (`URBAN`, `SUBURBAN`, `INDUSTRIAL`, `RURAL`, `OPEN_FIELD`), landing suitability (`SAFE`, `CAUTION`, `UNSAFE`, `UNKNOWN`), destination verification (`VERIFIED`, `UNVERIFIED`, `OBSTRUCTED`, `NOT_FOUND`), and realtime perception event envelopes.
+- **Python Perception Subsystem (`services/ai/skynav_ai/vision/`)**:
+  - `VisionProvider` abstract base class with pluggable `DevelopmentVisionProvider` (deterministic rule-based baseline) and `SimulatorVisionProvider`.
+  - `ObstacleDetector`: Hazard identification and severity assessment (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) with confidence filtering.
+  - `SceneClassifier`: Environmental context classification and description.
+  - `LandingZoneAssessor`: Evaluates usable drop area, surface suitability (Concrete, Pavement, Grass, Water), slope, and dynamic human/vehicle presence.
+  - `DestinationVerifier`: Optical fiducial pattern recognition and centering offset calculation ($dx, dy$).
+  - Fastify / HTTP endpoints on port 8000 for frame analysis, landing assessment, destination verification, and hazard detection.
+- **Node.js Fastify API Integration (`apps/api/src/modules/ai/`)**:
+  - Added vision methods to `AiClient` with deterministic fallback, RBAC enforcement (`requireRole(["ADMIN", "OPERATOR", "FLEET_MANAGER", "DISPATCHER"])`), tenant isolation, and audit event tracking (`VISION_FRAME_ANALYZED`, `LANDING_ZONE_ASSESSED`, `HAZARD_DETECTED`, `DESTINATION_VERIFIED`, `LANDING_ZONE_REJECTED`).
+  - Added `GET /api/v1/ai/vision/drones/:droneId/latest` for real-time perception state retrieval.
+- **Deterministic Simulator Perception Adapter (`services/simulator/src/perception.ts`)**:
+  - `SimulatedPerceptionSensor` generates deterministic perception frames during waypoint arrival and descent phases without altering simulator clock progression or physics.
+- **Web Perception Cockpit (`apps/web/src/features/admin/vision-perception-cockpit.tsx`)**:
+  - Embedded into Admin Mission Dispatch Board with live camera viewport, target centering crosshairs, landing zone suitability gauge, and detected hazard badges.
+- **AI/ML Honesty Declaration**:
+  - Current perception engine utilizes a development rule-based baseline with synthetic scene processing. It is explicitly architected behind `VisionProvider` to be replaced with production deep learning models (YOLOv8/v11, SegFormer) when training datasets and GPU inference clusters are provisioned.
 
-## Last integrated commit
+### 11. Milestone 6: Digital Twin Foundation
+- **Shared Digital Twin Contracts (`packages/contracts/src/digital-twin.ts`)**:
+  - Strongly typed schemas for `DroneTwin`, `MissionTwin`, `FleetTwin`, `EnvironmentTwin`, `PerceptionTwinState`, `AiTwinState`, `DigitalTwinSnapshot`, and `TwinHealthReport`.
+  - Enums for `TwinHealthStatus` (`HEALTHY`, `DEGRADED`, `CRITICAL`, `INCONSISTENT`, `OFFLINE`) and `TwinIssueSeverity` (`INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+  - Added permissions `"digital-twin:read"` and `"digital-twin:manage"` to RBAC roles (`ADMIN`, `OPERATOR`, `FLEET_MANAGER`, `DISPATCHER`).
+- **Synchronized State & Reconciliation Engine (`apps/api/src/modules/digital-twin/`)**:
+  - In-memory bounded, tenant-isolated state store tracking UAV twins, mission lifecycles, and fleet metrics.
+  - Event-driven telemetry ingestion with out-of-order timestamp protection (drops stale frames).
+  - Telemetry freshness computation (`LIVE` $\le 15\text{s}$, `DEGRADED` $\le 30\text{s}$, `STALE` $\le 60\text{s}$, `OFFLINE` $> 60\text{s}$).
+  - Reconciliation validator detecting state discrepancies (Authoritative vs Telemetry), descent altitude envelope anomalies during delivery holds, critical battery reserves ($< 15\%$), and stale telemetry signals.
+  - Structured audit logging (`TWIN_RECONCILIATION_DETECTED`).
+  - Twin Health Evaluator providing actionable diagnostics per drone, mission, and organization fleet.
+- **Fastify Digital Twin REST API (`apps/api/src/modules/digital-twin/digital-twin.routes.ts`)**:
+  - `GET /api/v1/digital-twin/fleet`: Organization fleet-wide metrics.
+  - `GET /api/v1/digital-twin/drones/:droneId`: Single drone twin state.
+  - `GET /api/v1/digital-twin/missions/:missionId`: Mission twin progress & reconciliation.
+  - `GET /api/v1/digital-twin/health`: Diagnostic issue breakdown and health rating.
+  - `GET /api/v1/digital-twin/snapshot`: Complete digital twin snapshot.
+  - Strict tenant isolation and customer access restriction (403 Forbidden).
+- **Web Digital Twin Cockpit (`apps/web/src/features/admin/digital-twin-cockpit.tsx`)**:
+  - Live synchronization status badge, fleet metrics summary grid, active reconciliation anomaly list, and interactive UAV twin inspector table embedded into Admin Fleet Operations (`/admin/fleet`).
 
-<commit SHA>
+### 12. Milestone 7: Production Hardening & Observability
+- **Environment & Configuration Hardening (`packages/config/src/index.ts`)**:
+  - Validates environment variables and rejects insecure defaults in production (short/default `JWT_SECRET`, default `DATABASE_URL`, wildcard `*` `API_CORS_ORIGIN`, invalid `REDIS_URL`).
+  - Added configuration parameters for rate limits (`RATE_LIMIT_AUTH_MAX`, `RATE_LIMIT_EMERGENCY_MAX`, `RATE_LIMIT_AI_MAX`, `RATE_LIMIT_API_MAX`, `RATE_LIMIT_WINDOW_MS`), payload bounds (`REQUEST_BODY_LIMIT_BYTES`), and metrics.
+- **Request Correlation & Tracing (`apps/api/src/plugins/correlation.ts`)**:
+  - Global `onRequest` hook extracting `x-correlation-id` / `x-request-id` or generating a UUID v4.
+  - Automatically echoes correlation ID in response headers and embeds into RFC 7807 Problem Details error payloads, structured logs, and audit records.
+- **Tiered API Rate Limiting (`apps/api/src/plugins/rate-limit.ts`)**:
+  - Route-aware sliding window rate limiter:
+    - Auth Tier: 10 requests / min (`/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/refresh`).
+    - Emergency Tier: 30 requests / min (`/api/v1/drones/:id/emergency`, `/api/v1/missions/:id/cancel`).
+    - AI Tier: 60 requests / min (`/api/v1/ai/*`).
+    - Standard API Tier: 300 requests / min.
+    - Whitelisted: `/health`, `/ready`, `/metrics`, `/api/v1/modules`.
+  - Returns `429 Too Many Requests` in RFC 7807 Problem Details format with `Retry-After` header.
+- **Structured JSON Logging & Sensitive Data Redaction (`apps/api/src/infrastructure/logging/logger.ts`)**:
+  - Production-grade structured logging format (`timestamp`, `level`, `service`, `environment`, `correlationId`, `userId`, `organizationId`, `route`, `statusCode`, `durationMs`).
+  - Automatic recursive redaction of sensitive credentials (`password`, `token`, `secret`, `authorization`, `cookie`, `key`, `credential`).
+- **Operational Health & Readiness Probes (`apps/api/src/modules/observability/observability.routes.ts`)**:
+  - `GET /health`: Fast, non-blocking liveness probe returning process uptime and service identifier.
+  - `GET /ready`: Structured readiness probe verifying PostgreSQL, Redis, and AI availability with latency metrics. Returns 200 OK when healthy or 503 Service Unavailable when degraded.
+  - `GET /metrics`: In-memory metrics snapshot covering request counts, errors, auth failures, WebSocket states, and memory heap statistics.
+- **Security Headers & Payload Protection**:
+  - Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 0`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security` in production.
+  - Request body payload size bounded to 1MB (`REQUEST_BODY_LIMIT_BYTES`).
+- **Worker & CI Hardening**:
+  - `NotificationWorkerMetrics` and `TelemetryWorkerMetrics` added for background stream observability.
+  - Updated Docker Compose with service restart policies (`restart: unless-stopped`).
+  - Hardened GitHub Actions CI (`.github/workflows/quality.yml`) to run lint, typecheck, tests, build, and Python AI test suite across push and PR events.
+
+### 13. Milestone 8: Production Deployment & Infrastructure
+- **Container Architecture & Multi-Stage Dockerfiles**:
+  - `apps/api/Dockerfile`: Multi-stage Node.js 22 container running Fastify API with non-root user `skynav` (`uid: 1001`), `/health` probe, and port 3001.
+  - `apps/web/Dockerfile`: Multi-stage Node.js 22 container for Next.js 15 web cockpit with non-root user `nextjs` (`uid: 1001`) and port 3000.
+  - `services/ai/Dockerfile`: Lightweight Python 3.11 Alpine container for Advisory AI & CV microservice running with non-root user `skynav` (`uid: 1001`) and port 8000.
+  - `services/telemetry-worker/Dockerfile`: Node.js 22 container executing `TelemetryWorker` with graceful shutdown.
+  - `services/notification-worker/Dockerfile`: Node.js 22 container executing `NotificationWorker` with transactional outbox processing.
+  - `.dockerignore`: Excludes build artifacts, secrets, virtual environments, and node_modules from container context.
+- **Complete 7-Service Docker Compose Stack (`docker-compose.yml`)**:
+  - Configured full local integration stack (`postgres`, `redis`, `ai`, `api`, `web`, `telemetry-worker`, `notification-worker`).
+  - Defined explicit healthchecks and dependency conditions (`service_healthy`) across all services.
+  - Persistent named volumes (`skynav_postgres_data`, `skynav_redis_data`) and unified bridge network (`skynav_network`).
+- **Standalone Worker Entrypoints**:
+  - `services/telemetry-worker/src/main.ts`: Independent process entrypoint with Redis connection, throughput heartbeat, and SIGTERM trap.
+  - `services/notification-worker/src/main.ts`: Independent process entrypoint with Redis connection, outbox processor, and SIGTERM trap.
+- **Production Database & Seed Defense (`db/seeds/index.mjs`)**:
+  - Enforced production guard refusing to seed development test accounts in `production` unless explicitly opted-in via `ALLOW_DEV_SEED_IN_PROD=true`.
+- **Operational & Disaster Recovery Documentation**:
+  - `docs/operations/production-deployment.md`: Full architecture topology, ports, environment matrix, secret handling, and startup procedures.
+  - `docs/operations/backup-and-recovery.md`: Authoritative state hierarchy, PostgreSQL snapshots/PITR, migration rollback strategy, and transactional outbox poison-message isolation.
+
+## Remaining
+
+- **Milestone 9: Swarm Coordination & Multi-UAV Deconfliction**
+- **Milestone 10: Advanced Autonomy & Final Verification**
+
 
 ## Important decisions
 
-- Simulation-first
-- PostgreSQL/PostGIS
-- Redis
-- Shared contracts
-- AI never bypasses safety
+- **Tenant-Scoped Redis Channel Architecture**: Redis channels incorporate `organizationId` directly in the channel key (`telemetry:org:{orgId}`, `telemetry:drone:{orgId}:{droneId}`), guaranteeing that cross-tenant message leakage is impossible at the transport tier.
+- **Pure Simulator Boundary**: Simulator core remains 100% deterministic and free of Redis/Fastify/network dependencies. The bridge consumes simulator events via standard callbacks.
+- **Digital Twin is Observational**: The Digital Twin is a real-time observation, analysis, and synchronization layer. It never directly controls physical UAV hardware, actuators, or autopilots.
+- **Tripartite State Model**:
+  1. *Authoritative Domain State*: Database & mission state machine rules.
+  2. *Digital Twin Observation*: Reconciled real-time telemetry, kinematics, and discrepancy diagnostics.
+  3. *AI / CV Advisory State*: Advisory route recommendations, ETA confidence intervals, and optical perception.
+- **Container Security & Least Privilege**: All production containers execute under unprivileged non-root user IDs (`1001`), use minimal Alpine base images, and do not mount host Docker sockets or require root privileges.
+- **Strict Production Seed Defense**: Development accounts are never seeded into production environments automatically without explicit environment variable overrides.
+- **Strict Separation of Liveness and Readiness**: `/health` is an ultra-fast non-blocking probe indicating process liveness, while `/ready` performs deep dependency health checks (PostgreSQL, Redis, AI) without crashing the service during temporary upstream outages.
+- **Tiered Route Rate Limiting**: Dedicated rate limit quotas protect sensitive authentication, emergency controls, and heavy AI inference endpoints while allowing generous throughput for standard queries and zero throttling on internal telemetry streams.
+- **Server-Side Authorization on Subscriptions**: WebSocket subscription requests are verified against server-side session JWT claims and database ownership records, preventing unauthorized client-side claims.
+- **Bounded Backpressure & Stale Frame Dropping**: High-frequency telemetry streams prioritize freshness over historical buffering; if a client buffer backs up or an older packet arrives late, it is dropped in favor of current state.
+- **Aviation HUD Aesthetic**: High-density operational interface using liquid glass surfaces and restrained micro-interactions.
+- **Vendor-Agnostic Map Abstraction**: `MapView` supports pluggable map adapters (SVG Radar Map for lightweight zero-dependency rendering, ready for MapLibre/Mapbox).
+- **PostgreSQL/PostGIS + Kysely**: Typed relational & spatial database queries.
+- **Token Rotation & Reuse Detection**: Refresh tokens are single-use; reuse triggers instant revocation of all active sessions.
+- **AI is Advisory**: Route scores and ETAs are recommendations; safety policy and human operator sign-off remain authoritative.
+- **Perception is Advisory**: Computer vision optical hazard and landing assessments are strictly advisory and cannot override deterministic safety gates, geofences, or operator dispatch commands.
