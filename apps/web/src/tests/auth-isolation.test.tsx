@@ -25,17 +25,19 @@ describe("Authentication & Account-Scoped Isolation Security Tests", () => {
     assert.ok(!html.includes("Admin Registration"));
   });
 
-  it("2. Login page provides admin quick-fill and strictly excludes customer demo logins", () => {
+  it("2. Login page strictly excludes all demo logins, fill shortcuts, and credentials", () => {
     const html = renderToString(
       <AuthProvider>
         <LoginPage />
       </AuthProvider>
     );
 
-    assert.ok(html.includes("Fill Admin"));
+    assert.ok(!html.includes("Fill Admin"));
     assert.ok(!html.includes("Fill Customer"));
     assert.ok(!html.includes("Demo Customer"));
+    assert.ok(!html.includes("Quick demo access"));
     assert.ok(!html.includes("customer@skynav.test"));
+    assert.ok(!html.includes("admin@skynav.test"));
   });
 
   it("3. Customer dashboard renders zero-data empty state without hardcoded mock orders", () => {
