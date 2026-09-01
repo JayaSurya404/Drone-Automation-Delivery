@@ -28,6 +28,7 @@ export function createCartRepository(db: Kysely<Database>): CartRepository {
           "products.description",
           "products.category",
           "products.price_cents",
+          "products.mrp_cents",
           "products.currency",
           "products.image_url",
           "products.stock_quantity",
@@ -67,19 +68,36 @@ export function createCartRepository(db: Kysely<Database>): CartRepository {
 
     async updateQuantity(userId, itemId, quantity) {
       if (quantity <= 0) {
-        await db.deleteFrom("cart_items").where("id", "=", itemId).where("user_id", "=", userId).execute();
+        await db
+          .deleteFrom("cart_items")
+          .where("user_id", "=", userId)
+          .where((eb) => eb.or([
+            eb("id", "=", itemId),
+            eb("product_id", "=", itemId)
+          ]))
+          .execute();
       } else {
         await db
           .updateTable("cart_items")
           .set({ quantity, updated_at: new Date() })
-          .where("id", "=", itemId)
           .where("user_id", "=", userId)
+          .where((eb) => eb.or([
+            eb("id", "=", itemId),
+            eb("product_id", "=", itemId)
+          ]))
           .execute();
       }
     },
 
     async removeItem(userId, itemId) {
-      await db.deleteFrom("cart_items").where("id", "=", itemId).where("user_id", "=", userId).execute();
+      await db
+        .deleteFrom("cart_items")
+        .where("user_id", "=", userId)
+        .where((eb) => eb.or([
+          eb("id", "=", itemId),
+          eb("product_id", "=", itemId)
+        ]))
+        .execute();
     },
 
     async clearCart(userId) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart, formatINR } from "../../../features/commerce/cart-context";
@@ -22,8 +22,7 @@ export default function CartPage() {
     router = useRouter();
   } catch {}
 
-  const { cart, updateCartQuantity, removeCartItem, clearCart, isLoadingCart } = useCart();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { cart, updateCartQuantity, removeCartItem, clearCart, isLoadingCart, mutatingItemId } = useCart();
 
   const items = cart?.items || [];
   const itemCount = cart?.itemCount || 0;
@@ -75,7 +74,8 @@ export default function CartPage() {
           <button
             type="button"
             onClick={() => clearCart()}
-            className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
+            disabled={isLoadingCart}
+            className="text-xs font-semibold text-rose-500 hover:text-rose-700 disabled:opacity-50 transition"
           >
             Clear all items
           </button>
@@ -109,6 +109,7 @@ export default function CartPage() {
               const p = item.product;
               const unitPrice = p.pricePaise || p.priceCents || 0;
               const lineTotal = unitPrice * item.quantity;
+              const isItemMutating = mutatingItemId === item.id || mutatingItemId === item.productId;
 
               return (
                 <div
@@ -142,6 +143,7 @@ export default function CartPage() {
                     <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 p-1">
                       <button
                         type="button"
+                        disabled={isItemMutating}
                         onClick={() => {
                           if (item.quantity === 1) {
                             removeCartItem(item.id);
@@ -149,7 +151,8 @@ export default function CartPage() {
                             updateCartQuantity(item.id, item.quantity - 1);
                           }
                         }}
-                        className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                        className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition"
+                        aria-label="Decrease quantity"
                       >
                         <MinusIcon size={14} />
                       </button>
@@ -158,8 +161,10 @@ export default function CartPage() {
                       </span>
                       <button
                         type="button"
+                        disabled={isItemMutating}
                         onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                        className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                        className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition"
+                        aria-label="Increase quantity"
                       >
                         <PlusIcon size={14} />
                       </button>
@@ -167,8 +172,9 @@ export default function CartPage() {
 
                     <button
                       type="button"
+                      disabled={isItemMutating}
                       onClick={() => removeCartItem(item.id)}
-                      className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
+                      className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 disabled:opacity-40 transition"
                       aria-label="Remove item"
                     >
                       <TrashIcon size={16} />

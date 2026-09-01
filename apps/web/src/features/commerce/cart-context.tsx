@@ -18,6 +18,7 @@ interface CartContextType {
   isLoadingCart: boolean;
   isLoadingWishlist: boolean;
   isLoadingAddresses: boolean;
+  mutatingItemId: string | null;
   fetchCart: () => Promise<void>;
   fetchWishlist: () => Promise<void>;
   fetchAddresses: () => Promise<void>;
@@ -57,16 +58,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingCart, setIsLoadingCart] = useState<boolean>(false);
   const [isLoadingWishlist, setIsLoadingWishlist] = useState<boolean>(false);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState<boolean>(false);
+  const [mutatingItemId, setMutatingItemId] = useState<string | null>(null);
 
-  const getHeaders = useCallback(() => {
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    };
+  const getToken = useCallback(() => {
+    if (token) return token;
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("skynav_token");
+    }
+    return null;
   }, [token]);
 
+  const getHeaders = useCallback(() => {
+    const t = getToken();
+    return {
+      "Content-Type": "application/json",
+      ...(t ? { Authorization: `Bearer ${t}` } : {})
+    };
+  }, [getToken]);
+
   const fetchCart = useCallback(async () => {
-    if (!token) {
+    const t = getToken();
+    if (!t) {
       setCart(null);
       return;
     }
@@ -84,10 +96,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoadingCart(false);
     }
-  }, [token, getHeaders]);
+  }, [getToken, getHeaders]);
 
   const fetchWishlist = useCallback(async () => {
-    if (!token) {
+    const t = getToken();
+    if (!t) {
       setWishlist(null);
       return;
     }
@@ -105,10 +118,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoadingWishlist(false);
     }
-  }, [token, getHeaders]);
+  }, [getToken, getHeaders]);
 
   const fetchAddresses = useCallback(async () => {
-    if (!token) {
+    const t = getToken();
+    if (!t) {
       setAddresses([]);
       setSelectedAddress(null);
       return;
@@ -132,10 +146,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoadingAddresses(false);
     }
-  }, [token, getHeaders]);
+  }, [getToken, getHeaders]);
 
   useEffect(() => {
-    if (isAuthenticated && token) {
+    const t = getToken();
+    if (t) {
       fetchCart();
       fetchWishlist();
       fetchAddresses();
@@ -145,10 +160,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setAddresses([]);
       setSelectedAddress(null);
     }
-  }, [isAuthenticated, token, fetchCart, fetchWishlist, fetchAddresses]);
+  }, [isAuthenticated, token, getToken, fetchCart, fetchWishlist, fetchAddresses]);
 
   const addToCart = async (product: ProductResponse, quantity = 1): Promise<boolean> => {
-    if (!token) return false;
+    const t = getToken();
+    if (!t) return false;
+    setMutatingItemId(product.id);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/cart/items`, {
         method: "POST",
@@ -162,12 +179,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("Add to cart failed", err);
+    } finally {
+      setMutatingItemId(null);
     }
     return false;
   };
 
   const updateCartQuantity = async (itemId: string, quantity: number): Promise<boolean> => {
-    if (!token) return false;
+    const t = getToken();
+    if (!t) return false;
+    setMutatingItemId(itemId);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/cart/items/${itemId}`, {
         method: "PATCH",
@@ -178,15 +199,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         setCart(json.data);
         return true;
+      } else {
+        await fetchCart();
       }
     } catch (err) {
       console.error("Update cart failed", err);
+      await fetchCart();
+    } finally {
+      setMutatingItemId(null);
     }
     return false;
   };
 
   const removeCartItem = async (itemId: string): Promise<boolean> => {
-    if (!token) return false;
+    const t = getToken();
+    if (!t) return false;
+    setMutatingItemId(itemId);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/cart/items/${itemId}`, {
         method: "DELETE",
@@ -196,15 +224,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         setCart(json.data);
         return true;
+      } else {
+        await fetchCart();
       }
     } catch (err) {
       console.error("Remove cart item failed", err);
+      await fetchCart();
+    } finally {
+      setMutatingItemId(null);
     }
     return false;
   };
 
   const clearCart = async (): Promise<boolean> => {
-    if (!token) return false;
+    const t = getToken();
+    if (!t) return false;
+    setIsLoadingCart(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/cart`, {
         method: "DELETE",
@@ -214,15 +249,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const json = await res.json();
         setCart(json.data);
         return true;
+      } else {
+        await fetchCart();
       }
     } catch (err) {
       console.error("Clear cart failed", err);
+      await fetchCart();
+    } finally {
+      setIsLoadingCart(false);
     }
     return false;
   };
 
   const addToWishlist = async (product: ProductResponse): Promise<boolean> => {
-    if (!token) return false;
+    const t = getToken();
+    if (!t) return false;
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/wishlist/items`, {
         method: "POST",
@@ -241,7 +282,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeFromWishlist = async (productId: string): Promise<boolean> => {
-    if (!token) return false;
+    const t = getToken();
+    if (!t) return false;
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/wishlist/items/${productId}`, {
         method: "DELETE",
@@ -268,7 +310,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createAddress = async (data: CreateCustomerAddressRequest): Promise<CustomerAddressResponse | null> => {
-    if (!token) return null;
+    const t = getToken();
+    if (!t) return null;
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/addresses`, {
         method: "POST",
@@ -289,7 +332,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteAddress = async (id: string): Promise<boolean> => {
-    if (!token) return false;
+    const t = getToken();
+    if (!t) return false;
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/addresses/${id}`, {
         method: "DELETE",
@@ -315,6 +359,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         isLoadingCart,
         isLoadingWishlist,
         isLoadingAddresses,
+        mutatingItemId,
         fetchCart,
         fetchWishlist,
         fetchAddresses,
