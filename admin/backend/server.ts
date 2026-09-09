@@ -13,6 +13,7 @@ import dispatchRoutes from './routes/dispatch.js';
 import missionsRoutes from './routes/missions.js';
 import fleetRoutes from './routes/fleet.js';
 import internalRoutes from './routes/internal.js';
+import operationsRoutes from './routes/operations.js';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/admin/orders', ordersRoutes);
 app.use('/api/admin/dispatch', dispatchRoutes);
 app.use('/api/admin/missions', missionsRoutes);
 app.use('/api/admin/fleet', fleetRoutes);
+app.use('/api/admin', operationsRoutes);
 app.use('/api/internal', internalRoutes);
 
 // Health check

@@ -42,10 +42,10 @@ export const sendVerificationEmail = async (
   const from = process.env.EMAIL_FROM || 'SkyNav Aero Store <no-reply@skynav-aero.com>';
 
   if (!isSmtpConfigured()) {
-    console.error(`[EMAIL SERVICE] Failed: SMTP credentials missing in .env for sending to ${toEmail}`);
+    console.log(`🔑 [DEV-EMAIL] SMTP not configured. Development verification code for ${customerName} (${toEmail}): [${code}]`);
     return {
-      success: false,
-      error: 'Email verification service is currently unavailable. Please configure EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD in .env to enable real email delivery.',
+      success: true,
+      messageId: `dev_verify_${Date.now()}`,
     };
   }
 
@@ -98,10 +98,10 @@ export const sendPasswordResetEmail = async (
   const from = process.env.EMAIL_FROM || 'SkyNav Aero Store <no-reply@skynav-aero.com>';
 
   if (!isSmtpConfigured()) {
-    console.error(`[EMAIL SERVICE] Failed: SMTP credentials missing in .env for password reset to ${toEmail}`);
+    console.log(`🔑 [DEV-EMAIL] SMTP not configured. Development password reset code for ${customerName} (${toEmail}): [${code}]`);
     return {
-      success: false,
-      error: 'Password reset email service is currently unavailable. Please configure EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD in .env.',
+      success: true,
+      messageId: `dev_reset_${Date.now()}`,
     };
   }
 

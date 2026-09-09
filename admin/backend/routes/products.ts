@@ -195,4 +195,42 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// ARCHIVE / DELETE Product
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const prod = queryOne<any>('SELECT * FROM products WHERE id = ?', [id]);
+    if (!prod) {
+      res.status(404).json({ error: 'Product not found.' });
+      return;
+    }
+
+    runCommand('UPDATE products SET is_active = 0, stock_count = 0 WHERE id = ?', [id]);
+
+    await customerIntegrationClient.syncProduct({
+      action: 'delete',
+      product: {
+        id: prod.id,
+        name: prod.name,
+        slug: prod.slug,
+        brand: prod.brand,
+        categoryId: prod.category_id,
+        categoryName: 'General',
+        subCategory: prod.sub_category,
+        description: prod.description,
+        price: prod.price,
+        stockCount: 0,
+        weightGrams: prod.weight_grams,
+        isDroneEligible: Boolean(prod.is_drone_eligible),
+        image: prod.image,
+        inStock: false,
+      },
+    });
+
+    res.json({ success: true, message: 'Product archived and removed from customer catalog.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

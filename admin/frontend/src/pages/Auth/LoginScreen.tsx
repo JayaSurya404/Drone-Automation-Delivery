@@ -101,7 +101,7 @@ export const LoginScreen: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await login(cleanEmail, selectedRole, rememberMe);
+      const res = await login(cleanEmail, selectedRole, rememberMe, password);
       if (res.success) {
         setIsSuccess(true);
         setTimeout(() => {

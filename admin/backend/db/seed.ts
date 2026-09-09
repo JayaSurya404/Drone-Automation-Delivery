@@ -7,6 +7,9 @@ export const seedAdminDatabase = async () => {
 
   // Clear existing records
   db.exec(`
+    DELETE FROM system_notifications;
+    DELETE FROM maintenance_records;
+    DELETE FROM geofence_zones;
     DELETE FROM emergency_alerts;
     DELETE FROM audit_logs;
     DELETE FROM missions;
@@ -27,6 +30,10 @@ export const seedAdminDatabase = async () => {
   adminStmt.run('ADM-01', 'Rajesh Sharma', 'admin@skynav.com', passwordHash, 'super_admin', '+1 (555) 019-2831', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', 'Active');
   adminStmt.run('ADM-02', 'Arjun Kumar', 'ops@skynav.com', passwordHash, 'ops_admin', '+1 (555) 019-2832', null, 'Active');
   adminStmt.run('ADM-03', 'Ananya Sen', 'dispatch@skynav.com', passwordHash, 'dispatch_manager', '+1 (555) 019-2833', null, 'Active');
+  adminStmt.run('ADM-04', 'Vikram Singh', 'fleet@skynav.com', passwordHash, 'fleet_manager', '+1 (555) 019-2834', null, 'Active');
+  adminStmt.run('ADM-05', 'Meera Patel', 'support@skynav.com', passwordHash, 'support_admin', '+1 (555) 019-2835', null, 'Active');
+  adminStmt.run('ADM-06', 'Karan Mehta', 'analytics@skynav.com', passwordHash, 'analytics_admin', '+1 (555) 019-2836', null, 'Active');
+  adminStmt.run('ADM-07', 'Sneha Rao', 'analyst@skynav.com', passwordHash, 'analyst', '+1 (555) 019-2837', null, 'Active');
 
   // 2. CATEGORIES
   const catStmt = db.prepare(`
@@ -165,7 +172,46 @@ export const seedAdminDatabase = async () => {
     );
   }
 
-  console.log('✅ SkyNav Admin Database seeded with Admins, Products, Categories, and 40 Fleet Drones.');
+  // 5. GEOFENCE ZONES
+  const geoStmt = db.prepare(`
+    INSERT INTO geofence_zones (id, name, type, coordinates_json, bounds_radius_meters, active, max_altitude_meters, description)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  geoStmt.run('GEO-01', 'SFO Airport Exclusion Zone', 'nofly', JSON.stringify([[37.6213, -122.3790]]), 6200, 1, 3000, 'FAA Class B Airport Exclusion Corridor');
+  geoStmt.run('GEO-02', 'Presidio Military Coastal Zone', 'restricted', JSON.stringify([[37.7989, -122.4662]]), 2100, 1, 1200, 'Federal Security Reservation & Military Reserve');
+  geoStmt.run('GEO-03', 'Downtown SF High-Density Corridor', 'delivery', JSON.stringify([[37.7897, -122.3969]]), 3500, 1, 120, 'Primary Autonomous Delivery Flight Corridor');
+  geoStmt.run('GEO-04', 'UCSF Medical Heliport Caution Area', 'caution', JSON.stringify([[37.7631, -122.4580]]), 1000, 1, 350, 'Emergency Medevac Helicopter Transit Corridor');
+
+  // 6. MAINTENANCE RECORDS
+  const maintStmt = db.prepare(`
+    INSERT INTO maintenance_records (id, drone_id, issue, priority, scheduled_date, status, technician, notes)
+    VALUES (?, ?, ?, ?, date('now', '+3 days'), 'Scheduled', ?, ?)
+  `);
+
+  maintStmt.run('MNT-01', 'D-005', 'Rotor blade leading-edge micro-pitting detected during preflight inspection', 'Medium', 'Vikram Singh', 'Scheduled 100-cycle rotor replacement.');
+  maintStmt.run('MNT-02', 'D-012', 'LiDAR obstacle sensor calibration drift (+1.2cm variance)', 'Low', 'Fleet Tech A', 'Sensor array software zero-point recalibration.');
+  maintStmt.run('MNT-03', 'D-024', 'Battery cell #4 internal resistance higher than nominal (+8%)', 'High', 'Vikram Singh', 'Replace smart battery power pack module.');
+
+  // 7. SYSTEM NOTIFICATIONS
+  const notifStmt = db.prepare(`
+    INSERT INTO system_notifications (id, title, message, category, read)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  notifStmt.run('NOTIF-01', 'Fleet Readiness 100%', 'All 40 autonomous delivery drones telemetry links operational.', 'success', 0);
+  notifStmt.run('NOTIF-02', 'Weather Advisory', 'Wind gusts 14 kt at Hub #1. All operations within safe flight envelope.', 'info', 0);
+  notifStmt.run('NOTIF-03', 'Airspace Clearance', 'FAA Part 107 authorization renewed for Bay Area operational corridor.', 'info', 1);
+
+  // 8. AUDIT LOGS
+  const auditStmt = db.prepare(`
+    INSERT INTO audit_logs (id, admin_name, admin_role, action, entity, entity_id, severity, details)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  auditStmt.run('LOG-01', 'Rajesh Sharma', 'super_admin', 'SYSTEM_INITIALIZATION', 'System', 'CORE', 'Info', 'SkyNav Autonomous Drone System initialized');
+
+  console.log('✅ SkyNav Admin Database seeded with Admins, Products, Categories, 40 Drones, Geofences, Maintenance & Alerts.');
 };
 
 seedAdminDatabase().catch((err) => {

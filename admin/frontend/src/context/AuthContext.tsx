@@ -5,7 +5,7 @@ import { INITIAL_ADMINS } from '../data/mockData';
 interface AuthContextType {
   user: AdminUser | null;
   isAuthenticated: boolean;
-  login: (email: string, role?: AdminRole, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, role?: AdminRole, rememberMe?: boolean, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   switchRole: (role: AdminRole) => void;
   hasPermission: (pathOrRoles: string | AdminRole[]) => boolean;
@@ -13,6 +13,7 @@ interface AuthContextType {
 }
 
 const STORAGE_KEY = 'skynav_auth_user';
+const TOKEN_KEY = 'skynav_admin_token';
 
 // Role-to-Route Permission Matrix
 const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
@@ -90,9 +91,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore parse error
     }
-    // Default to Super Admin for initial seamless demo if nothing saved
-    return INITIAL_ADMINS[0];
+    return null;
   });
+
+  // Verify session on mount with backend /api/admin/auth/me
+  useEffect(() => {
+    let isMounted = true;
+    const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+
+    if (token) {
+      fetch('/api/admin/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            if (isMounted && data.user) {
+              const fullUser: AdminUser = {
+                ...data.user,
+                lastLogin: 'Active Session',
+                permissions: ROLE_PERMISSIONS[data.user.role as AdminRole] || ['*'],
+              };
+              setUser(fullUser);
+              const storage = localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage;
+              storage.setItem(STORAGE_KEY, JSON.stringify(fullUser));
+            }
+          } else {
+            // Token expired or invalid
+            if (isMounted) {
+              setUser(null);
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(STORAGE_KEY);
+              sessionStorage.removeItem(TOKEN_KEY);
+              sessionStorage.removeItem(STORAGE_KEY);
+            }
+          }
+        })
+        .catch(() => {
+          // Network error - retain cached user if present
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const getDefaultRouteForRole = (role?: AdminRole): string => {
     const activeRole = role || user?.role || 'super_admin';
@@ -116,64 +159,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (
     email: string,
     role: AdminRole = 'super_admin',
-    rememberMe = true
+    rememberMe = true,
+    password?: string
   ): Promise<{ success: boolean; error?: string }> => {
-    // Artificial latency for authentic enterprise feel
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
     const cleanEmail = email.trim().toLowerCase();
 
-    // Check against predefined enterprise profiles
-    let matchedUser = INITIAL_ADMINS.find(
-      (a) => a.email.toLowerCase() === cleanEmail || a.role === role
-    );
-
-    if (!matchedUser) {
-      const nameFromEmail = cleanEmail.split('@')[0].replace(/[._-]/g, ' ');
-      matchedUser = {
-        id: `ADM-${Math.floor(100 + Math.random() * 900)}`,
-        name: nameFromEmail.replace(/\b\w/g, (c) => c.toUpperCase()),
-        email: cleanEmail,
-        phone: '+91 98400 ' + Math.floor(10000 + Math.random() * 90000),
-        role,
-        status: 'Active',
-        lastLogin: 'Just now (New Session)',
-        permissions: ROLE_PERMISSIONS[role] || ['*'],
-      };
-    } else if (role && matchedUser.role !== role) {
-      // If user explicitly picked a demo role on the login UI, update role profile
-      const roleProfile = INITIAL_ADMINS.find((a) => a.role === role) || matchedUser;
-      matchedUser = {
-        ...roleProfile,
-        email: cleanEmail,
-      };
-    }
-
-    setUser(matchedUser);
-
     try {
-      if (rememberMe) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(matchedUser));
-        sessionStorage.removeItem(STORAGE_KEY);
-      } else {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(matchedUser));
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch {
-      // Storage unavailable fallback
-    }
+      const res = await fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password: password || 'admin123',
+          role,
+        }),
+      });
 
-    return { success: true };
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Invalid operator credentials.' };
+      }
+
+      const authenticatedUser: AdminUser = {
+        ...data.user,
+        lastLogin: 'Just now',
+        permissions: ROLE_PERMISSIONS[data.user.role as AdminRole] || ['*'],
+      };
+
+      setUser(authenticatedUser);
+
+      const storage = rememberMe ? localStorage : sessionStorage;
+      const otherStorage = rememberMe ? sessionStorage : localStorage;
+
+      storage.setItem(TOKEN_KEY, data.token);
+      storage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
+      otherStorage.removeItem(TOKEN_KEY);
+      otherStorage.removeItem(STORAGE_KEY);
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Unable to connect to authentication server.' };
+    }
   };
 
   const logout = () => {
     setUser(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Storage cleanup fallback
-    }
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
   };
 
   const switchRole = (role: AdminRole) => {

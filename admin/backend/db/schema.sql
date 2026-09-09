@@ -168,3 +168,41 @@ CREATE TABLE IF NOT EXISTS emergency_alerts (
   timestamp TEXT NOT NULL DEFAULT (datetime('now')),
   message TEXT NOT NULL
 );
+
+-- 9. GEOFENCE ZONES
+CREATE TABLE IF NOT EXISTS geofence_zones (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('delivery', 'restricted', 'nofly', 'caution')),
+  coordinates_json TEXT NOT NULL,
+  bounds_radius_meters REAL NOT NULL DEFAULT 500,
+  active INTEGER NOT NULL DEFAULT 1,
+  max_altitude_meters REAL NOT NULL DEFAULT 120,
+  description TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 10. MAINTENANCE RECORDS
+CREATE TABLE IF NOT EXISTS maintenance_records (
+  id TEXT PRIMARY KEY,
+  drone_id TEXT NOT NULL,
+  issue TEXT NOT NULL,
+  priority TEXT NOT NULL DEFAULT 'Medium' CHECK (priority IN ('Low', 'Medium', 'High', 'Critical')),
+  reported_date TEXT NOT NULL DEFAULT (date('now')),
+  scheduled_date TEXT NOT NULL DEFAULT (date('now', '+7 days')),
+  status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Under Maintenance', 'Repaired', 'Overdue')),
+  technician TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (drone_id) REFERENCES drones(id) ON DELETE CASCADE
+);
+
+-- 11. SYSTEM NOTIFICATIONS
+CREATE TABLE IF NOT EXISTS system_notifications (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('critical', 'warning', 'info', 'success')),
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

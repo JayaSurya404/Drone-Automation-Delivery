@@ -204,7 +204,7 @@ class RealtimeDeliveryService {
       connectionStatus: 'connected',
       lastUpdated: new Date().toISOString(),
       isCompleted: order.status === 'Delivered',
-      handoverOtp: order.deliveryOtp || '8492',
+      handoverOtp: order.deliveryOtp || '',
     };
   }
 }

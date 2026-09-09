@@ -166,6 +166,60 @@ class MockDataStore {
         }
       }
 
+      // 4. Fetch geofences from Admin Backend
+      const geoRes = await fetch('/api/admin/geofences');
+      if (geoRes.ok) {
+        const rawGeo = await geoRes.json();
+        if (Array.isArray(rawGeo) && rawGeo.length > 0) {
+          this.geofences = rawGeo;
+        }
+      }
+
+      // 5. Fetch emergencies from Admin Backend
+      const emgRes = await fetch('/api/admin/emergencies');
+      if (emgRes.ok) {
+        const rawEmg = await emgRes.json();
+        if (Array.isArray(rawEmg)) {
+          this.emergencies = rawEmg;
+        }
+      }
+
+      // 6. Fetch maintenance records from Admin Backend
+      const maintRes = await fetch('/api/admin/maintenance');
+      if (maintRes.ok) {
+        const rawMaint = await maintRes.json();
+        if (Array.isArray(rawMaint)) {
+          this.maintenance = rawMaint;
+        }
+      }
+
+      // 7. Fetch audit logs from Admin Backend
+      const auditRes = await fetch('/api/admin/audit-logs');
+      if (auditRes.ok) {
+        const rawAudit = await auditRes.json();
+        if (Array.isArray(rawAudit)) {
+          this.auditLogs = rawAudit;
+        }
+      }
+
+      // 8. Fetch system notifications from Admin Backend
+      const notifRes = await fetch('/api/admin/notifications');
+      if (notifRes.ok) {
+        const rawNotifs = await notifRes.json();
+        if (Array.isArray(rawNotifs)) {
+          this.notifications = rawNotifs;
+        }
+      }
+
+      // 9. Fetch customers from Admin Backend
+      const custRes = await fetch('/api/admin/customers');
+      if (custRes.ok) {
+        const rawCust = await custRes.json();
+        if (Array.isArray(rawCust) && rawCust.length > 0) {
+          this.customers = rawCust;
+        }
+      }
+
       this.notify();
     } catch (err) {
       console.warn('[Admin Store] Could not fetch real operational data, using cache:', err);
@@ -438,6 +492,14 @@ class MockDataStore {
     this.emergencies.unshift(newAlert);
     this.addNotification(`CRITICAL EMERGENCY: Drone ${droneId} - ${issueType}`, 'critical');
     this.addAuditLog('System', 'Autopilot AI', 'EMERGENCY_TRIGGERED', 'Drone', droneId, 'Critical', message);
+
+    // Sync to backend DB
+    fetch('/api/admin/emergencies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ droneId, issueType, message }),
+    }).catch(() => {});
+
     this.notify();
   }
 
@@ -468,6 +530,13 @@ class MockDataStore {
       emergency.status = 'resolved';
     }
 
+    // Sync command to backend DB
+    fetch(`/api/admin/emergencies/${emergency?.id || 'EMG-DEFAULT'}/command`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command, droneId }),
+    }).catch(() => {});
+
     this.notify();
   }
 
@@ -485,11 +554,13 @@ class MockDataStore {
   public markNotificationRead(id: string) {
     const notif = this.notifications.find((n) => n.id === id);
     if (notif) notif.read = true;
+    fetch(`/api/admin/notifications/${id}/read`, { method: 'PATCH' }).catch(() => {});
     this.notify();
   }
 
   public markAllNotificationsRead() {
     this.notifications.forEach((n) => (n.read = true));
+    fetch('/api/admin/notifications/read-all', { method: 'PATCH' }).catch(() => {});
     this.notify();
   }
 
@@ -505,6 +576,12 @@ class MockDataStore {
       severity,
       details,
     });
+
+    fetch('/api/admin/audit-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminName, adminRole, action, entity, entityId, severity, details }),
+    }).catch(() => {});
   }
 
   public updateMerchantStatus(merchantId: string, status: Merchant['status']) {
@@ -548,6 +625,13 @@ class MockDataStore {
     const id = `GEO-${(this.geofences.length + 1).toString().padStart(2, '0')}`;
     this.geofences.push({ id, ...geofence });
     this.addAuditLog('Rajesh Sharma', 'Super Admin', 'CREATE_GEOFENCE', 'Geofencing', id, 'Warning', `Created geofence zone ${geofence.name}`);
+
+    fetch('/api/admin/geofences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geofence),
+    }).catch(() => {});
+
     this.notify();
   }
 }

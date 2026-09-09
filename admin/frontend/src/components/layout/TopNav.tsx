@@ -28,9 +28,10 @@ import {
 interface TopNavProps {
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
-export const TopNav: React.FC<TopNavProps> = ({ sidebarCollapsed, onToggleSidebar }) => {
+export const TopNav: React.FC<TopNavProps> = ({ sidebarCollapsed, onToggleSidebar, onToggleMobileMenu }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, switchRole, getDefaultRouteForRole } = useAuth();
@@ -77,8 +78,8 @@ export const TopNav: React.FC<TopNavProps> = ({ sidebarCollapsed, onToggleSideba
 
   return (
     <header
-      className={`fixed top-0 right-0 z-30 h-16 border-b border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl transition-all duration-300 flex items-center ${
-        sidebarCollapsed ? 'left-20' : 'left-20 md:left-64'
+      className={`fixed top-0 right-0 z-30 h-16 border-b border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl transition-all duration-300 flex items-center left-0 ${
+        sidebarCollapsed ? 'md:left-20' : 'md:left-64'
       }`}
     >
       <div className="w-full flex items-center justify-between px-3 sm:px-6 gap-2 sm:gap-4">
@@ -87,7 +88,7 @@ export const TopNav: React.FC<TopNavProps> = ({ sidebarCollapsed, onToggleSideba
            ========================================= */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
-            onClick={onToggleSidebar}
+            onClick={onToggleMobileMenu || onToggleSidebar}
             className="md:hidden h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
             title="Toggle Navigation Menu"
           >

@@ -40,6 +40,7 @@ import { SimulationCenter } from './pages/Simulation/SimulationCenter';
 const MainLayout: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -48,15 +49,24 @@ const MainLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased selection:bg-cyan-500 selection:text-white transition-colors duration-200">
       {/* Sidebar Navigation */}
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((prev) => !prev)} />
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((prev) => !prev)}
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={() => setMobileMenuOpen(false)}
+      />
 
       {/* Top Navigation Header */}
-      <TopNav sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)} />
+      <TopNav
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+        onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
+      />
 
       {/* Main Content Area */}
       <main
-        className={`pt-20 px-4 sm:px-6 pb-12 transition-all duration-300 ${
-          sidebarCollapsed ? 'pl-20 sm:pl-24' : 'pl-20 md:pl-72'
+        className={`pt-20 px-3 sm:px-6 pb-12 transition-all duration-300 pl-3 ${
+          sidebarCollapsed ? 'md:pl-24' : 'md:pl-72'
         }`}
       >
         <div className="max-w-7xl mx-auto">

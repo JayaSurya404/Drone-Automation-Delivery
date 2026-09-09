@@ -105,6 +105,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (storedUser && storedToken && mounted) {
           setUser(storedUser);
           setToken(storedToken);
+          // Verify with database /auth/me
+          try {
+            const me = await api.customer.getProfile();
+            if (mounted) {
+              setUser(me);
+              storage.set(storage.keys.AUTH_USER, me);
+            }
+          } catch {
+            if (mounted) {
+              setUser(null);
+              setToken(null);
+              storage.remove(storage.keys.AUTH_USER);
+              storage.remove(storage.keys.AUTH_TOKEN);
+            }
+          }
         }
         if (mounted) setIsLoading(false);
         return;
@@ -177,6 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const res = await api.auth.login(payload);
         setUser(res.user);
         setToken(res.token);
+        storage.set(storage.keys.AUTH_USER, res.user);
+        storage.set(storage.keys.AUTH_TOKEN, res.token);
         return res;
       }
     } finally {
@@ -237,6 +254,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (res.user && res.token) {
       setUser(res.user);
       setToken(res.token);
+      storage.set(storage.keys.AUTH_USER, res.user);
+      storage.set(storage.keys.AUTH_TOKEN, res.token);
     }
     return res;
   };
