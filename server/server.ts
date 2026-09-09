@@ -20,6 +20,7 @@ import notificationsRoutes from './routes/notifications.js';
 import reviewsRoutes from './routes/reviews.js';
 import supportRoutes from './routes/support.js';
 import healthRoutes from './routes/health.js';
+import airspaceRoutes from './routes/airspace.js';
 
 dotenv.config();
 
@@ -62,6 +63,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/airspace', airspaceRoutes);
 
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

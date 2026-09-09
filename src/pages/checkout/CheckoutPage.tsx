@@ -5,6 +5,7 @@ import { useAddresses } from '../../context/AddressContext';
 import { useOrders } from '../../context/OrderContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CustomerAddress } from '../../types/address';
+import { ClearanceRadiusOption } from '../../types/airspace';
 import { DeliverySpeedOption, PaymentMethod, CustomerOrder } from '../../types/order';
 import { CheckoutStepper } from '../../components/checkout/CheckoutStepper';
 import { AddressStep } from '../../components/checkout/AddressStep';
@@ -29,6 +30,9 @@ export const CheckoutPage: React.FC = () => {
   const [lat, setLat] = useState<number>(selectedAddress?.latitude || 37.7749);
   const [lng, setLng] = useState<number>(selectedAddress?.longitude || -122.4194);
   const [dropZoneType, setDropZoneType] = useState<string>(selectedAddress?.dropZoneType || 'Lawn');
+  const [clearanceRadius, setClearanceRadius] = useState<ClearanceRadiusOption>(
+    ((selectedAddress?.clearanceRadiusMeters as any) || 3.5) as ClearanceRadiusOption
+  );
   const [instructions, setInstructions] = useState<string>(selectedAddress?.instructions || '');
   const [speedOption, setSpeedOption] = useState<DeliverySpeedOption>('express');
   const [scheduledTime, setScheduledTime] = useState<string | undefined>(undefined);
@@ -65,6 +69,7 @@ export const CheckoutPage: React.FC = () => {
           latitude: lat,
           longitude: lng,
           dropZoneType: dropZoneType as any,
+          clearanceRadiusMeters: clearanceRadius,
           instructions,
         },
         deliveryInstructions: instructions,
@@ -249,6 +254,7 @@ export const CheckoutPage: React.FC = () => {
               setLat(addr.latitude);
               setLng(addr.longitude);
               if (addr.dropZoneType) setDropZoneType(addr.dropZoneType);
+              if (addr.clearanceRadiusMeters) setClearanceRadius(addr.clearanceRadiusMeters as ClearanceRadiusOption);
             }}
             onNext={() => setCurrentStep(2)}
           />
@@ -257,10 +263,12 @@ export const CheckoutPage: React.FC = () => {
         {currentStep === 2 && address && (
           <LocationStep
             address={address}
-            onLocationConfirmed={(newLat, newLng, zone) => {
+            initialClearanceRadius={clearanceRadius}
+            onLocationConfirmed={(newLat, newLng, zone, radius) => {
               setLat(newLat);
               setLng(newLng);
               setDropZoneType(zone);
+              if (radius) setClearanceRadius(radius);
               setCurrentStep(3);
             }}
             onBack={() => setCurrentStep(1)}

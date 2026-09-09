@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAddresses } from '../../context/AddressContext';
 import { useNotifications } from '../../context/NotificationContext';
-import { CustomerAddress } from '../../types/address';
+import { CustomerAddress, GeofenceCheckResult } from '../../types/address';
+import { ClearanceRadiusOption, OverheadHazardChecklist } from '../../types/airspace';
 import { LocationPickerMap } from '../../components/map/LocationPickerMap';
 import { GeofenceChecker } from '../../components/map/GeofenceChecker';
+import { ClearanceRadiusSelector } from '../../components/map/ClearanceRadiusSelector';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Modal } from '../../components/common/Modal';
@@ -22,6 +24,7 @@ import {
   Building,
   Car,
   Shield,
+  Disc,
 } from 'lucide-react';
 
 export const AddressesPage: React.FC = () => {
@@ -31,6 +34,7 @@ export const AddressesPage: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null);
+  const [airspaceResult, setAirspaceResult] = useState<GeofenceCheckResult | null>(null);
 
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -45,6 +49,13 @@ export const AddressesPage: React.FC = () => {
     latitude: 37.7749,
     longitude: -122.4194,
     dropZoneType: 'Lawn' as 'Lawn' | 'Rooftop Pad' | 'Balcony Landing' | 'Driveway',
+    clearanceRadius: 3.5 as ClearanceRadiusOption,
+    hazardsChecklist: {
+      noWires: true,
+      levelGround: true,
+      clearSkyView: true,
+      petsProtected: true,
+    } as OverheadHazardChecklist,
     instructions: '',
     isDefault: false,
   });
@@ -53,6 +64,7 @@ export const AddressesPage: React.FC = () => {
 
   const handleOpenAdd = () => {
     setEditingAddress(null);
+    setAirspaceResult(null);
     setFormData({
       name: user?.name || '',
       phone: user?.phone || '',
@@ -66,6 +78,13 @@ export const AddressesPage: React.FC = () => {
       latitude: 37.7749,
       longitude: -122.4194,
       dropZoneType: 'Lawn',
+      clearanceRadius: 3.5,
+      hazardsChecklist: {
+        noWires: true,
+        levelGround: true,
+        clearSkyView: true,
+        petsProtected: true,
+      },
       instructions: '',
       isDefault: addresses.length === 0,
     });
@@ -74,6 +93,7 @@ export const AddressesPage: React.FC = () => {
 
   const handleOpenEdit = (addr: CustomerAddress) => {
     setEditingAddress(addr);
+    setAirspaceResult(null);
     setFormData({
       name: addr.name,
       phone: addr.phone,
@@ -87,6 +107,13 @@ export const AddressesPage: React.FC = () => {
       latitude: addr.latitude,
       longitude: addr.longitude,
       dropZoneType: (addr.dropZoneType as any) || 'Lawn',
+      clearanceRadius: ((addr.clearanceRadiusMeters as any) || 3.5) as ClearanceRadiusOption,
+      hazardsChecklist: {
+        noWires: true,
+        levelGround: true,
+        clearSkyView: true,
+        petsProtected: true,
+      },
       instructions: addr.instructions || '',
       isDefault: addr.isDefault,
     });
@@ -107,12 +134,20 @@ export const AddressesPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (airspaceResult && !airspaceResult.isEligible) {
+      alert(`Aviation Safety Violation: Cannot save address. ${airspaceResult.message}`);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       await saveAddress({
         ...(editingAddress ? { id: editingAddress.id } : {}),
         ...formData,
+        clearanceRadiusMeters: formData.clearanceRadius,
+        hazardsVerified: Object.values(formData.hazardsChecklist).every(Boolean),
       });
 
       showToast('Address Saved', editingAddress ? 'Address updated.' : 'New landing location added.', 'success');
@@ -131,7 +166,7 @@ export const AddressesPage: React.FC = () => {
         <div>
           <h1>Saved Delivery Addresses</h1>
           <p className="section-subtitle">
-            Manage your rooftop beacons, lawn landing pads, and verified GPS drone coordinates.
+            Manage your rooftop beacons, lawn landing pads, and verified GPS drone coordinates with FAA airspace clearance.
           </p>
         </div>
 
@@ -200,11 +235,26 @@ export const AddressesPage: React.FC = () => {
                 </div>
 
                 <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', fontSize: '0.825rem' }}>
-                  <div style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <Crosshair size={14} />
-                    <span>Drop Zone: {addr.dropZoneType || 'Lawn'}</span>
+                  <div style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Crosshair size={14} />
+                      <span>Drop Zone: {addr.dropZoneType || 'Lawn'}</span>
+                    </span>
+
+                    <span
+                      style={{
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(14, 165, 233, 0.1)',
+                        color: 'var(--accent-blue, #0284c7)',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      🎯 {addr.clearanceRadiusMeters || 3.5}m Clearance
+                    </span>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.15rem' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
                     GPS: {addr.latitude?.toFixed(4)}° N, {Math.abs(addr.longitude || 0)?.toFixed(4)}° W
                   </div>
                   {addr.instructions && (
@@ -256,8 +306,8 @@ export const AddressesPage: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingAddress ? 'Edit Delivery Address' : 'Add New Drone Landing Spot'}
-        maxWidth="620px"
+        title={editingAddress ? 'Edit Delivery Address & Drop Zone' : 'Add New Drone Landing Spot'}
+        maxWidth="680px"
       >
         <form onSubmit={handleSubmit}>
           {/* Label selector */}
@@ -336,16 +386,35 @@ export const AddressesPage: React.FC = () => {
             />
           </div>
 
-          {/* Interactive GPS Pin Dropper */}
-          <div style={{ margin: '1rem 0' }}>
-            <label className="form-label" style={{ marginBottom: '0.4rem', display: 'block' }}>
-              Set Precise Drone Landing Pin on Map:
-            </label>
+          {/* Airspace Safety Check */}
+          <div style={{ margin: '1rem 0 0.5rem 0' }}>
+            <GeofenceChecker
+              latitude={formData.latitude}
+              longitude={formData.longitude}
+              clearanceRadiusMeters={formData.clearanceRadius}
+              onEligibilityChecked={(res) => setAirspaceResult(res)}
+            />
+          </div>
+
+          {/* Interactive GPS Pin Dropper with NFZ Overlays */}
+          <div style={{ margin: '0.75rem 0 1rem 0' }}>
             <LocationPickerMap
               initialLat={formData.latitude}
               initialLng={formData.longitude}
+              clearanceRadius={formData.clearanceRadius}
+              isEligible={airspaceResult ? airspaceResult.isEligible : true}
               onLocationChange={(newLat, newLng) => setFormData({ ...formData, latitude: newLat, longitude: newLng })}
-              height="260px"
+              height="280px"
+            />
+          </div>
+
+          {/* Precision Clearance Radius Selector & Hazard Checklist */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <ClearanceRadiusSelector
+              selectedRadius={formData.clearanceRadius}
+              onRadiusChange={(radius) => setFormData({ ...formData, clearanceRadius: radius })}
+              checklist={formData.hazardsChecklist}
+              onChecklistChange={(list) => setFormData({ ...formData, hazardsChecklist: list })}
             />
           </div>
 
@@ -384,12 +453,17 @@ export const AddressesPage: React.FC = () => {
             </label>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
             <Button variant="ghost" type="button" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit" isLoading={isSaving}>
-              Save Address
+            <Button
+              variant="primary"
+              type="submit"
+              isLoading={isSaving}
+              disabled={airspaceResult !== null && !airspaceResult.isEligible}
+            >
+              {airspaceResult && !airspaceResult.isEligible ? 'Airspace Prohibited' : 'Save Address'}
             </Button>
           </div>
         </form>

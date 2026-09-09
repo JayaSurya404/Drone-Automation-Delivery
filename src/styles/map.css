@@ -232,3 +232,126 @@
   font-weight: 600;
   color: #dc2626;
 }
+
+/* ─── No-Fly Zone (NFZ) Overlay Styles ─── */
+.custom-nfz-leaflet-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.custom-nfz-leaflet-popup .leaflet-popup-content {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.nfz-popup-card {
+  padding: 1rem;
+  background: #ffffff;
+}
+
+.nfz-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.nfz-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nfz-popup-header.prohibited .nfz-badge {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.nfz-popup-header.warning .nfz-badge {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.nfz-code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.nfz-popup-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.nfz-popup-reason {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.65rem;
+}
+
+.nfz-popup-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  padding-top: 0.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* ─── Drop-Zone Clearance Circle Animation ─── */
+.dropzone-clearance-circle {
+  transition: all 0.3s ease;
+}
+
+/* ─── Airspace Map Toolbar ─── */
+.airspace-map-toolbar {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.airspace-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.airspace-toggle-btn.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+}
+
+.airspace-toggle-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}

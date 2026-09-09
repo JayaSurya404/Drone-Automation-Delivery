@@ -1,4 +1,5 @@
 import { DroneLocation, HubLocation } from '../types/tracking';
+import { NoFlyZone } from '../types/airspace';
 
 export interface MapViewport {
   center: [number, number];
@@ -20,6 +21,9 @@ export interface IMapProvider {
   updateHub(hub: HubLocation): void;
   setFlightRoute(route: [number, number][]): void;
   setGeofenceRadius(centerLat: number, centerLng: number, radiusMeters: number): void;
+  setNoFlyZones(zones: NoFlyZone[]): void;
+  setClearanceRadius(radiusMeters: number, isEligible?: boolean): void;
+  toggleAirspaceLayer(visible: boolean): void;
   fitBounds(coordinates: [number, number][]): void;
   destroy(): void;
 }
@@ -33,6 +37,11 @@ export class LeafletMapProvider implements IMapProvider {
   private hubMarker: any = null;
   private flightPolyline: any = null;
   private geofenceCircle: any = null;
+  private nfzLayerGroup: any = null;
+  private clearanceCircle: any = null;
+  private currentDestCoords: [number, number] | null = null;
+  private currentClearanceRadius: number = 3.5;
+  private currentClearanceEligible: boolean = true;
   private isLocationPicker: boolean = false;
   private onLocationSelectCallback?: (lat: number, lng: number) => void;
 
@@ -127,6 +136,8 @@ export class LeafletMapProvider implements IMapProvider {
       iconAnchor: [21, 21],
     });
 
+    this.currentDestCoords = [lat, lng];
+
     if (this.destMarker) {
       this.destMarker.setLatLng([lat, lng]);
     } else {
@@ -138,12 +149,16 @@ export class LeafletMapProvider implements IMapProvider {
       if (this.isLocationPicker) {
         this.destMarker.on('dragend', (e: any) => {
           const pos = e.target.getLatLng();
+          this.currentDestCoords = [pos.lat, pos.lng];
+          this.renderClearanceCircle();
           if (this.onLocationSelectCallback) {
             this.onLocationSelectCallback(pos.lat, pos.lng);
           }
         });
       }
     }
+
+    this.renderClearanceCircle();
 
     if (label) {
       this.destMarker.bindTooltip(label, { direction: 'top', offset: [0, -20] });
@@ -211,6 +226,105 @@ export class LeafletMapProvider implements IMapProvider {
     }
   }
 
+  // Precision Drop-Zone Clearance Radius Circle
+  public setClearanceRadius(radiusMeters: number, isEligible: boolean = true): void {
+    this.currentClearanceRadius = radiusMeters;
+    this.currentClearanceEligible = isEligible;
+    this.renderClearanceCircle();
+  }
+
+  private renderClearanceCircle(): void {
+    if (!this.mapInstance || !this.L || !this.currentDestCoords) return;
+
+    const isClear = this.currentClearanceEligible;
+    const strokeColor = isClear ? '#10b981' : '#ef4444';
+    const fillColor = isClear ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.28)';
+
+    if (this.clearanceCircle) {
+      this.clearanceCircle.setLatLng(this.currentDestCoords);
+      this.clearanceCircle.setRadius(this.currentClearanceRadius);
+      this.clearanceCircle.setStyle({
+        color: strokeColor,
+        fillColor: fillColor,
+        weight: 2,
+        dashArray: '4, 4',
+      });
+    } else {
+      this.clearanceCircle = this.L.circle(this.currentDestCoords, {
+        color: strokeColor,
+        fillColor: fillColor,
+        fillOpacity: 0.25,
+        radius: this.currentClearanceRadius,
+        weight: 2,
+        dashArray: '4, 4',
+        className: 'dropzone-clearance-circle',
+      }).addTo(this.mapInstance);
+    }
+  }
+
+  // Render No-Fly Zones (NFZ) & Restricted Corridors
+  public setNoFlyZones(zones: NoFlyZone[]): void {
+    if (!this.mapInstance || !this.L) return;
+
+    if (this.nfzLayerGroup) {
+      this.nfzLayerGroup.clearLayers();
+    } else {
+      this.nfzLayerGroup = this.L.layerGroup().addTo(this.mapInstance);
+    }
+
+    zones.forEach((zone) => {
+      const isProhibited = zone.restriction === 'PROHIBITED';
+      const strokeColor = isProhibited ? '#ef4444' : '#f59e0b';
+      const fillColor = isProhibited ? '#ef4444' : '#f59e0b';
+      const fillOpacity = isProhibited ? 0.16 : 0.12;
+
+      const circle = this.L.circle([zone.latitude, zone.longitude], {
+        radius: zone.radiusMeters,
+        color: strokeColor,
+        fillColor,
+        fillOpacity,
+        weight: isProhibited ? 2 : 1.5,
+        dashArray: isProhibited ? '6, 6' : '4, 4',
+        className: `nfz-circle ${isProhibited ? 'prohibited' : 'warning'}`,
+      });
+
+      const popupHtml = `
+        <div class="nfz-popup-card">
+          <div class="nfz-popup-header ${isProhibited ? 'prohibited' : 'warning'}">
+            <span class="nfz-badge">${isProhibited ? '⛔ PROHIBITED AIRSPACE' : '⚠️ RESTRICTED CAUTION'}</span>
+            <span class="nfz-code">${zone.code}</span>
+          </div>
+          <div class="nfz-popup-title">${zone.name}</div>
+          <p class="nfz-popup-reason">${zone.reason}</p>
+          <div class="nfz-popup-meta">
+            <span><strong>Authority:</strong> ${zone.regulatoryRef}</span>
+            <span><strong>Radius:</strong> ${(zone.radiusMeters / 1000).toFixed(1)} km</span>
+            <span><strong>Ceiling:</strong> ${zone.altitudeCeilingMeters}m MSL</span>
+          </div>
+        </div>
+      `;
+
+      circle.bindPopup(popupHtml, { maxWidth: 300, className: 'custom-nfz-leaflet-popup' });
+      circle.bindTooltip(`⚠️ ${zone.name}`, { direction: 'top', sticky: true });
+
+      circle.addTo(this.nfzLayerGroup);
+    });
+  }
+
+  public toggleAirspaceLayer(visible: boolean): void {
+    if (!this.mapInstance || !this.nfzLayerGroup) return;
+
+    if (visible) {
+      if (!this.mapInstance.hasLayer(this.nfzLayerGroup)) {
+        this.mapInstance.addLayer(this.nfzLayerGroup);
+      }
+    } else {
+      if (this.mapInstance.hasLayer(this.nfzLayerGroup)) {
+        this.mapInstance.removeLayer(this.nfzLayerGroup);
+      }
+    }
+  }
+
   public fitBounds(coordinates: [number, number][]): void {
     if (!this.mapInstance || !this.L || coordinates.length === 0) return;
     const bounds = this.L.latLngBounds(coordinates);
@@ -219,6 +333,16 @@ export class LeafletMapProvider implements IMapProvider {
 
   public destroy(): void {
     if (this.mapInstance) {
+      if (this.nfzLayerGroup) {
+        this.nfzLayerGroup.clearLayers();
+        this.nfzLayerGroup = null;
+      }
+      this.clearanceCircle = null;
+      this.destMarker = null;
+      this.droneMarker = null;
+      this.hubMarker = null;
+      this.flightPolyline = null;
+      this.geofenceCircle = null;
       this.mapInstance.remove();
       this.mapInstance = null;
     }

@@ -2,13 +2,14 @@ import { Router, Response } from 'express';
 import { db, queryAll, queryOne, runCommand } from '../db/database.js';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.js';
 import { droneTrackingService } from '../services/droneTrackingService.js';
+import { airspaceService } from '../services/airspaceService.js';
 
 const router = Router();
 
-// 1. CHECK GEOFENCE & DRONE DELIVERY ELIGIBILITY
+// 1. CHECK GEOFENCE & DRONE DELIVERY ELIGIBILITY (WITH NFZ AIRSPACE EVALUATION)
 router.post('/eligibility', (req, res): void => {
   try {
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, clearanceRadiusMeters } = req.body;
 
     if (latitude === undefined || longitude === undefined) {
       res.status(400).json({ error: 'Latitude and Longitude coordinates are required.' });
@@ -17,53 +18,26 @@ router.post('/eligibility', (req, res): void => {
 
     const lat = Number(latitude);
     const lng = Number(longitude);
+    const clearance = Number(clearanceRadiusMeters) || 3.5;
 
-    // Find closest active fulfillment hub in database
-    const zones = queryAll<any>("SELECT * FROM delivery_zones WHERE status = 'ACTIVE'");
-    if (zones.length === 0) {
-      res.json({
-        isEligible: false,
-        message: 'No active drone fulfillment hubs available in this region.',
-        distanceFromHubKm: 999,
-        estimatedFlightMinutes: 0,
-        status: 'Temporarily Unavailable',
-      });
+    if (isNaN(lat) || isNaN(lng)) {
+      res.status(400).json({ error: 'Invalid coordinates provided.' });
       return;
     }
 
-    let nearestZone = zones[0];
-    let minDistance = droneTrackingService.calculateDistanceKm(
-      nearestZone.hub_latitude,
-      nearestZone.hub_longitude,
-      lat,
-      lng
-    );
-
-    for (let i = 1; i < zones.length; i++) {
-      const dist = droneTrackingService.calculateDistanceKm(
-        zones[i].hub_latitude,
-        zones[i].hub_longitude,
-        lat,
-        lng
-      );
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestZone = zones[i];
-      }
-    }
-
-    const isEligible = minDistance <= nearestZone.radius_km;
-    const flightMinutes = isEligible ? Math.max(8, Math.round(minDistance * 1.6 + 4)) : 0;
+    const evaluation = airspaceService.evaluateDropZone(lat, lng, clearance);
 
     res.json({
-      isEligible,
-      message: isEligible
-        ? `Within ${nearestZone.name} airspace corridor. Safe drone landing confirmed.`
-        : `Location is ${minDistance} km away (exceeds ${nearestZone.radius_km} km max drone radius).`,
-      distanceFromHubKm: minDistance,
-      estimatedFlightMinutes: flightMinutes,
-      status: isEligible ? 'Eligible' : 'Not Eligible',
-      hubName: nearestZone.hub_name,
+      isEligible: evaluation.isEligible,
+      message: evaluation.message,
+      distanceFromHubKm: evaluation.distanceFromHubKm,
+      estimatedFlightMinutes: evaluation.estimatedFlightMinutes,
+      status: evaluation.isEligible ? 'Eligible' : 'Not Eligible',
+      airspaceStatus: evaluation.status,
+      conflictingZones: evaluation.conflictingZones,
+      hubName: evaluation.hubName,
+      safetyScorePercent: evaluation.safetyScorePercent,
+      clearanceRadiusMeters: evaluation.clearanceRadiusMeters,
     });
   } catch (err) {
     console.error('Eligibility error:', err);
@@ -114,6 +88,21 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
 
     if (!deliveryAddress) {
       res.status(400).json({ error: 'Please specify a valid delivery drop zone address.' });
+      return;
+    }
+
+    // Deterministic Pre-Flight Airspace Safety Validation
+    const destLat = Number(deliveryAddress.latitude);
+    const destLng = Number(deliveryAddress.longitude);
+    const clearance = Number(deliveryAddress.clearance_radius_meters || deliveryAddress.clearanceRadiusMeters) || 3.5;
+
+    const airspaceEval = airspaceService.evaluateDropZone(destLat, destLng, clearance);
+    if (!airspaceEval.isEligible) {
+      res.status(400).json({
+        error: `Aviation Safety Violation: Cannot dispatch mission. ${airspaceEval.message}`,
+        airspaceStatus: airspaceEval.status,
+        conflictingZones: airspaceEval.conflictingZones,
+      });
       return;
     }
 

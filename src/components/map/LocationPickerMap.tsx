@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LeafletMapProvider } from '../../services/mapProvider';
 import { useTheme } from '../../context/ThemeContext';
-import { Crosshair, MapPin } from 'lucide-react';
+import { api } from '../../services/api';
+import { NoFlyZone } from '../../types/airspace';
+import { Crosshair, MapPin, ShieldAlert, Layers, AlertTriangle } from 'lucide-react';
 import { Button } from '../common/Button';
 
 interface LocationPickerMapProps {
   initialLat?: number;
   initialLng?: number;
+  clearanceRadius?: number;
+  isEligible?: boolean;
   onLocationChange: (lat: number, lng: number) => void;
   height?: string;
 }
@@ -14,6 +18,8 @@ interface LocationPickerMapProps {
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   initialLat = 37.7749,
   initialLng = -122.4194,
+  clearanceRadius = 3.5,
+  isEligible = true,
   onLocationChange,
   height = '340px',
 }) => {
@@ -24,36 +30,71 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     lat: initialLat,
     lng: initialLng,
   });
+  const [noFlyZones, setNoFlyZones] = useState<NoFlyZone[]>([]);
+  const [isAirspaceVisible, setIsAirspaceVisible] = useState<boolean>(true);
 
+  // Initialize Map
   useEffect(() => {
     if (!containerRef.current) return;
 
     const provider = new LeafletMapProvider();
     mapProviderRef.current = provider;
 
-    provider.initialize({
-      containerElement: containerRef.current,
-      initialViewport: {
-        center: [initialLat, initialLng],
-        zoom: 14,
-      },
-      isInteractive: true,
-      theme,
-      onLocationSelect: (lat, lng) => {
-        setCoords({ lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) });
-        onLocationChange(parseFloat(lat.toFixed(6)), parseFloat(lng.toFixed(6)));
-      },
-    }).then(() => {
-      provider.updateDestination(initialLat, initialLng, 'Drag to adjust exact landing spot');
-      // Draw 15km SkyHub geofence circle
-      provider.setGeofenceRadius(37.7625, -122.4480, 15000);
-    });
+    provider
+      .initialize({
+        containerElement: containerRef.current,
+        initialViewport: {
+          center: [initialLat, initialLng],
+          zoom: 13,
+        },
+        isInteractive: true,
+        theme,
+        onLocationSelect: (lat, lng) => {
+          const formattedLat = parseFloat(lat.toFixed(6));
+          const formattedLng = parseFloat(lng.toFixed(6));
+          setCoords({ lat: formattedLat, lng: formattedLng });
+          onLocationChange(formattedLat, formattedLng);
+        },
+      })
+      .then(async () => {
+        provider.updateDestination(initialLat, initialLng, 'Target Landing Zone');
+        provider.setClearanceRadius(clearanceRadius, isEligible);
+        // Draw 18.5km SkyHub Metro Geofence boundary
+        provider.setGeofenceRadius(37.7625, -122.4480, 18500);
+
+        // Fetch active No-Fly Zones from airspace service
+        try {
+          const { zones } = await api.airspace.getZones();
+          if (zones && zones.length > 0) {
+            setNoFlyZones(zones);
+            provider.setNoFlyZones(zones);
+          }
+        } catch (e) {
+          console.warn('Could not fetch airspace zones:', e);
+        }
+      });
 
     return () => {
       provider.destroy();
       mapProviderRef.current = null;
     };
   }, [theme]);
+
+  // Update clearance radius whenever prop changes
+  useEffect(() => {
+    if (mapProviderRef.current) {
+      mapProviderRef.current.setClearanceRadius(clearanceRadius, isEligible);
+    }
+  }, [clearanceRadius, isEligible]);
+
+  // Toggle Airspace radar layers
+  const handleToggleAirspace = () => {
+    const nextState = !isAirspaceVisible;
+    setIsAirspaceVisible(nextState);
+    if (mapProviderRef.current) {
+      mapProviderRef.current.toggleAirspaceLayer(nextState);
+    }
+  };
 
   const handleUseCurrentLocation = () => {
     if ('geolocation' in navigator) {
@@ -65,6 +106,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           onLocationChange(lat, lng);
           if (mapProviderRef.current) {
             mapProviderRef.current.updateDestination(lat, lng, 'Current Device Location');
+            mapProviderRef.current.setClearanceRadius(clearanceRadius, isEligible);
             mapProviderRef.current.fitBounds([[lat, lng]]);
           }
         },
@@ -83,11 +125,26 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       <div className="map-wrapper" style={{ height }}>
         <div ref={containerRef} className="map-container" style={{ height: '100%' }} />
 
-        <div className="map-overlay-badge">
-          <MapPin size={16} color="#00e5ff" />
-          <span>Click map or drag marker to set exact drop-off spot</span>
+        {/* Floating Airspace Controls */}
+        <div className="airspace-map-toolbar">
+          <button
+            type="button"
+            onClick={handleToggleAirspace}
+            className={`airspace-toggle-btn ${isAirspaceVisible ? 'active' : ''}`}
+            title="Toggle Restricted No-Fly Zones radar overlay"
+          >
+            <ShieldAlert size={14} color={isAirspaceVisible ? '#ef4444' : 'var(--text-tertiary)'} />
+            <span>Airspace NFZ: {isAirspaceVisible ? 'ON' : 'OFF'}</span>
+          </button>
         </div>
 
+        {/* Hint Badge */}
+        <div className="map-overlay-badge">
+          <MapPin size={16} color="var(--accent-blue, #0284c7)" />
+          <span>Click map or drag marker to set drop-off spot</span>
+        </div>
+
+        {/* Floating Controls */}
         <div className="map-controls-floating">
           <button
             type="button"
@@ -101,6 +158,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         </div>
       </div>
 
+      {/* Airspace Map Legend & Coordinate Bar */}
       <div
         style={{
           display: 'flex',
@@ -109,16 +167,36 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           flexWrap: 'wrap',
           gap: '0.75rem',
           padding: '0.75rem 1rem',
-          background: 'var(--bg-tertiary)',
+          background: 'var(--bg-tertiary, #f8fafc)',
           borderRadius: 'var(--radius-md)',
-          fontSize: '0.85rem',
+          fontSize: '0.8rem',
+          border: '1px solid var(--border-subtle, #e2e8f0)',
         }}
       >
-        <div>
-          <span style={{ color: 'var(--text-tertiary)' }}>GPS Coordinates: </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
-            {coords.lat.toFixed(4)}° N, {Math.abs(coords.lng).toFixed(4)}° W
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ color: 'var(--text-tertiary)' }}>GPS Coordinates: </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {coords.lat.toFixed(4)}° N, {Math.abs(coords.lng).toFixed(4)}° W
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+              <span>{clearanceRadius}m Target Ring</span>
+            </span>
+
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+              <span>Prohibited NFZ</span>
+            </span>
+
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+              <span>Caution Corridor</span>
+            </span>
+          </div>
         </div>
 
         <Button
@@ -128,7 +206,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           leftIcon={<Crosshair size={14} />}
           onClick={handleUseCurrentLocation}
         >
-          Use My GPS Location
+          My GPS Location
         </Button>
       </div>
     </div>
