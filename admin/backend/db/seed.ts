@@ -1,5 +1,15 @@
 import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { db, initDb } from './database.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config();
 
 export const seedAdminDatabase = async () => {
   console.log('🌱 Initializing schema and seeding SkyNav Admin database...');
@@ -20,20 +30,25 @@ export const seedAdminDatabase = async () => {
     DELETE FROM admin_users;
   `);
 
-  // 1. ADMIN OPERATORS
-  const passwordHash = await bcrypt.hash('admin123', 10);
+  // 1. SINGLE FULL-ACCESS ADMIN ACCOUNT
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@skynav.com').trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
   const adminStmt = db.prepare(`
     INSERT INTO admin_users (id, name, email, password_hash, role, phone, avatar, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  adminStmt.run('ADM-01', 'Rajesh Sharma', 'admin@skynav.com', passwordHash, 'super_admin', '+1 (555) 019-2831', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', 'Active');
-  adminStmt.run('ADM-02', 'Arjun Kumar', 'ops@skynav.com', passwordHash, 'ops_admin', '+1 (555) 019-2832', null, 'Active');
-  adminStmt.run('ADM-03', 'Ananya Sen', 'dispatch@skynav.com', passwordHash, 'dispatch_manager', '+1 (555) 019-2833', null, 'Active');
-  adminStmt.run('ADM-04', 'Vikram Singh', 'fleet@skynav.com', passwordHash, 'fleet_manager', '+1 (555) 019-2834', null, 'Active');
-  adminStmt.run('ADM-05', 'Meera Patel', 'support@skynav.com', passwordHash, 'support_admin', '+1 (555) 019-2835', null, 'Active');
-  adminStmt.run('ADM-06', 'Karan Mehta', 'analytics@skynav.com', passwordHash, 'analytics_admin', '+1 (555) 019-2836', null, 'Active');
-  adminStmt.run('ADM-07', 'Sneha Rao', 'analyst@skynav.com', passwordHash, 'analyst', '+1 (555) 019-2837', null, 'Active');
+  adminStmt.run(
+    'ADM-01',
+    'Rajesh Sharma',
+    adminEmail,
+    passwordHash,
+    'admin',
+    '+1 (555) 019-2831',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    'Active'
+  );
 
   // 2. CATEGORIES
   const catStmt = db.prepare(`

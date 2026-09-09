@@ -403,15 +403,23 @@ router.get('/tickets', (_req: Request, res: Response): void => {
   res.json(ticketStore);
 });
 
-router.patch('/tickets/:id', (req: Request, res: Response): void => {
-  const { id } = req.params;
-  const updates = req.body;
-  const t = ticketStore.find((item) => item.id === id);
-  if (t) {
-    Object.assign(t, updates);
-    res.json({ success: true, ticket: t });
-  } else {
-    res.status(404).json({ error: 'Ticket not found' });
+// ── ADMIN ACCOUNTS ──
+router.get('/admins', (_req: Request, res: Response): void => {
+  try {
+    const rows = queryAll<any>('SELECT id, name, email, role, phone, avatar, status, created_at FROM admin_users');
+    res.json(rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role,
+      phone: r.phone,
+      avatar: r.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      status: r.status,
+      lastLogin: 'Active Session',
+      permissions: ['*'],
+    })));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

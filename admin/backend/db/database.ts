@@ -26,6 +26,15 @@ db.pragma('foreign_keys = ON');
 export const initDb = () => {
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+
+  // Ensure admin_users table schema supports 'admin' role
+  try {
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='admin_users'").get() as any;
+    if (tableInfo && !tableInfo.sql.includes("'admin'")) {
+      db.exec('DROP TABLE IF EXISTS admin_users;');
+    }
+  } catch {}
+
   db.exec(schemaSql);
 };
 

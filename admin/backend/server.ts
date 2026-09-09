@@ -15,6 +15,15 @@ import fleetRoutes from './routes/fleet.js';
 import internalRoutes from './routes/internal.js';
 import operationsRoutes from './routes/operations.js';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env from workspace root and local directory
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
 
 // Initialize SQLite database schema

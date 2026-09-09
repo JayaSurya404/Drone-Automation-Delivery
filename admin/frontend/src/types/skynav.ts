@@ -259,6 +259,7 @@ export interface AuditLog {
 }
 
 export type AdminRole =
+  | 'admin'
   | 'super_admin'
   | 'ops_admin'
   | 'fleet_manager'

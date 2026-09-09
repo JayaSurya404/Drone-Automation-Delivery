@@ -7,7 +7,7 @@ import { useOperationsModals } from '../../context/OperationsModalContext';
 import { mockStore } from '../../services/mockDataStore';
 import { Avatar } from '../common/Avatar';
 import { Modal } from '../common/Modal';
-import { AdminRole } from '../../types/skynav';
+
 import {
   Search,
   Bell,
@@ -34,7 +34,7 @@ interface TopNavProps {
 export const TopNav: React.FC<TopNavProps> = ({ sidebarCollapsed, onToggleSidebar, onToggleMobileMenu }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, switchRole, getDefaultRouteForRole } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { overallStatus, openHealthDrawer } = useSystemHealth();
   const { openCommandPalette, openDigitalTwin, openSimulation } = useOperationsModals();
@@ -58,14 +58,7 @@ export const TopNav: React.FC<TopNavProps> = ({ sidebarCollapsed, onToggleSideba
   const notifications = mockStore.getNotifications();
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const ROLES_LIST: { role: AdminRole; label: string }[] = [
-    { role: 'super_admin', label: 'Super Admin' },
-    { role: 'ops_admin', label: 'Operations Admin' },
-    { role: 'fleet_manager', label: 'Fleet Manager' },
-    { role: 'dispatch_manager', label: 'Dispatch Manager' },
-    { role: 'support_admin', label: 'Support Admin' },
-    { role: 'analytics_admin', label: 'Analytics Admin' },
-  ];
+
 
   // Format time components cleanly
   const timeFormatted = currentTime.toLocaleTimeString('en-IN', {
@@ -296,32 +289,7 @@ export const TopNav: React.FC<TopNavProps> = ({ sidebarCollapsed, onToggleSideba
                   <User className="h-4 w-4 text-cyan-500" /> My Profile & Security
                 </button>
 
-                {/* Role Switcher Menu for Jury / Demo */}
-                <div className="p-2 border-t border-b border-slate-100 dark:border-slate-800 space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Switch Active Role
-                  </span>
-                  <div className="grid grid-cols-2 gap-1">
-                    {ROLES_LIST.map((r) => (
-                      <button
-                        key={r.role}
-                        onClick={() => {
-                          switchRole(r.role);
-                          setIsProfileOpen(false);
-                          const target = getDefaultRouteForRole(r.role);
-                          navigate(target);
-                        }}
-                        className={`text-[10px] p-1.5 rounded-lg text-left font-bold capitalize transition-colors truncate ${
-                          user?.role === r.role
-                            ? 'bg-cyan-500 text-slate-950 font-black'
-                            : 'bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
 
                 <button
                   onClick={() => {

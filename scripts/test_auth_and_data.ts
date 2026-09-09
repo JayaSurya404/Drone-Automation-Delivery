@@ -68,9 +68,24 @@ async function runAuthAndDataAuditTest() {
   console.log('✅ Customer orders strictly sourced from customer.db');
 
   // ──────────────────────────────────────────
-  // TEST 4: ADMIN AUTHENTICATION & RBAC
+  // TEST 4: ADMIN AUTHENTICATION & SINGLE ADMIN FULL-ACCESS
   // ──────────────────────────────────────────
-  console.log('\n[TEST 4] Testing Admin login with seeded DB credentials');
+  console.log('\n[TEST 4a] Testing wrong password fails with 401');
+  const wrongPwdRes = await fetch(`${ADMIN_API}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'admin@skynav.com',
+      password: 'WrongPassword999!',
+    }),
+  });
+  console.log('Wrong password status:', wrongPwdRes.status);
+  if (wrongPwdRes.status !== 401) {
+    throw new Error(`Expected 401 for wrong password, got: ${wrongPwdRes.status}`);
+  }
+  console.log('✅ Wrong password correctly rejected with 401 Unauthorized');
+
+  console.log('\n[TEST 4b] Testing Admin login with seeded single admin DB credentials');
   console.log('Credentials: admin@skynav.com / admin123');
 
   const adminLoginRes = await fetch(`${ADMIN_API}/auth/login`, {
@@ -79,7 +94,6 @@ async function runAuthAndDataAuditTest() {
     body: JSON.stringify({
       email: 'admin@skynav.com',
       password: 'admin123',
-      role: 'super_admin',
     }),
   });
 
@@ -97,10 +111,10 @@ async function runAuthAndDataAuditTest() {
     email: adminLoginData.user.email,
   });
 
-  if (adminLoginData.user.role !== 'super_admin') {
-    throw new Error(`Expected role super_admin, got: ${adminLoginData.user.role}`);
+  if (adminLoginData.user.role !== 'admin') {
+    throw new Error(`Expected role 'admin', got: ${adminLoginData.user.role}`);
   }
-  console.log('✅ Admin login & RBAC verified against admin.db');
+  console.log('✅ Single Admin login verified against admin.db with role: admin');
 
   console.log('\n[TEST 5] Verifying Admin session restoration via GET /api/admin/auth/me');
   const adminMeRes = await fetch(`${ADMIN_API}/auth/me`, {

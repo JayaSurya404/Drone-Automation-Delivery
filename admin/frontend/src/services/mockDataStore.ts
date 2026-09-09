@@ -232,6 +232,15 @@ class MockDataStore {
         }
       }
 
+      // 13. Fetch admin users from Admin Backend
+      const admRes = await fetch('/api/admin/admins');
+      if (admRes.ok) {
+        const rawAdm = await admRes.json();
+        if (Array.isArray(rawAdm)) {
+          this.admins = rawAdm;
+        }
+      }
+
       this.notify();
     } catch (err) {
       console.warn('[Admin Store] Could not fetch real operational data from backend API:', err);

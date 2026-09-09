@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('super_admin', 'ops_admin', 'fleet_manager', 'dispatch_manager', 'support_admin', 'analytics_admin', 'analyst')),
+  role TEXT NOT NULL CHECK (role IN ('admin', 'super_admin', 'ops_admin', 'fleet_manager', 'dispatch_manager', 'support_admin', 'analytics_admin', 'analyst')),
   phone TEXT,
   avatar TEXT,
   status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),

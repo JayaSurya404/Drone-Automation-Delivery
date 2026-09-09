@@ -14,67 +14,16 @@ interface AuthContextType {
 const STORAGE_KEY = 'skynav_auth_user';
 const TOKEN_KEY = 'skynav_admin_token';
 
-// Role-to-Route Permission Matrix
+// Role-to-Route Permission Matrix (Single Full-Access Admin Account)
 const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
+  admin: ['*'],
   super_admin: ['*'],
-  ops_admin: [
-    '/dashboard',
-    '/simulation',
-    '/operations',
-    '/orders',
-    '/missions',
-    '/packages',
-    '/routes',
-    '/fleet',
-    '/customers',
-    '/reports',
-    '/support',
-    '/notifications',
-  ],
-  fleet_manager: [
-    '/dashboard',
-    '/simulation',
-    '/fleet',
-    '/battery-health',
-    '/maintenance',
-    '/operations',
-    '/emergency',
-    '/notifications',
-  ],
-  dispatch_manager: [
-    '/dashboard',
-    '/simulation',
-    '/orders',
-    '/missions',
-    '/packages',
-    '/routes',
-    '/operations',
-    '/emergency',
-    '/notifications',
-  ],
-  support_admin: [
-    '/simulation',
-    '/customers',
-    '/orders',
-    '/support',
-    '/notifications',
-  ],
-  analytics_admin: [
-    '/dashboard',
-    '/simulation',
-    '/analytics',
-    '/reports',
-    '/payments',
-    '/notifications',
-  ],
-  analyst: [
-    '/dashboard',
-    '/simulation',
-    '/analytics',
-    '/reports',
-    '/payments',
-    '/notifications',
-  ],
+  ops_admin: ['*'],
+  fleet_manager: ['*'],
+  dispatch_manager: ['*'],
+  support_admin: ['*'],
+  analytics_admin: ['*'],
+  analyst: ['*'],
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -109,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const fullUser: AdminUser = {
                 ...data.user,
                 lastLogin: 'Active Session',
-                permissions: ROLE_PERMISSIONS[data.user.role as AdminRole] || ['*'],
+                permissions: ['*'],
               };
               setUser(fullUser);
               const storage = localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage;
@@ -136,28 +85,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const getDefaultRouteForRole = (role?: AdminRole): string => {
-    const activeRole = role || user?.role || 'super_admin';
-    switch (activeRole) {
-      case 'fleet_manager':
-        return '/fleet';
-      case 'dispatch_manager':
-        return '/orders';
-      case 'support_admin':
-        return '/customers';
-      case 'analytics_admin':
-      case 'analyst':
-        return '/analytics';
-      case 'super_admin':
-      case 'ops_admin':
-      default:
-        return '/dashboard';
-    }
+  const getDefaultRouteForRole = (_role?: AdminRole): string => {
+    return '/dashboard';
   };
 
   const login = async (
     email: string,
-    role: AdminRole = 'super_admin',
+    role: AdminRole = 'admin',
     rememberMe = true,
     password?: string
   ): Promise<{ success: boolean; error?: string }> => {
@@ -169,20 +103,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
-          password: password || 'admin123',
+          password: password || '',
           role,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Invalid operator credentials.' };
+        return { success: false, error: data.error || 'Invalid administrator credentials.' };
       }
 
       const authenticatedUser: AdminUser = {
         ...data.user,
-        lastLogin: 'Just now',
-        permissions: ROLE_PERMISSIONS[data.user.role as AdminRole] || ['*'],
+        lastLogin: 'Active Session',
+        permissions: ['*'],
       };
 
       setUser(authenticatedUser);
@@ -209,34 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem(TOKEN_KEY);
   };
 
-  const switchRole = (role: AdminRole) => {
-    const ROLE_EMAILS: Record<AdminRole, string> = {
-      super_admin: 'admin@skynav.com',
-      ops_admin: 'ops@skynav.com',
-      dispatch_manager: 'dispatch@skynav.com',
-      fleet_manager: 'fleet@skynav.com',
-      support_admin: 'support@skynav.com',
-      analytics_admin: 'analytics@skynav.com',
-      analyst: 'analyst@skynav.com',
-    };
-    const targetEmail = ROLE_EMAILS[role] || 'admin@skynav.com';
-    login(targetEmail, role, true, 'admin123').catch((err) => {
-      console.error('[Admin Auth] Error switching role via database auth:', err);
-    });
+  const switchRole = (_role: AdminRole) => {
+    // Single full-access admin account mode active - no role switching needed
   };
 
-  const hasPermission = (pathOrRoles: string | AdminRole[]): boolean => {
+  const hasPermission = (_pathOrRoles: string | AdminRole[]): boolean => {
     if (!user) return false;
-    if (user.role === 'super_admin') return true;
-
-    if (Array.isArray(pathOrRoles)) {
-      return pathOrRoles.includes(user.role);
-    }
-
-    const path = pathOrRoles.toLowerCase();
-    const allowed = ROLE_PERMISSIONS[user.role] || [];
-    if (allowed.includes('*')) return true;
-    return allowed.some((allowedPath) => path.startsWith(allowedPath));
+    // Single admin account has authoritative full access across all operations
+    return true;
   };
 
   return (

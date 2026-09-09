@@ -15,36 +15,24 @@ import {
   ShieldAlert,
   Loader2,
 } from 'lucide-react';
-import { AdminRole } from '../../types/skynav';
 import { RealDroneGallery } from '../../components/drone/RealDroneGallery';
 import { ForgotPasswordScreen } from './ForgotPasswordScreen';
 import { EmailVerificationScreen } from './EmailVerificationScreen';
 
 export const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { login, getDefaultRouteForRole } = useAuth();
+  const { login } = useAuth();
 
   const [view, setView] = useState<'login' | 'forgot' | 'verify'>('login');
   const [email, setEmail] = useState('admin@skynav.com');
-  const [password, setPassword] = useState('Admin@2026!');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<AdminRole>('super_admin');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-
-  // Quick Demo Roles for easy inspection during review
-  const DEMO_ROLES: { role: AdminRole; label: string; email: string; name: string }[] = [
-    { role: 'super_admin', label: 'Super Admin', email: 'admin@skynav.com', name: 'Rajesh Sharma' },
-    { role: 'ops_admin', label: 'Operations Admin', email: 'operations@skynav.com', name: 'Arjun Kumar' },
-    { role: 'fleet_manager', label: 'Fleet Manager', email: 'fleet@skynav.com', name: 'Ananya Menon' },
-    { role: 'dispatch_manager', label: 'Dispatch Manager', email: 'dispatch@skynav.com', name: 'Vikram Iyer' },
-    { role: 'support_admin', label: 'Support Admin', email: 'support@skynav.com', name: 'Deepa Krishnan' },
-    { role: 'analytics_admin', label: 'Analytics Admin', email: 'analytics@skynav.com', name: 'Meera Patel' },
-  ];
 
   // Password rules validation
   const hasMinLength = password.length >= 8;
@@ -65,14 +53,7 @@ export const LoginScreen: React.FC = () => {
 
   const strengthScore = getStrengthScore();
 
-  const handleSelectDemoRole = (roleObj: (typeof DEMO_ROLES)[0]) => {
-    setSelectedRole(roleObj.role);
-    setEmail(roleObj.email);
-    setPassword('Admin@2026!');
-    setEmailError('');
-    setPasswordError('');
-    setGeneralError('');
-  };
+
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -100,12 +81,11 @@ export const LoginScreen: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await login(cleanEmail, selectedRole, rememberMe, password);
+      const res = await login(cleanEmail, 'admin', rememberMe, password);
       if (res.success) {
         setIsSuccess(true);
         setTimeout(() => {
-          const targetPath = getDefaultRouteForRole(selectedRole);
-          navigate(targetPath);
+          navigate('/dashboard');
         }, 500);
       } else {
         setGeneralError(res.error || 'Authentication failed. Please verify credentials.');
@@ -177,35 +157,8 @@ export const LoginScreen: React.FC = () => {
             </div>
             <h2 className="text-2xl font-black text-slate-100 tracking-tight">Sign In To SkyNav</h2>
             <p className="text-xs text-slate-400">
-              Select an operational role or enter authorized credentials.
+              Enter authorized administrator credentials.
             </p>
-          </div>
-
-          {/* Quick Demo Role Selector Pills */}
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-              Quick Role Demo Access (Click to test role experience)
-            </label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {DEMO_ROLES.map((r) => {
-                const isSelected = selectedRole === r.role;
-                return (
-                  <button
-                    key={r.role}
-                    type="button"
-                    onClick={() => handleSelectDemoRole(r)}
-                    className={`p-2 rounded-xl text-left transition-all border ${
-                      isSelected
-                        ? 'bg-cyan-500/20 border-cyan-500/80 text-cyan-300 shadow-md'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-[10px] font-bold truncate">{r.label}</p>
-                    <p className="text-[9px] text-slate-500 font-mono truncate">{r.name}</p>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {generalError && (
@@ -363,7 +316,7 @@ export const LoginScreen: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <span>Sign In as {DEMO_ROLES.find((d) => d.role === selectedRole)?.label || 'Super Admin'}</span>
+                  <span>Sign In to Admin Dashboard</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

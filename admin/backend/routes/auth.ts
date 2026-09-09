@@ -10,8 +10,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password, role } = req.body;
 
-    if (!email) {
-      res.status(400).json({ error: 'Email is required.' });
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required.' });
       return;
     }
 
@@ -19,24 +19,19 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     const admin = queryOne<any>('SELECT * FROM admin_users WHERE email = ?', [cleanEmail]);
 
     if (!admin) {
-      res.status(401).json({ error: 'Invalid operator credentials.' });
+      res.status(401).json({ error: 'Invalid admin credentials.' });
       return;
     }
 
-    // Check password if provided
-    if (password) {
-      const match = await bcrypt.compare(password, admin.password_hash);
-      if (!match && password !== 'admin123' && password !== 'Admin@2026!') {
-        res.status(401).json({ error: 'Invalid operator credentials.' });
-        return;
-      }
+    // Strictly verify bcrypt password
+    const match = await bcrypt.compare(password, admin.password_hash);
+    if (!match) {
+      res.status(401).json({ error: 'Invalid admin credentials.' });
+      return;
     }
 
-    // Role override if specified and authorized
-    const activeRole = role || admin.role;
-
     const token = jwt.sign(
-      { id: admin.id, email: admin.email, role: activeRole },
+      { id: admin.id, email: admin.email, role: admin.role },
       JWT_SECRET,
       { expiresIn: '12h' }
     );
@@ -48,7 +43,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         name: admin.name,
         email: admin.email,
         phone: admin.phone,
-        role: activeRole,
+        role: admin.role,
         status: admin.status,
         avatar: admin.avatar,
       },
