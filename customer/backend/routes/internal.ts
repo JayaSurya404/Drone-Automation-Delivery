@@ -58,15 +58,16 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
       // Ensure drone exists in local customer drones table to satisfy foreign key constraint
       const existingDrone = queryOne<any>('SELECT id FROM drones WHERE id = ?', [payload.drone.id]);
       if (!existingDrone) {
+        const identifier = `${payload.drone.name || 'SkyNav Drone'} [${payload.drone.id}]`;
         runCommand(`
-          INSERT INTO drones (id, identifier, model, battery_level, status, payload_capacity_kg)
-          VALUES (?, ?, ?, ?, 'IN_FLIGHT', ?)
+          INSERT INTO drones (id, identifier, model, battery_level, status, max_payload_kg, latitude, longitude)
+          VALUES (?, ?, ?, ?, 'ASSIGNED', ?, 37.7625, -122.4480)
         `, [
           payload.drone.id,
-          payload.drone.name,
-          payload.drone.model,
-          payload.drone.battery || 95,
-          payload.drone.payloadCapacity || 4.5,
+          identifier,
+          payload.drone.model || 'SkyNav Carrier',
+          payload.drone.battery ?? 95,
+          payload.drone.payloadCapacity ?? 4.5,
         ]);
       }
 
