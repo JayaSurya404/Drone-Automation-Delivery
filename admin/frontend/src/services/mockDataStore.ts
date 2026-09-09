@@ -14,37 +14,22 @@ import {
   SystemNotification,
 } from '../types/skynav';
 
-import {
-  INITIAL_DRONES,
-  INITIAL_ORDERS,
-  INITIAL_MISSIONS,
-  INITIAL_GEOFENCES,
-  INITIAL_EMERGENCIES,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_MAINTENANCE,
-  INITIAL_TICKETS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_ADMINS,
-  MOCK_MERCHANTS,
-  MOCK_CUSTOMERS,
-  MOCK_PAYMENTS,
-  BASE_CENTER,
-} from '../data/mockData';
+import { BASE_CENTER } from '../data/mockData';
 
 class MockDataStore {
-  private drones: Drone[] = [...INITIAL_DRONES];
-  private orders: Order[] = [...INITIAL_ORDERS];
-  private missions: Mission[] = [...INITIAL_MISSIONS];
-  private geofences: GeofenceZone[] = [...INITIAL_GEOFENCES];
-  private emergencies: EmergencyAlert[] = [...INITIAL_EMERGENCIES];
-  private notifications: SystemNotification[] = [...INITIAL_NOTIFICATIONS];
-  private maintenance: MaintenanceRecord[] = [...INITIAL_MAINTENANCE];
-  private tickets: SupportTicket[] = [...INITIAL_TICKETS];
-  private auditLogs: AuditLog[] = [...INITIAL_AUDIT_LOGS];
-  private admins: AdminUser[] = [...INITIAL_ADMINS];
-  private merchants: Merchant[] = [...MOCK_MERCHANTS];
-  private customers: Customer[] = [...MOCK_CUSTOMERS];
-  private payments: PaymentTransaction[] = [...MOCK_PAYMENTS];
+  private drones: Drone[] = [];
+  private orders: Order[] = [];
+  private missions: Mission[] = [];
+  private geofences: GeofenceZone[] = [];
+  private emergencies: EmergencyAlert[] = [];
+  private notifications: SystemNotification[] = [];
+  private maintenance: MaintenanceRecord[] = [];
+  private tickets: SupportTicket[] = [];
+  private auditLogs: AuditLog[] = [];
+  private admins: AdminUser[] = [];
+  private merchants: Merchant[] = [];
+  private customers: Customer[] = [];
+  private payments: PaymentTransaction[] = [];
 
   private listeners: Set<() => void> = new Set();
   private ws: WebSocket | null = null;
@@ -77,7 +62,7 @@ class MockDataStore {
       const ordersRes = await fetch('/api/admin/orders');
       if (ordersRes.ok) {
         const rawOrders = await ordersRes.json();
-        if (Array.isArray(rawOrders) && rawOrders.length > 0) {
+        if (Array.isArray(rawOrders)) {
           this.orders = rawOrders.map((o: any) => ({
             id: o.id,
             customerId: o.customerOrderId || 'C-1001',
@@ -111,7 +96,7 @@ class MockDataStore {
       const fleetRes = await fetch('/api/admin/fleet');
       if (fleetRes.ok) {
         const rawFleet = await fleetRes.json();
-        if (Array.isArray(rawFleet) && rawFleet.length > 0) {
+        if (Array.isArray(rawFleet)) {
           this.drones = rawFleet.map((d: any) => ({
             id: d.id,
             name: d.name,
@@ -170,7 +155,7 @@ class MockDataStore {
       const geoRes = await fetch('/api/admin/geofences');
       if (geoRes.ok) {
         const rawGeo = await geoRes.json();
-        if (Array.isArray(rawGeo) && rawGeo.length > 0) {
+        if (Array.isArray(rawGeo)) {
           this.geofences = rawGeo;
         }
       }
@@ -215,14 +200,41 @@ class MockDataStore {
       const custRes = await fetch('/api/admin/customers');
       if (custRes.ok) {
         const rawCust = await custRes.json();
-        if (Array.isArray(rawCust) && rawCust.length > 0) {
+        if (Array.isArray(rawCust)) {
           this.customers = rawCust;
+        }
+      }
+
+      // 10. Fetch payments from Admin Backend
+      const payRes = await fetch('/api/admin/payments');
+      if (payRes.ok) {
+        const rawPay = await payRes.json();
+        if (Array.isArray(rawPay)) {
+          this.payments = rawPay;
+        }
+      }
+
+      // 11. Fetch merchants from Admin Backend
+      const merRes = await fetch('/api/admin/merchants');
+      if (merRes.ok) {
+        const rawMer = await merRes.json();
+        if (Array.isArray(rawMer)) {
+          this.merchants = rawMer;
+        }
+      }
+
+      // 12. Fetch support tickets from Admin Backend
+      const tckRes = await fetch('/api/admin/tickets');
+      if (tckRes.ok) {
+        const rawTck = await tckRes.json();
+        if (Array.isArray(rawTck)) {
+          this.tickets = rawTck;
         }
       }
 
       this.notify();
     } catch (err) {
-      console.warn('[Admin Store] Could not fetch real operational data, using cache:', err);
+      console.warn('[Admin Store] Could not fetch real operational data from backend API:', err);
     }
   }
 
@@ -589,6 +601,11 @@ class MockDataStore {
     if (m) {
       m.status = status;
       this.addAuditLog('Rajesh Sharma', 'Super Admin', 'UPDATE_STATUS', 'Merchants', merchantId, 'Info', `Set merchant status to ${status}`);
+      fetch(`/api/admin/merchants/${merchantId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      }).catch(() => {});
       this.notify();
     }
   }

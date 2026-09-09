@@ -19,7 +19,6 @@ import { AdminRole } from '../../types/skynav';
 import { RealDroneGallery } from '../../components/drone/RealDroneGallery';
 import { ForgotPasswordScreen } from './ForgotPasswordScreen';
 import { EmailVerificationScreen } from './EmailVerificationScreen';
-import { INITIAL_ADMINS } from '../../data/mockData';
 
 export const LoginScreen: React.FC = () => {
   const navigate = useNavigate();

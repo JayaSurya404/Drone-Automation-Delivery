@@ -63,7 +63,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     const finalCategoryId = resolvedCategoryId;
 
-    const id = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const id = req.body.id || `prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const prodSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     runCommand(`

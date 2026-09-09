@@ -96,7 +96,7 @@ export const RegisterPage: React.FC = () => {
 
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Check Your Email</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: '0.75rem', lineHeight: 1.6 }}>
-            We've sent an account activation link to <br />
+            We've sent an account activation code to <br />
             <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{registeredEmail}</strong>
           </p>
 
@@ -117,14 +117,23 @@ export const RegisterPage: React.FC = () => {
               <CheckCircle2 size={16} style={{ color: 'var(--accent-cyan)' }} />
               <span>Next Steps:</span>
             </div>
-            1. Open the email from <strong>SkyNav Drone Store</strong>.<br />
-            2. Click the <strong>Confirm your email</strong> link.<br />
-            3. You'll be automatically redirected back to continue shopping!
+            1. Open the verification email from <strong>SkyNav Autonomous Drone Delivery</strong>.<br />
+            2. Copy your <strong>6-digit verification code</strong>.<br />
+            3. Click <strong>Enter 6-Digit Code</strong> below to activate your account and start ordering!
           </div>
 
-          <Button variant="outline" fullWidth onClick={() => navigate('/login')}>
-            Back to Sign In
-          </Button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <Button
+              variant="primary"
+              fullWidth
+              onClick={() => navigate('/verify-account', { state: { email: registeredEmail } })}
+            >
+              Enter 6-Digit Code <ArrowRight size={16} style={{ marginLeft: '0.5rem' }} />
+            </Button>
+            <Button variant="outline" fullWidth onClick={() => navigate('/login')}>
+              Back to Sign In
+            </Button>
+          </div>
         </div>
       </div>
     );

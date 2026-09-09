@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AdminUser, AdminRole } from '../types/skynav';
-import { INITIAL_ADMINS } from '../data/mockData';
 
 interface AuthContextType {
   user: AdminUser | null;
@@ -211,13 +210,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRole = (role: AdminRole) => {
-    const roleProfile = INITIAL_ADMINS.find((a) => a.role === role);
-    if (roleProfile) {
-      setUser(roleProfile);
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(roleProfile));
-      } catch {}
-    }
+    const ROLE_EMAILS: Record<AdminRole, string> = {
+      super_admin: 'admin@skynav.com',
+      ops_admin: 'ops@skynav.com',
+      dispatch_manager: 'dispatch@skynav.com',
+      fleet_manager: 'fleet@skynav.com',
+      support_admin: 'support@skynav.com',
+      analytics_admin: 'analytics@skynav.com',
+      analyst: 'analyst@skynav.com',
+    };
+    const targetEmail = ROLE_EMAILS[role] || 'admin@skynav.com';
+    login(targetEmail, role, true, 'admin123').catch((err) => {
+      console.error('[Admin Auth] Error switching role via database auth:', err);
+    });
   };
 
   const hasPermission = (pathOrRoles: string | AdminRole[]): boolean => {

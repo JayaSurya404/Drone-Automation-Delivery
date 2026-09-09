@@ -19,6 +19,13 @@ const generate6DigitCode = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+// Safely parse SQLite datetime strings (stored as UTC without 'Z')
+const parseDbDateUtc = (dateStr: string): number => {
+  if (!dateStr) return 0;
+  const isoStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+  return new Date(isoStr.endsWith('Z') ? isoStr : `${isoStr}Z`).getTime();
+};
+
 // 1. REGISTER
 router.post('/register', async (req, res): Promise<void> => {
   try {
@@ -110,6 +117,8 @@ router.post('/register', async (req, res): Promise<void> => {
       token,
       requiresVerification: true,
       email: cleanEmail,
+      previewUrl: emailResult.previewUrl || undefined,
+      devVerificationCode: process.env.NODE_ENV !== 'production' ? verificationCode : undefined,
     });
   } catch (err: any) {
     console.error('Register error:', err);
@@ -162,8 +171,8 @@ router.post('/verify-account', async (req, res): Promise<void> => {
       return;
     }
 
-    // Check expiration
-    const expiresAt = new Date(tokenRecord.expires_at).getTime();
+    // Check expiration safely with UTC timestamp parsing
+    const expiresAt = parseDbDateUtc(tokenRecord.expires_at);
     if (Date.now() > expiresAt) {
       res.status(400).json({ error: 'Verification code has expired. Please click Resend Code to receive a fresh code.' });
       return;
@@ -281,7 +290,7 @@ router.post('/resend-verification', async (req, res): Promise<void> => {
     `, [user.id]);
 
     if (recentToken) {
-      const createdAt = new Date(recentToken.created_at).getTime();
+      const createdAt = parseDbDateUtc(recentToken.created_at);
       const elapsedSeconds = Math.floor((Date.now() - createdAt) / 1000);
       if (elapsedSeconds < 45) {
         res.status(429).json({
@@ -491,8 +500,8 @@ router.post('/reset-password', async (req, res): Promise<void> => {
       return;
     }
 
-    // Check expiry
-    if (Date.now() > new Date(tokenRecord.expires_at).getTime()) {
+    // Check expiry safely with UTC timestamp parsing
+    if (Date.now() > parseDbDateUtc(tokenRecord.expires_at)) {
       res.status(400).json({ error: 'The password reset code has expired. Please request a new one.' });
       return;
     }

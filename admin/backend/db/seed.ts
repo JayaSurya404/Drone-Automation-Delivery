@@ -193,7 +193,108 @@ export const seedAdminDatabase = async () => {
   maintStmt.run('MNT-02', 'D-012', 'LiDAR obstacle sensor calibration drift (+1.2cm variance)', 'Low', 'Fleet Tech A', 'Sensor array software zero-point recalibration.');
   maintStmt.run('MNT-03', 'D-024', 'Battery cell #4 internal resistance higher than nominal (+8%)', 'High', 'Vikram Singh', 'Replace smart battery power pack module.');
 
-  // 7. SYSTEM NOTIFICATIONS
+  // 7. OPERATIONAL ORDERS & MISSIONS
+  const opOrderStmt = db.prepare(`
+    INSERT INTO operational_orders (
+      id, customer_order_id, customer_name, customer_phone, package_name,
+      package_weight_kg, items_json, pickup_address, pickup_lat, pickup_lng,
+      destination_address, destination_lat, destination_lng, delivery_speed,
+      status, drone_id, mission_id, handover_otp, total_amount, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?), datetime('now', ?))
+  `);
+
+  const missionStmt = db.prepare(`
+    INSERT INTO missions (
+      id, operational_order_id, customer_order_id, drone_id,
+      planned_route_json, actual_route_json, distance_km, estimated_duration_minutes,
+      current_status, current_latitude, current_longitude, current_altitude,
+      current_speed, current_bearing, remaining_distance_km, eta_seconds,
+      created_at, start_time, completion_time
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?), datetime('now', ?), datetime('now', ?))
+  `);
+
+  const items1 = JSON.stringify([
+    { productId: 'prod_food_1', name: 'Artisan Woodfired Truffle Mushroom Pizza (12")', quantity: 1, price: 21.99 },
+    { productId: 'prod_med_1', name: 'Rapid Response First-Aid Trauma Kit', quantity: 1, price: 34.99 }
+  ]);
+
+  const items2 = JSON.stringify([
+    { productId: 'prod_elec_1', name: 'Anker 65W GaN High-Speed Fast Charger', quantity: 1, price: 39.99 }
+  ]);
+
+  // ORD-1001: Delivered
+  opOrderStmt.run(
+    'ORD-1001',
+    'ORD-1001',
+    'Test Customer',
+    '+1 (555) 789-0123',
+    'Food & Trauma Kit Pod',
+    1.23,
+    items1,
+    'SkyHub Aero Fulfillment Central #1 (37.7625, -122.4480)',
+    37.7625,
+    -122.4480,
+    '100 Market Street, San Francisco, CA',
+    37.7897,
+    -122.3969,
+    'standard',
+    'delivered',
+    'D-002',
+    'MSN-1001',
+    '7842',
+    60.49,
+    '-2 days',
+    '-2 days'
+  );
+
+  missionStmt.run(
+    'MSN-1001',
+    'ORD-1001',
+    'ORD-1001',
+    'D-002',
+    JSON.stringify([[37.7625, -122.4480], [37.7750, -122.4200], [37.7897, -122.3969]]),
+    JSON.stringify([[37.7625, -122.4480], [37.7750, -122.4200], [37.7897, -122.3969]]),
+    5.4,
+    14,
+    'delivered',
+    37.7897,
+    -122.3969,
+    0,
+    0,
+    45,
+    0,
+    0,
+    '-2 days',
+    '-2 days',
+    '-2 days'
+  );
+
+  // ORD-1002: Pending Dispatch
+  opOrderStmt.run(
+    'ORD-1002',
+    'ORD-1002',
+    'Test Customer',
+    '+1 (555) 789-0123',
+    'High-Speed Tech Pod',
+    0.22,
+    items2,
+    'SkyHub Aero Fulfillment Central #1 (37.7625, -122.4480)',
+    37.7625,
+    -122.4480,
+    '100 Market Street, San Francisco, CA',
+    37.7897,
+    -122.3969,
+    'express',
+    'pending_dispatch',
+    null,
+    null,
+    '3195',
+    47.18,
+    '-1 hour',
+    '-1 hour'
+  );
+
+  // 8. SYSTEM NOTIFICATIONS
   const notifStmt = db.prepare(`
     INSERT INTO system_notifications (id, title, message, category, read)
     VALUES (?, ?, ?, ?, ?)
@@ -203,7 +304,7 @@ export const seedAdminDatabase = async () => {
   notifStmt.run('NOTIF-02', 'Weather Advisory', 'Wind gusts 14 kt at Hub #1. All operations within safe flight envelope.', 'info', 0);
   notifStmt.run('NOTIF-03', 'Airspace Clearance', 'FAA Part 107 authorization renewed for Bay Area operational corridor.', 'info', 1);
 
-  // 8. AUDIT LOGS
+  // 9. AUDIT LOGS
   const auditStmt = db.prepare(`
     INSERT INTO audit_logs (id, admin_name, admin_role, action, entity, entity_id, severity, details)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -211,7 +312,7 @@ export const seedAdminDatabase = async () => {
 
   auditStmt.run('LOG-01', 'Rajesh Sharma', 'super_admin', 'SYSTEM_INITIALIZATION', 'System', 'CORE', 'Info', 'SkyNav Autonomous Drone System initialized');
 
-  console.log('✅ SkyNav Admin Database seeded with Admins, Products, Categories, 40 Drones, Geofences, Maintenance & Alerts.');
+  console.log('✅ SkyNav Admin Database seeded with Admins, Products, Categories, 40 Drones, Geofences, Orders, Missions, Maintenance & Alerts.');
 };
 
 seedAdminDatabase().catch((err) => {

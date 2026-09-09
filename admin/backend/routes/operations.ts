@@ -308,4 +308,111 @@ router.get('/analytics', (_req: Request, res: Response): void => {
   }
 });
 
+// ── PAYMENTS & FINANCIAL TRANSACTIONS ──
+router.get('/payments', (_req: Request, res: Response): void => {
+  try {
+    const orders = queryAll<any>('SELECT id, customer_order_id, customer_name, total_amount, created_at, status FROM operational_orders ORDER BY created_at DESC');
+    const payments = orders.map((o) => ({
+      id: `TXN-${o.id.replace('ORD-', '')}`,
+      orderId: o.id,
+      customerName: o.customer_name || 'Customer',
+      amount: o.total_amount || 0,
+      paymentMethod: 'Credit Card (Stripe)',
+      timestamp: o.created_at,
+      status: o.status === 'cancelled' ? 'Refunded' : (o.status === 'failed' ? 'Failed' : 'Successful')
+    }));
+    res.json(payments);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── MERCHANTS ──
+let merchantStore = [
+  {
+    id: 'M-01',
+    businessName: 'Bella Napoli Aero Kitchen',
+    ownerName: 'Marco Rossi',
+    category: 'Hot Meals & Food',
+    totalOrders: 142,
+    successRate: 98.4,
+    revenue: 3480.50,
+    status: 'Approved',
+    address: '784 Folsom St, San Francisco, CA',
+    coords: { lat: 37.7820, lng: -122.4010 }
+  },
+  {
+    id: 'M-02',
+    businessName: 'AeroRescue Medical Dispensary',
+    ownerName: 'Dr. Sarah Jenkins',
+    category: 'Medicine & Health',
+    totalOrders: 89,
+    successRate: 99.1,
+    revenue: 2890.00,
+    status: 'Approved',
+    address: '505 Parnassus Ave, San Francisco, CA',
+    coords: { lat: 37.7631, lng: -122.4580 }
+  },
+  {
+    id: 'M-03',
+    businessName: 'VoltWave Hardware Hub',
+    ownerName: 'Kenji Sato',
+    category: 'Tech & Electronics',
+    totalOrders: 64,
+    successRate: 97.0,
+    revenue: 2150.00,
+    status: 'Approved',
+    address: '120 4th St, San Francisco, CA',
+    coords: { lat: 37.7850, lng: -122.4030 }
+  }
+];
+
+router.get('/merchants', (_req: Request, res: Response): void => {
+  res.json(merchantStore);
+});
+
+router.patch('/merchants/:id/status', (req: Request, res: Response): void => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const m = merchantStore.find((item) => item.id === id);
+  if (m) {
+    m.status = status;
+    res.json({ success: true, merchant: m });
+  } else {
+    res.status(404).json({ error: 'Merchant not found' });
+  }
+});
+
+// ── SUPPORT TICKETS ──
+let ticketStore = [
+  {
+    id: 'TCK-101',
+    orderId: 'ORD-1002',
+    customerName: 'Test Customer',
+    issueType: 'Delivery Status Query',
+    status: 'Open',
+    priority: 'Medium',
+    createdAt: new Date().toISOString(),
+    messages: [
+      { sender: 'customer', text: 'When will the drone launch for my express charger order?', timestamp: new Date().toISOString() }
+    ]
+  }
+];
+
+router.get('/tickets', (_req: Request, res: Response): void => {
+  res.json(ticketStore);
+});
+
+router.patch('/tickets/:id', (req: Request, res: Response): void => {
+  const { id } = req.params;
+  const updates = req.body;
+  const t = ticketStore.find((item) => item.id === id);
+  if (t) {
+    Object.assign(t, updates);
+    res.json({ success: true, ticket: t });
+  } else {
+    res.status(404).json({ error: 'Ticket not found' });
+  }
+});
+
 export default router;

@@ -53,11 +53,37 @@ export const seedDatabase = async () => {
     VALUES (?, 1, 1, 1)
   `).run(userId);
 
-  // Initialize Cart & Wishlist for user
+  // Initialize Cart & Wishlist for Alex Mercer
   const cartId = 'cart_984210';
   const wishlistId = 'wish_984210';
   db.prepare(`INSERT INTO carts (id, customer_id) VALUES (?, ?)`).run(cartId, userId);
   db.prepare(`INSERT INTO wishlists (id, customer_id) VALUES (?, ?)`).run(wishlistId, userId);
+
+  // 1B. SEED DEDICATED REAL TEST CUSTOMER (testcustomer@example.com)
+  const testCustomerPasswordHash = await bcrypt.hash('Customer123!', 10);
+  const testUserId = 'cust_test_customer_1';
+
+  db.prepare(`
+    INSERT INTO users (id, name, email, phone, password_hash, avatar, is_verified, account_status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-15 days'), datetime('now'))
+  `).run(
+    testUserId,
+    'Test Customer',
+    'testcustomer@example.com',
+    '+1 (555) 789-0123',
+    testCustomerPasswordHash,
+    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+    1,
+    'active'
+  );
+
+  db.prepare(`
+    INSERT INTO notification_preferences (user_id, email_updates, sms_alerts, drone_proximity_sound)
+    VALUES (?, 1, 1, 1)
+  `).run(testUserId);
+
+  db.prepare(`INSERT INTO carts (id, customer_id) VALUES (?, ?)`).run('cart_test_1', testUserId);
+  db.prepare(`INSERT INTO wishlists (id, customer_id) VALUES (?, ?)`).run('wish_test_1', testUserId);
 
   // 2. SEED FULFILLMENT HUBS & DELIVERY ZONES
   const zoneStmt = db.prepare(`
@@ -477,6 +503,120 @@ export const seedDatabase = async () => {
     0,
     'Rooftop Pad'
   );
+
+  addrStmt.run(
+    'addr_test_1',
+    testUserId,
+    'Home',
+    'Test Customer',
+    '+1 (555) 789-0123',
+    'Apt 12B, Sky Tower',
+    '100 Market Street',
+    'Downtown Corridor',
+    'San Francisco',
+    'CA',
+    '94105',
+    37.7897,
+    -122.3969,
+    'Private lawn drop zone marked with optical drone landing beacon.',
+    1,
+    'Lawn'
+  );
+
+  // 6B. SEED INITIAL REAL DATABASE-BACKED ORDERS
+  const orderStmt = db.prepare(`
+    INSERT INTO orders (
+      id, customer_id, subtotal, delivery_fee, tax, discount, total,
+      payment_method, payment_status, status, delivery_speed, delivery_address_json,
+      delivery_instructions, drop_zone_type, delivery_otp, is_cancellable,
+      estimated_delivery_time, created_at, updated_at, completed_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?), datetime('now', ?), ?)
+  `);
+
+  const orderItemStmt = db.prepare(`
+    INSERT INTO order_items (id, order_id, product_id, product_name, product_image, unit_price, quantity, total_price, weight_grams)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const statusHistoryStmt = db.prepare(`
+    INSERT INTO order_status_history (id, order_id, previous_status, new_status, description, completed, timestamp)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now', ?))
+  `);
+
+  // ORD-1001 (Delivered past order)
+  const addrSnapshot1 = JSON.stringify({
+    name: 'Test Customer',
+    phone: '+1 (555) 789-0123',
+    building: 'Apt 12B, Sky Tower',
+    street: '100 Market Street',
+    area: 'Downtown Corridor',
+    city: 'San Francisco',
+    state: 'CA',
+    postalCode: '94105',
+    dropZoneType: 'Lawn'
+  });
+
+  orderStmt.run(
+    'ORD-1001',
+    testUserId,
+    56.98,
+    3.99,
+    4.56,
+    5.04,
+    60.49,
+    'Credit Card',
+    'Paid',
+    'Delivered',
+    'standard',
+    addrSnapshot1,
+    'Lower pod gently onto designated lawn beacon.',
+    'Lawn',
+    '7842',
+    0,
+    '14 mins',
+    '-2 days',
+    '-2 days',
+    new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
+  );
+
+  orderItemStmt.run('item_1001_1', 'ORD-1001', 'prod_food_1', 'Artisan Woodfired Truffle Mushroom Pizza (12")', 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', 21.99, 1, 21.99, 580);
+  orderItemStmt.run('item_1001_2', 'ORD-1001', 'prod_med_1', 'AeroFirst Rapid First Aid & Trauma Burn Kit', 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=600&auto=format&fit=crop&q=80', 34.99, 1, 34.99, 650);
+
+  statusHistoryStmt.run('hist_1001_1', 'ORD-1001', null, 'Order Placed', 'Order placed successfully.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_2', 'ORD-1001', 'Order Placed', 'Order Confirmed', 'Payment confirmed.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_3', 'ORD-1001', 'Order Confirmed', 'Preparing', 'Items packed at fulfillment hub.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_4', 'ORD-1001', 'Preparing', 'Drone Assigned', 'SkyNav Falcon-02 assigned to delivery.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_5', 'ORD-1001', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via corridor.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_6', 'ORD-1001', 'Drone Launched', 'Delivered', 'Autonomous payload tether lowered successfully.', 1, '-2 days');
+
+  // ORD-1002 (Active Pending Dispatch order)
+  orderStmt.run(
+    'ORD-1002',
+    testUserId,
+    39.99,
+    3.99,
+    3.20,
+    0,
+    47.18,
+    'Credit Card',
+    'Paid',
+    'Pending Dispatch',
+    'express',
+    addrSnapshot1,
+    'Priority dispatch to terrace drop zone.',
+    'Lawn',
+    '3195',
+    1,
+    '12 mins',
+    '-1 hour',
+    '-1 hour',
+    null
+  );
+
+  orderItemStmt.run('item_1002_1', 'ORD-1002', 'prod_elec_1', 'VoltWave 100W GaN Pro Fast Charger & 240W Cable', 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', 39.99, 1, 39.99, 220);
+
+  statusHistoryStmt.run('hist_1002_1', 'ORD-1002', null, 'Order Placed', 'Order placed via express aerial dispatch.', 1, '-1 hour');
+  statusHistoryStmt.run('hist_1002_2', 'ORD-1002', 'Order Placed', 'Pending Dispatch', 'Awaiting drone launch clearance.', 1, '-50 minutes');
 
   // 7. SEED INITIAL SAMPLE REVIEWS
   const revStmt = db.prepare(`

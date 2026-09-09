@@ -22,6 +22,7 @@ import supportRoutes from './routes/support.js';
 import healthRoutes from './routes/health.js';
 import airspaceRoutes from './routes/airspace.js';
 import internalRoutes from './routes/internal.js';
+import { verifySmtpConnection } from './services/emailService.js';
 
 dotenv.config();
 
@@ -109,12 +110,18 @@ wss.on('connection', (ws: WebSocket, req) => {
   });
 });
 
-server.listen(Number(PORT), '0.0.0.0', () => {
+server.listen(Number(PORT), '0.0.0.0', async () => {
   console.log(`\n======================================================`);
   console.log(`🚀 SkyNav Autonomous Drone Backend Running on port ${PORT}`);
   console.log(`📡 REST API: http://localhost:${PORT}/api`);
   console.log(`🛸 WebSocket: ws://localhost:${PORT}/ws`);
   console.log(`💚 Health Check: http://localhost:${PORT}/api/health`);
+  try {
+    const smtpStatus = await verifySmtpConnection();
+    console.log(`📧 Email Delivery Service: [${smtpStatus.mode}] (Verified: ${smtpStatus.verified})`);
+  } catch (err: any) {
+    console.warn(`📧 Email Delivery Service: Check failed (${err.message})`);
+  }
   console.log(`======================================================\n`);
 });
 
