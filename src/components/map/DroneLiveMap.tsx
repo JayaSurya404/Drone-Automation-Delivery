@@ -81,6 +81,16 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     };
   }, []); // Mount only
 
+  // Handle container resize automatically
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      mapProviderRef.current?.invalidateSize();
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   // Smoothly update drone position marker when coordinates change
   useEffect(() => {
     if (mapProviderRef.current) {

@@ -107,7 +107,7 @@ wss.on('connection', (ws: WebSocket, req) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`\n======================================================`);
   console.log(`🚀 SkyNav Autonomous Drone Backend Running on port ${PORT}`);
   console.log(`📡 REST API: http://localhost:${PORT}/api`);

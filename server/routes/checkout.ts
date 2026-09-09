@@ -169,10 +169,10 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
       hub_name: 'SkyHub Aero Fulfillment Central #1',
     };
 
-    const destLat = deliveryAddress.latitude || 37.7749;
-    const destLng = deliveryAddress.longitude || -122.4194;
-    const flightRoute = droneTrackingService.generateFlightRoute(hub.hub_latitude, hub.hub_longitude, destLat, destLng);
-    const initialDistanceKm = droneTrackingService.calculateDistanceKm(hub.hub_latitude, hub.hub_longitude, destLat, destLng);
+    const targetLat = destLat || 37.7749;
+    const targetLng = destLng || -122.4194;
+    const flightRoute = droneTrackingService.generateFlightRoute(hub.hub_latitude, hub.hub_longitude, targetLat, targetLng);
+    const initialDistanceKm = droneTrackingService.calculateDistanceKm(hub.hub_latitude, hub.hub_longitude, targetLat, targetLng);
 
     // EXECUTE TRANSACTION
     db.transaction(() => {

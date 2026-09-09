@@ -25,6 +25,7 @@ export interface IMapProvider {
   setClearanceRadius(radiusMeters: number, isEligible?: boolean): void;
   toggleAirspaceLayer(visible: boolean): void;
   fitBounds(coordinates: [number, number][]): void;
+  invalidateSize(): void;
   destroy(): void;
 }
 
@@ -70,8 +71,17 @@ export class LeafletMapProvider implements IMapProvider {
 
     this.L.tileLayer(tileUrl, {
       maxZoom: 19,
-      subdomains: 'abc',
+      subdomains: ['a', 'b', 'c'],
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.mapInstance);
+
+    // Recalculate dimensions once mounted in DOM
+    setTimeout(() => {
+      this.invalidateSize();
+    }, 150);
+    setTimeout(() => {
+      this.invalidateSize();
+    }, 500);
 
     if (this.isLocationPicker) {
       this.mapInstance.on('click', (e: any) => {
@@ -326,9 +336,26 @@ export class LeafletMapProvider implements IMapProvider {
   }
 
   public fitBounds(coordinates: [number, number][]): void {
-    if (!this.mapInstance || !this.L || coordinates.length === 0) return;
-    const bounds = this.L.latLngBounds(coordinates);
-    this.mapInstance.fitBounds(bounds, { padding: [50, 50] });
+    if (!this.mapInstance || !this.L || !coordinates || coordinates.length === 0) return;
+    const validCoords = coordinates.filter(
+      (c) => Array.isArray(c) && c.length === 2 && !isNaN(c[0]) && !isNaN(c[1]) && (c[0] !== 0 || c[1] !== 0)
+    );
+    if (validCoords.length === 0) return;
+    try {
+      this.invalidateSize();
+      const bounds = this.L.latLngBounds(validCoords);
+      if (bounds.isValid && bounds.isValid()) {
+        this.mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      }
+    } catch (e) {
+      console.warn('Error fitting map bounds:', e);
+    }
+  }
+
+  public invalidateSize(): void {
+    if (this.mapInstance) {
+      this.mapInstance.invalidateSize();
+    }
   }
 
   public destroy(): void {

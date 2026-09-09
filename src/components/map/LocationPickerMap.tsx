@@ -80,6 +80,16 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     };
   }, [theme]);
 
+  // Handle container resize automatically
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      mapProviderRef.current?.invalidateSize();
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   // Update clearance radius whenever prop changes
   useEffect(() => {
     if (mapProviderRef.current) {
