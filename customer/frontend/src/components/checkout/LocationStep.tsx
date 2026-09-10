@@ -27,8 +27,8 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   onLocationConfirmed,
   onBack,
 }) => {
-  const [lat, setLat] = useState<number>(address.latitude || 37.7749);
-  const [lng, setLng] = useState<number>(address.longitude || -122.4194);
+  const [lat, setLat] = useState<number>(address.latitude || 11.0550);
+  const [lng, setLng] = useState<number>(address.longitude || 77.0650);
   const [selectedDropZone, setSelectedDropZone] = useState<string>(address.dropZoneType || 'Lawn');
   const [clearanceRadius, setClearanceRadius] = useState<ClearanceRadiusOption>(
     ((address.clearanceRadiusMeters as any) || initialClearanceRadius) as ClearanceRadiusOption
@@ -51,7 +51,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         <div>
           <h3 className="card-title">2. Set Precision Drone Drop-off Zone & Airspace Clearance</h3>
           <p className="section-subtitle">
-            Every autonomous flight is validated against FAA No-Fly Zones, hospital corridors, and requires verified landing clearance.
+            Every autonomous flight is validated against DGCA No-Fly Zones, military buffers, and requires verified landing clearance.
           </p>
         </div>
       </div>

@@ -204,9 +204,9 @@ export const FeaturedProductsCarousel: React.FC<FeaturedProductsCarouselProps> =
                     {/* Price & Add to Cart */}
                     <div className="featured-card-buy-row">
                       <div className="featured-price-group">
-                        <span className="featured-curr-price">${product.price.toFixed(2)}</span>
+                        <span className="featured-curr-price">₹{product.price.toLocaleString('en-IN')}</span>
                         {product.originalPrice && product.originalPrice > product.price && (
-                          <span className="featured-orig-price">${product.originalPrice.toFixed(2)}</span>
+                          <span className="featured-orig-price">₹{product.originalPrice.toLocaleString('en-IN')}</span>
                         )}
                       </div>
 

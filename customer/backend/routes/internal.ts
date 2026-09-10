@@ -61,7 +61,7 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
         const identifier = `${payload.drone.name || 'SkyNav Drone'} [${payload.drone.id}]`;
         runCommand(`
           INSERT INTO drones (id, identifier, model, battery_level, status, max_payload_kg, latitude, longitude)
-          VALUES (?, ?, ?, ?, 'ASSIGNED', ?, 37.7625, -122.4480)
+          VALUES (?, ?, ?, ?, 'ASSIGNED', ?, 11.0550, 77.0650)
         `, [
           payload.drone.id,
           identifier,
@@ -114,8 +114,8 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
         droneName: payload.drone.name,
         status: 'Drone Assigned',
         currentLocation: {
-          latitude: 37.7625,
-          longitude: -122.4480,
+          latitude: 11.0550,
+          longitude: 77.0650,
           altitudeMeters: 0,
           speedKmh: 0,
           bearing: 0,

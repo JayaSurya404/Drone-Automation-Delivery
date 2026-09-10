@@ -62,7 +62,7 @@ export const GeofenceChecker: React.FC<GeofenceCheckerProps> = ({
       <div className="geofence-status-box" style={{ background: 'var(--bg-tertiary, #f8fafc)', border: '1px solid var(--border-default, #e2e8f0)' }}>
         <Loader2 className="animate-spin" size={20} color="var(--accent-cyan, #0ea5e9)" />
         <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-          Auditing FAA Airspace Corridors & No-Fly Zones (NFZ)...
+          Auditing DGCA Airspace Corridors & No-Fly Zones (NFZ)...
         </span>
       </div>
     );

@@ -122,10 +122,10 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
       totalWeightGrams += (item.weight_grams || 250) * item.quantity;
     }
 
-    // Drone delivery fee
-    let baseDeliveryFee = 3.99;
-    if (deliverySpeed === 'express') baseDeliveryFee += 3.50;
-    if (totalWeightGrams > 1500) baseDeliveryFee += 2.00;
+    // Drone delivery fee (INR)
+    let baseDeliveryFee = 49.00;
+    if (deliverySpeed === 'express') baseDeliveryFee += 39.00;
+    if (totalWeightGrams > 1500) baseDeliveryFee += 25.00;
 
     const deliveryFee = parseFloat(baseDeliveryFee.toFixed(2));
 
@@ -134,12 +134,12 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
     if (promoCode) {
       const clean = promoCode.trim().toUpperCase();
       if (clean === 'DRONE10' || clean === 'SKYFIRST') promoDiscountPct = 10;
-      else if (clean === 'AERO20' && subtotal >= 50) promoDiscountPct = 20;
+      else if (clean === 'AERO20' && subtotal >= 500) promoDiscountPct = 20;
     }
 
     const discount = parseFloat(((subtotal * promoDiscountPct) / 100).toFixed(2));
     const taxableAmount = Math.max(0, subtotal - discount);
-    const tax = parseFloat((taxableAmount * 0.085).toFixed(2));
+    const tax = parseFloat((taxableAmount * 0.05).toFixed(2)); // 5% GST
     const total = parseFloat((taxableAmount + deliveryFee + tax).toFixed(2));
 
     const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -165,13 +165,13 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
 
     // Hub coordinates
     const hub = queryOne<any>('SELECT * FROM delivery_zones LIMIT 1') || {
-      hub_latitude: 37.7625,
-      hub_longitude: -122.4480,
-      hub_name: 'SkyHub Aero Fulfillment Central #1',
+      hub_latitude: 11.0550,
+      hub_longitude: 77.0650,
+      hub_name: 'SkyHub Chinniyampalayam',
     };
 
-    const targetLat = destLat || 37.7749;
-    const targetLng = destLng || -122.4194;
+    const targetLat = destLat || 11.0550;
+    const targetLng = destLng || 77.0650;
     const flightRoute = droneTrackingService.generateFlightRoute(hub.hub_latitude, hub.hub_longitude, targetLat, targetLng);
     const initialDistanceKm = droneTrackingService.calculateDistanceKm(hub.hub_latitude, hub.hub_longitude, targetLat, targetLng);
 

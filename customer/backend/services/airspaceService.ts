@@ -28,96 +28,96 @@ export interface DropZoneSafetyEvaluation {
   hubName?: string;
 }
 
-// Curated FAA & civil aviation restricted zones across the San Francisco Bay Area operational corridor
-const SF_NO_FLY_ZONES: NoFlyZone[] = [
+// Curated DGCA & Indian civil aviation restricted zones across the Coimbatore / Tamil Nadu operational corridor
+const COIMBATORE_NO_FLY_ZONES: NoFlyZone[] = [
   {
-    id: 'nfz_sfo_class_b',
-    name: 'San Francisco International Airport (SFO) Airspace Exclusion Buffer',
-    code: 'SFO-CLASS-B',
+    id: 'nfz_cjb_airport',
+    name: 'Coimbatore International Airport (CJB / VOCB) Active Runway Security Perimeter',
+    code: 'CJB-CLASS-D-CORE',
     type: 'AIRPORT',
     restriction: 'PROHIBITED',
-    latitude: 37.6213,
-    longitude: -122.3790,
-    radiusMeters: 6200,
+    latitude: 11.0298,
+    longitude: 77.0434,
+    radiusMeters: 2500,
     altitudeFloorMeters: 0,
     altitudeCeilingMeters: 3000,
-    reason: 'Active Class B commercial jet approach and departure corridors. Autonomous civil UAV operations strictly forbidden without LAANC waiver.',
-    regulatoryRef: 'FAA 14 CFR § 107.41 / Class B Airspace',
+    reason: 'Active commercial aircraft runway & terminal security perimeter. UAV operations prohibited inside runway safety boundary.',
+    regulatoryRef: 'DGCA UAS Rules 2021 / Class D Runway Buffer',
     activeSchedule: '24/7 Continuous',
   },
   {
-    id: 'nfz_presidio_military',
-    name: 'Presidio & Golden Gate National Coastal Defense Zone',
-    code: 'PRESIDIO-DEF',
+    id: 'nfz_cjb_corridor',
+    name: 'Coimbatore Airport Outer Air Corridor Advisory Zone',
+    code: 'CJB-UAV-YELLOW',
+    type: 'AIRPORT',
+    restriction: 'RESTRICTED_WARNING',
+    latitude: 11.0298,
+    longitude: 77.0434,
+    radiusMeters: 5000,
+    altitudeFloorMeters: 0,
+    altitudeCeilingMeters: 60,
+    reason: 'DGCA designated low-altitude commercial delivery air corridor under 60m AGL. Normal drone flight permitted with continuous telemetry.',
+    regulatoryRef: 'DGCA Digital Sky Drone Airspace Map (Yellow Zone Corridor)',
+    activeSchedule: '24/7 Monitored',
+  },
+  {
+    id: 'nfz_sulur_iaf',
+    name: 'Sulur Air Force Station (AFS Sulur) Military Airspace Zone',
+    code: 'SULUR-IAF-RED',
     type: 'MILITARY',
     restriction: 'PROHIBITED',
-    latitude: 37.7989,
-    longitude: -122.4662,
-    radiusMeters: 2100,
+    latitude: 11.0136,
+    longitude: 77.1611,
+    radiusMeters: 6000,
     altitudeFloorMeters: 0,
-    altitudeCeilingMeters: 1200,
-    reason: 'Federal security reservation, Golden Gate Bridge infrastructure protection zone, and maritime military exclusion.',
-    regulatoryRef: 'Title 36 CFR § 1.5 / National Park & Federal Reserve Airspace',
+    altitudeCeilingMeters: 4000,
+    reason: 'Indian Air Force fighter jet training range and defense installation. Classified Red Zone by Ministry of Civil Aviation.',
+    regulatoryRef: 'MoD & DGCA National Drone Airspace Map (Red Zone)',
     activeSchedule: '24/7 Continuous',
   },
   {
-    id: 'nfz_alcatraz_fed',
-    name: 'Alcatraz Island Federal Security Enclave',
-    code: 'ALCATRAZ-FED',
-    type: 'GOVERNMENT',
-    restriction: 'PROHIBITED',
-    latitude: 37.8267,
-    longitude: -122.4230,
-    radiusMeters: 1200,
-    altitudeFloorMeters: 0,
-    altitudeCeilingMeters: 600,
-    reason: 'Federal correctional historic boundary & pelican wildlife marine reserve.',
-    regulatoryRef: 'FAA FDC NOTAM 4/3621 Federal Enclave',
-    activeSchedule: '24/7 Continuous',
-  },
-  {
-    id: 'nfz_ucsf_parnassus_heli',
-    name: 'UCSF Medical Center Emergency Trauma Heliport',
-    code: 'UCSF-HELI-CORR',
+    id: 'nfz_cmch_heliport',
+    name: 'Coimbatore Medical College Hospital (CMCH) Trauma Heliport Corridor',
+    code: 'CMCH-HELI-CORR',
     type: 'HOSPITAL_HELIPAD',
     restriction: 'RESTRICTED_WARNING',
-    latitude: 37.7631,
-    longitude: -122.4580,
-    radiusMeters: 1000,
+    latitude: 10.9996,
+    longitude: 76.9664,
+    radiusMeters: 1200,
     altitudeFloorMeters: 0,
     altitudeCeilingMeters: 350,
     reason: 'Emergency Medevac helicopter transit corridor. Drones must maintain safe lateral separation and limit altitude to max 35m.',
-    regulatoryRef: 'FAA Advisory Circular 150/5390-2C Heliport Safety',
+    regulatoryRef: 'DGCA Heliport Safety Guidelines 2022',
     activeSchedule: 'Continuous Emergency Priority',
   },
   {
-    id: 'nfz_sf_civic_gov',
-    name: 'San Francisco Civic Center & Federal Building Security Zone',
-    code: 'SF-CIVIC-SEC',
+    id: 'nfz_coimbatore_collectorate',
+    name: 'Coimbatore District Collectorate & Police Commissionerate Security Enclave',
+    code: 'CBE-GOV-SEC',
     type: 'GOVERNMENT',
     restriction: 'RESTRICTED_WARNING',
-    latitude: 37.7795,
-    longitude: -122.4175,
-    radiusMeters: 750,
+    latitude: 11.0018,
+    longitude: 76.9629,
+    radiusMeters: 800,
     altitudeFloorMeters: 0,
-    altitudeCeilingMeters: 400,
-    reason: 'Dense municipal government complex. Automated speed limit: 30 km/h and tether drop mandatory.',
-    regulatoryRef: 'SF Municipal Code Art. 22A Urban UAV Guidance',
-    activeSchedule: 'Mon-Fri 06:00 - 19:00',
+    altitudeCeilingMeters: 300,
+    reason: 'Dense municipal government & law enforcement complex. Speed limit: 30 km/h and precision tether landing mandatory.',
+    regulatoryRef: 'Coimbatore District Administration UAV Protocol',
+    activeSchedule: 'Mon-Sat 08:00 - 20:00',
   },
   {
-    id: 'nfz_oak_runway_approach',
-    name: 'Oakland International Airport Runway 28L/R Approach Buffer',
-    code: 'OAK-CLASS-C',
-    type: 'AIRPORT',
-    restriction: 'PROHIBITED',
-    latitude: 37.7213,
-    longitude: -122.2208,
-    radiusMeters: 5500,
+    id: 'nfz_psg_hospitals',
+    name: 'PSG Hospitals & Health Campus Air Corridor',
+    code: 'PSG-MED-CORR',
+    type: 'HOSPITAL_HELIPAD',
+    restriction: 'RESTRICTED_WARNING',
+    latitude: 11.0250,
+    longitude: 77.0300,
+    radiusMeters: 1000,
     altitudeFloorMeters: 0,
-    altitudeCeilingMeters: 2500,
-    reason: 'Class C commercial aircraft final approach radar vectoring corridor.',
-    regulatoryRef: 'FAA 14 CFR § 107.41 / Class C Airspace',
+    altitudeCeilingMeters: 250,
+    reason: 'Hospital quiet zone & ambulance transit corridor. Acoustic optimization active.',
+    regulatoryRef: 'DGCA Urban UAV Guidelines',
     activeSchedule: '24/7 Continuous',
   },
 ];
@@ -140,7 +140,7 @@ class AirspaceService {
 
   // Get all active No-Fly Zones
   public getNoFlyZones(): NoFlyZone[] {
-    return SF_NO_FLY_ZONES;
+    return COIMBATORE_NO_FLY_ZONES;
   }
 
   // Authoritatively evaluate a candidate drop zone location
@@ -165,16 +165,16 @@ class AirspaceService {
         }
       }
     } else {
-      // Default fallback hub (SkyHub Central)
-      minDistanceMeters = this.calculateDistanceMeters(37.7625, -122.4480, lat, lng);
+      // Default fallback hub: SkyHub Chinniyampalayam
+      minDistanceMeters = this.calculateDistanceMeters(11.0550, 77.0650, lat, lng);
       nearestHub = {
-        hub_name: 'SkyHub Aero Fulfillment Central #1',
-        radius_km: 18.5,
+        hub_name: 'SkyHub Chinniyampalayam',
+        radius_km: 12.0,
       };
     }
 
     const distKm = parseFloat((minDistanceMeters / 1000).toFixed(2));
-    const maxRadiusKm = nearestHub.radius_km || 18.5;
+    const maxRadiusKm = nearestHub.radius_km || 12.0;
 
     // Out of hub delivery range check
     if (distKm > maxRadiusKm) {
@@ -195,7 +195,7 @@ class AirspaceService {
     const prohibitedConflicts: NoFlyZone[] = [];
     const warningConflicts: NoFlyZone[] = [];
 
-    for (const nfz of SF_NO_FLY_ZONES) {
+    for (const nfz of COIMBATORE_NO_FLY_ZONES) {
       const distanceToCenter = this.calculateDistanceMeters(lat, lng, nfz.latitude, nfz.longitude);
       // Check if drop location + clearance radius overlaps with NFZ circle
       if (distanceToCenter <= nfz.radiusMeters + safeRadius) {

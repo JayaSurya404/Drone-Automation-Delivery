@@ -265,8 +265,8 @@ router.get('/customers', (_req: Request, res: Response): void => {
           successfulDeliveries: 0,
           status: 'Active',
           joinedDate: ord.created_at || '2026-01-01',
-          defaultAddress: ord.destination_address || 'San Francisco, CA',
-          defaultCoords: { lat: 37.7749, lng: -122.4194 },
+          defaultAddress: ord.destination_address || 'Chinniyampalayam, Coimbatore, Tamil Nadu',
+          defaultCoords: { lat: 11.0550, lng: 77.0650 },
         });
       }
       const c = customerMap.get(name);
@@ -331,39 +331,39 @@ router.get('/payments', (_req: Request, res: Response): void => {
 let merchantStore = [
   {
     id: 'M-01',
-    businessName: 'Bella Napoli Aero Kitchen',
-    ownerName: 'Marco Rossi',
+    businessName: 'Kovai Fresh Aero Kitchen',
+    ownerName: 'Kavitha Ramasamy',
     category: 'Hot Meals & Food',
     totalOrders: 142,
     successRate: 98.4,
-    revenue: 3480.50,
+    revenue: 44800.00,
     status: 'Approved',
-    address: '784 Folsom St, San Francisco, CA',
-    coords: { lat: 37.7820, lng: -122.4010 }
+    address: 'Avinashi Road, Chinniyampalayam, Coimbatore, Tamil Nadu',
+    coords: { lat: 11.0540, lng: 77.0620 }
   },
   {
     id: 'M-02',
-    businessName: 'AeroRescue Medical Dispensary',
-    ownerName: 'Dr. Sarah Jenkins',
+    businessName: 'AeroRescue Apollo Pharmacy Pod',
+    ownerName: 'Dr. Ramesh Sundaram',
     category: 'Medicine & Health',
     totalOrders: 89,
     successRate: 99.1,
-    revenue: 2890.00,
+    revenue: 38900.00,
     status: 'Approved',
-    address: '505 Parnassus Ave, San Francisco, CA',
-    coords: { lat: 37.7631, lng: -122.4580 }
+    address: 'KMCH Corridor, Avinashi Rd, Peelamedu, Coimbatore',
+    coords: { lat: 11.0420, lng: 77.0420 }
   },
   {
     id: 'M-03',
-    businessName: 'VoltWave Hardware Hub',
-    ownerName: 'Kenji Sato',
+    businessName: 'Kovai Tech & Electronics Hub',
+    ownerName: 'Senthil Kumar',
     category: 'Tech & Electronics',
     totalOrders: 64,
     successRate: 97.0,
-    revenue: 2150.00,
+    revenue: 31500.00,
     status: 'Approved',
-    address: '120 4th St, San Francisco, CA',
-    coords: { lat: 37.7850, lng: -122.4030 }
+    address: 'Tidel Park Road, Peelamedu, Coimbatore',
+    coords: { lat: 11.0280, lng: 77.0260 }
   }
 ];
 

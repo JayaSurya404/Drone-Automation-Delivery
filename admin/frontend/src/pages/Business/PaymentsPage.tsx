@@ -18,7 +18,7 @@ export const PaymentsPage: React.FC = () => {
     { header: 'Customer', accessor: 'customerName', sortable: true },
     {
       header: 'Amount',
-      accessor: (r) => <span className="font-bold text-slate-100">${r.amount.toFixed(2)}</span>,
+      accessor: (r) => <span className="font-bold text-slate-100">₹{r.amount.toLocaleString('en-IN')}</span>,
       sortable: true,
     },
     { header: 'Method', accessor: 'paymentMethod', sortable: true },
@@ -45,7 +45,7 @@ export const PaymentsPage: React.FC = () => {
 
         <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-right">
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Settled Volume</span>
-          <span className="text-lg font-black text-emerald-400">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+          <span className="text-lg font-black text-emerald-400">₹{totalRevenue.toLocaleString('en-IN')}</span>
         </div>
       </div>
 

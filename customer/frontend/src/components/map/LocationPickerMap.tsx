@@ -16,8 +16,8 @@ interface LocationPickerMapProps {
 }
 
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
-  initialLat = 37.7749,
-  initialLng = -122.4194,
+  initialLat = 11.0550,
+  initialLng = 77.0650,
   clearanceRadius = 3.5,
   isEligible = true,
   onLocationChange,
@@ -59,8 +59,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       .then(async () => {
         provider.updateDestination(initialLat, initialLng, 'Target Landing Zone');
         provider.setClearanceRadius(clearanceRadius, isEligible);
-        // Draw 18.5km SkyHub Metro Geofence boundary
-        provider.setGeofenceRadius(37.7625, -122.4480, 18500);
+        // Draw 12km SkyHub Chinniyampalayam Geofence boundary
+        provider.setGeofenceRadius(11.0550, 77.0650, 12000);
 
         // Fetch active No-Fly Zones from airspace service
         try {

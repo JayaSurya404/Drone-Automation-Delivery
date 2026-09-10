@@ -16,6 +16,7 @@ import { LoginScreen } from './pages/Auth/LoginScreen';
 import { Dashboard } from './pages/Dashboard/Dashboard';
 import { LiveOperations } from './pages/Operations/LiveOperations';
 import { OrdersPage } from './pages/Orders/OrdersPage';
+import { ProductsPage } from './pages/Products/ProductsPage';
 import { MissionsPage } from './pages/Missions/MissionsPage';
 import { PackagesPage } from './pages/Packages/PackagesPage';
 import { RoutesPage } from './pages/Routes/RoutesPage';
@@ -99,6 +100,7 @@ export const App: React.FC = () => {
                     <Route path="/simulation" element={<SimulationCenter />} />
                     <Route path="/operations" element={<LiveOperations />} />
                     <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/products" element={<ProductsPage />} />
                     <Route path="/missions" element={<MissionsPage />} />
                     <Route path="/packages" element={<PackagesPage />} />
                     <Route path="/routes" element={<RoutesPage />} />

@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   Send,
   Package,
+  Layers,
   Route as RouteIcon,
   Bot,
   BatteryCharging,
@@ -67,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobileOpe
       title: 'DELIVERY',
       items: [
         { label: 'Orders', path: '/orders', icon: ShoppingBag },
+        { label: 'Products', path: '/products', icon: Layers },
         { label: 'Missions', path: '/missions', icon: Send },
         { label: 'Packages', path: '/packages', icon: Package },
         { label: 'Routes', path: '/routes', icon: RouteIcon },

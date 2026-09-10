@@ -28,6 +28,8 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
   const mapProviderRef = useRef<LeafletMapProvider | null>(null);
   const [isAirspaceVisible, setIsAirspaceVisible] = useState<boolean>(true);
 
+  const hasInitialFitRef = useRef<boolean>(false);
+
   // Initialize Map Once on Mount
   useEffect(() => {
     if (!containerRef.current) return;
@@ -35,28 +37,36 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     const provider = new LeafletMapProvider();
     mapProviderRef.current = provider;
 
-    const midLat = (hubLocation.latitude + destinationLocation.latitude) / 2;
-    const midLng = (hubLocation.longitude + destinationLocation.longitude) / 2;
+    const initialLat = destinationLocation?.latitude || hubLocation?.latitude || 11.0550;
+    const initialLng = destinationLocation?.longitude || hubLocation?.longitude || 77.0650;
 
     provider
       .initialize({
         containerElement: containerRef.current,
         initialViewport: {
-          center: [midLat, midLng],
+          center: [initialLat, initialLng],
           zoom: 13,
         },
         isInteractive: true,
       })
       .then(async () => {
-        provider.updateHub(hubLocation);
-        provider.updateDestination(
-          destinationLocation.latitude,
-          destinationLocation.longitude,
-          destinationLocation.address
-        );
+        if (hubLocation?.latitude) {
+          provider.updateHub(hubLocation);
+        }
+        if (destinationLocation?.latitude) {
+          provider.updateDestination(
+            destinationLocation.latitude,
+            destinationLocation.longitude,
+            destinationLocation.address
+          );
+        }
         provider.setClearanceRadius(3.5, true);
-        provider.setFlightRoute(flightRoute);
-        provider.updateDronePosition(droneLocation);
+        if (flightRoute && flightRoute.length > 0) {
+          provider.setFlightRoute(flightRoute);
+        }
+        if (droneLocation?.latitude) {
+          provider.updateDronePosition(droneLocation);
+        }
 
         // Fetch and draw active No-Fly Zones
         try {
@@ -68,11 +78,21 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
           console.warn('Could not load NFZ zones for live map:', e);
         }
 
-        provider.fitBounds([
-          [hubLocation.latitude, hubLocation.longitude],
-          [destinationLocation.latitude, destinationLocation.longitude],
-          [droneLocation.latitude, droneLocation.longitude],
-        ]);
+        const fitPoints: [number, number][] = [];
+        if (destinationLocation?.latitude && destinationLocation?.longitude) {
+          fitPoints.push([destinationLocation.latitude, destinationLocation.longitude]);
+        }
+        if (droneLocation?.latitude && droneLocation?.longitude) {
+          fitPoints.push([droneLocation.latitude, droneLocation.longitude]);
+        }
+        if (hubLocation?.latitude && hubLocation?.longitude) {
+          fitPoints.push([hubLocation.latitude, hubLocation.longitude]);
+        }
+
+        if (fitPoints.length > 0) {
+          provider.fitBounds(fitPoints);
+          hasInitialFitRef.current = true;
+        }
       });
 
     return () => {
@@ -91,9 +111,31 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Smoothly update drone position marker when coordinates change
+  // Update destination marker and clearance zone when coordinates update
   useEffect(() => {
-    if (mapProviderRef.current) {
+    if (mapProviderRef.current && destinationLocation?.latitude && destinationLocation?.longitude) {
+      mapProviderRef.current.updateDestination(
+        destinationLocation.latitude,
+        destinationLocation.longitude,
+        destinationLocation.address
+      );
+      if (!hasInitialFitRef.current) {
+        handleRecenter();
+        hasInitialFitRef.current = true;
+      }
+    }
+  }, [destinationLocation?.latitude, destinationLocation?.longitude, destinationLocation?.address]);
+
+  // Update flight route polyline when available
+  useEffect(() => {
+    if (mapProviderRef.current && flightRoute && flightRoute.length > 0) {
+      mapProviderRef.current.setFlightRoute(flightRoute);
+    }
+  }, [flightRoute]);
+
+  // Smoothly update drone position marker without snapping the user's camera view
+  useEffect(() => {
+    if (mapProviderRef.current && droneLocation?.latitude && droneLocation?.longitude) {
       mapProviderRef.current.updateDronePosition(droneLocation);
     }
   }, [droneLocation.latitude, droneLocation.longitude, droneLocation.bearing]);
@@ -108,11 +150,22 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
 
   const handleRecenter = () => {
     if (mapProviderRef.current) {
-      mapProviderRef.current.fitBounds([
-        [hubLocation.latitude, hubLocation.longitude],
-        [destinationLocation.latitude, destinationLocation.longitude],
-        [droneLocation.latitude, droneLocation.longitude],
-      ]);
+      const points: [number, number][] = [];
+      if (destinationLocation?.latitude && destinationLocation?.longitude) {
+        points.push([destinationLocation.latitude, destinationLocation.longitude]);
+      }
+      if (droneLocation?.latitude && droneLocation?.longitude) {
+        points.push([droneLocation.latitude, droneLocation.longitude]);
+      }
+      if (hubLocation?.latitude && hubLocation?.longitude) {
+        points.push([hubLocation.latitude, hubLocation.longitude]);
+      }
+      if (flightRoute && flightRoute.length > 0) {
+        points.push(...flightRoute);
+      }
+      if (points.length > 0) {
+        mapProviderRef.current.fitBounds(points);
+      }
     }
   };
 

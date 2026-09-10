@@ -32,7 +32,7 @@ export const RoutesPage: React.FC = () => {
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider">⚠ ROUTE DEVIATION DETECTED</h3>
               <p className="text-xs">
-                Drone D-001 drifted 140 meters off planned San Francisco Air Corridor flight path due to wind gust updraft.
+                Drone D-001 drifted 140 meters off planned Coimbatore Air Corridor flight path due to wind gust updraft.
               </p>
             </div>
           </div>

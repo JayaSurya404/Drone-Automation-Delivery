@@ -12,10 +12,10 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
 export const seedDatabase = async () => {
-  console.log('🌱 Initializing schema and seeding SkyNav Drone database...');
+  console.log('🌱 Initializing schema and seeding SkyNav Customer database (Coimbatore / Chinniyampalayam)...');
   initDb();
 
-  // Clear existing records to ensure clean idempotent seed
+  // Clear existing records
   db.exec(`
     DELETE FROM support_messages;
     DELETE FROM support_tickets;
@@ -39,22 +39,20 @@ export const seedDatabase = async () => {
     DELETE FROM faqs;
   `);
 
-  // 1. SEED DEFAULT USER (Alex Mercer)
-  const passwordHash = await bcrypt.hash('Password123!', 10);
-  const userId = 'cust_984210';
+  // 1. SEED SINGLE DEVELOPMENT CUSTOMER (customer@skynav / skynav@123)
+  const passwordHash = await bcrypt.hash('skynav@123', 10);
+  const userId = 'cust_skynav_dev';
 
   db.prepare(`
     INSERT INTO users (id, name, email, phone, password_hash, avatar, is_verified, account_status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-30 days'), datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, 1, 'active', datetime('now', '-30 days'), datetime('now'))
   `).run(
     userId,
-    'Alex Mercer',
-    'alex.mercer@skynav.io',
-    '+1 (555) 248-7790',
+    'SkyNav Customer',
+    'customer@skynav',
+    '+91 98422 10002',
     passwordHash,
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    1,
-    'active'
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
   );
 
   // Notification Preferences
@@ -63,81 +61,42 @@ export const seedDatabase = async () => {
     VALUES (?, 1, 1, 1)
   `).run(userId);
 
-  // Initialize Cart & Wishlist for Alex Mercer
-  const cartId = 'cart_984210';
-  const wishlistId = 'wish_984210';
+  // Initialize Cart & Wishlist for customer@skynav
+  const cartId = `cart_${userId}`;
+  const wishlistId = `wish_${userId}`;
   db.prepare(`INSERT INTO carts (id, customer_id) VALUES (?, ?)`).run(cartId, userId);
   db.prepare(`INSERT INTO wishlists (id, customer_id) VALUES (?, ?)`).run(wishlistId, userId);
 
-  // 1B. SEED DEDICATED REAL TEST CUSTOMER (testcustomer@example.com)
-  const testCustomerPasswordHash = await bcrypt.hash('Customer123!', 10);
-  const testUserId = 'cust_test_customer_1';
-
-  db.prepare(`
-    INSERT INTO users (id, name, email, phone, password_hash, avatar, is_verified, account_status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-15 days'), datetime('now'))
-  `).run(
-    testUserId,
-    'Test Customer',
-    'testcustomer@example.com',
-    '+1 (555) 789-0123',
-    testCustomerPasswordHash,
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-    1,
-    'active'
-  );
-
-  db.prepare(`
-    INSERT INTO notification_preferences (user_id, email_updates, sms_alerts, drone_proximity_sound)
-    VALUES (?, 1, 1, 1)
-  `).run(testUserId);
-
-  db.prepare(`INSERT INTO carts (id, customer_id) VALUES (?, ?)`).run('cart_test_1', testUserId);
-  db.prepare(`INSERT INTO wishlists (id, customer_id) VALUES (?, ?)`).run('wish_test_1', testUserId);
-
-  // 2. SEED FULFILLMENT HUBS & DELIVERY ZONES
+  // 2. SEED AUTHORITATIVE FULFILLMENT HUB & DELIVERY ZONE
   const zoneStmt = db.prepare(`
     INSERT INTO delivery_zones (id, name, hub_name, hub_latitude, hub_longitude, radius_km, max_drone_weight_kg, base_fee, express_surcharge, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   zoneStmt.run(
-    'zone_sf_central',
-    'San Francisco Metro Urban Corridor',
-    'SkyHub Aero Fulfillment Central #1',
-    37.7625,
-    -122.4480,
-    18.5,
-    5.0,
-    3.99,
-    3.50,
-    'ACTIVE'
-  );
-
-  zoneStmt.run(
-    'zone_soma_tech',
-    'SoMa & Mission High-Density Bay Corridor',
-    'SkyHub Bay Gateway Station #2',
-    37.7850,
-    -122.3950,
+    'zone_coimbatore_cbe',
+    'Coimbatore Urban Autonomous Flight Corridor',
+    'SkyHub Chinniyampalayam',
+    11.0550,
+    77.0650,
     12.0,
-    4.5,
-    3.99,
-    2.99,
+    5.0,
+    49.00,
+    39.00,
     'ACTIVE'
   );
 
-  // 3. SEED DRONES FLEET
+  // 3. SEED DRONES FLEET AROUND CHINNIYAMPALAYAM
   const droneStmt = db.prepare(`
     INSERT INTO drones (id, identifier, model, status, battery_level, latitude, longitude, altitude, heading, speed_kmh, max_payload_kg)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  droneStmt.run('drone_01', 'SkyNav Alpha-01', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 37.7625, -122.4480, 0, 0, 0, 4.5);
-  droneStmt.run('drone_02', 'SkyNav Falcon-02', 'AeroCarrier HeavyLift v5', 'AVAILABLE', 100, 37.7625, -122.4480, 0, 0, 0, 5.0);
-  droneStmt.run('drone_03', 'SkyNav Osprey-03', 'Osprey Rapid VTOL', 'AVAILABLE', 92, 37.7850, -122.3950, 0, 0, 0, 3.5);
-  droneStmt.run('drone_04', 'SkyNav Swift-04', 'SwiftCourier MedPod', 'AVAILABLE', 88, 37.7625, -122.4480, 0, 0, 0, 2.5);
-  droneStmt.run('drone_05', 'SkyNav Hawk-05', 'SkyNav Hawk Cargo-X', 'AVAILABLE', 95, 37.7850, -122.3950, 0, 0, 0, 4.0);
+  droneStmt.run('drone_01', 'SkyNav Alpha-01', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 11.0550, 77.0650, 0, 0, 0, 4.5);
+  droneStmt.run('drone_02', 'SkyNav Falcon-02', 'AeroCarrier HeavyLift v5', 'AVAILABLE', 100, 11.0550, 77.0650, 0, 0, 0, 5.0);
+  droneStmt.run('drone_03', 'SkyNav Osprey-03', 'Osprey Rapid VTOL', 'AVAILABLE', 92, 11.0530, 77.0620, 0, 0, 0, 3.5);
+  droneStmt.run('drone_04', 'SkyNav Swift-04', 'SwiftCourier MedPod', 'AVAILABLE', 88, 11.0550, 77.0650, 0, 0, 0, 2.5);
+  droneStmt.run('drone_05', 'SkyNav Hawk-05', 'SkyNav Hawk Cargo-X', 'AVAILABLE', 95, 11.0530, 77.0620, 0, 0, 0, 4.0);
 
   // 4. SEED CATEGORIES
   const categoryStmt = db.prepare(`
@@ -146,331 +105,316 @@ export const seedDatabase = async () => {
   `);
 
   const categories = [
-    { id: 'cat_food', name: 'Hot Meals & Food', slug: 'Food', desc: 'Fresh chef-crafted pizzas, sushi, burgers & artisan delicacies delivered hot.', img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', icon: 'Pizza', order: 1 },
+    { id: 'cat_food', name: 'Hot Meals & Food', slug: 'Food', desc: 'Fresh chef-crafted meals, authentic South Indian breakfast & delicacies delivered hot.', img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', icon: 'Pizza', order: 1 },
     { id: 'cat_med', name: 'Medicine & Health', slug: 'Medicine', desc: 'Emergency trauma packs, test kits, inhalers, analgesics & prescription refills.', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80', icon: 'Pill', order: 2 },
-    { id: 'cat_groc', name: 'Fresh Groceries', slug: 'Groceries', desc: 'Organic produce, artisan coffee, bakery bread, dairy & gourmet pantry staples.', img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80', icon: 'ShoppingBag', order: 3 },
-    { id: 'cat_elec', name: 'Tech & Electronics', slug: 'Electronics', desc: 'High-speed GaN chargers, ANC earbuds, MagSafe accessories & cables.', img: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', icon: 'Zap', order: 4 },
+    { id: 'cat_groc', name: 'Fresh Groceries', slug: 'Groceries', desc: 'Aavin fresh dairy, Nilgiris tea, organic farm produce & pantry staples.', img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80', icon: 'ShoppingBag', order: 3 },
+    { id: 'cat_elec', name: 'Tech & Electronics', slug: 'Electronics', desc: 'High-speed GaN chargers, heavy-duty power banks & durable USB-C cables.', img: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', icon: 'Zap', order: 4 },
     { id: 'cat_doc', name: 'Instant Documents', slug: 'Documents', desc: 'Secure biometric sealed pouches, legal contracts, notary briefs & deeds.', img: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80', icon: 'FileText', order: 5 },
-    { id: 'cat_other', name: 'Daily Essentials', slug: 'Other', desc: 'Weather gear, titanium tools, emergency battery pods & home lifestyle.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80', icon: 'Sparkles', order: 6 },
+    { id: 'cat_other', name: 'Daily Essentials', slug: 'Other', desc: 'Heritage cold-pressed oils, air care, emergency pods & home lifestyle.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80', icon: 'Sparkles', order: 6 },
   ];
 
   for (const c of categories) {
     categoryStmt.run(c.id, c.name, c.slug, c.desc, c.img, c.icon, c.order);
   }
 
-  // 5. SEED PRODUCTS
-  const prodStmt = db.prepare(`
+  // 5. SEED PRODUCTS (INR Prices)
+  const productStmt = db.prepare(`
     INSERT INTO products (
-      id, name, slug, brand, category_id, sub_category, description, price, original_price,
-      discount_percent, rating, review_count, image, images_json, is_drone_eligible, max_payload_kg,
-      estimated_delivery_mins, in_stock, stock_count, badge, features_json, specifications_json,
-      dimensions, weight_grams
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, name, slug, brand, category_id, sub_category, description, price,
+      original_price, discount_percent, rating, review_count, in_stock, stock_count,
+      is_drone_eligible, weight_grams, dimensions, estimated_delivery_mins,
+      badge, features_json, specifications_json, image, images_json
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?
+    )
   `);
 
   const products = [
     {
-      id: 'prod_food_1',
-      name: 'Artisan Woodfired Truffle Mushroom Pizza (12")',
-      slug: 'artisan-woodfired-truffle-mushroom-pizza-12',
-      brand: 'Bella Napoli Aero Kitchen',
-      category_id: 'cat_food',
-      sub_category: 'Italian Gourmet',
-      description: 'Hand-stretched 48-hour fermented sourdough crust topped with black truffle puree, wild foraged cremini mushrooms, fresh buffalo mozzarella, and aged Parmigiano Reggiano. Dispatched in an insulated thermal heat-lock pod ensuring 68°C table-ready temperature on arrival.',
-      price: 21.99,
-      original_price: 28.00,
-      discount_percent: 21,
+      id: 'prod_elec_1',
+      name: 'BoAt Storm GaN 65W Rapid Dual-Port Fast Charger',
+      slug: 'boat-storm-gan-65w-rapid-fast-charger',
+      brand: 'boAt',
+      categoryId: 'cat_elec',
+      category: 'Electronics',
+      subCategory: 'Charging & Power',
+      description: 'Ultra-compact Gallium Nitride 65W fast charger with dual Type-C and USB-A power delivery for Indian smartphones and laptops.',
+      price: 1299.00,
+      originalPrice: 1999.00,
+      discountPercent: 35,
       rating: 4.9,
-      review_count: 310,
-      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 1.5,
-      estimated_delivery_mins: 14,
-      in_stock: 1,
-      stock_count: 45,
-      badge: 'Popular',
-      features_json: JSON.stringify([
-        '48h naturally fermented sourdough',
-        'Italian black truffle reduction & wild mushrooms',
-        'Insulated 68°C thermal drone pod dispatch'
-      ]),
-      specifications_json: JSON.stringify({ Size: '12 inches', Servings: '1-2 persons', Temp: 'Thermal Lock 68°C', Crust: 'Sourdough' }),
-      dimensions: '32 x 32 x 5 cm',
-      weight_grams: 580,
+      reviewCount: 342,
+      inStock: 1,
+      stockCount: 50,
+      isDroneEligible: 1,
+      weightGrams: 180,
+      dimensions: '5.2 x 4.8 x 3.1 cm',
+      deliveryMins: 11,
+      badge: 'Best Seller',
+      featured: 1,
+      tags: JSON.stringify(['gan', 'fast-charger', 'boat', 'electronics', 'type-c']),
+      image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Wattage': '65W GaN', 'Ports': '2x USB-C, 1x USB-A', 'Protocol': 'PD 3.0 / QC 4+', 'Weight': '180g' })
     },
     {
-      id: 'prod_food_2',
-      name: 'Kyoto Special Wild Salmon Sashimi & Nigiri Bento',
-      slug: 'kyoto-special-wild-salmon-sashimi-nigiri-bento',
-      brand: 'Sora Craft Sushi Lab',
-      category_id: 'cat_food',
-      sub_category: 'Japanese Cuisine',
-      description: 'Chef selection of Norwegian wild salmon sashimi, king salmon nigiri, spicy salmon roll, house pickled ginger, and fresh grated Shizuoka wasabi. Transported in a precision active sub-zero gel cooling chamber to preserve pristine raw fish texture.',
-      price: 26.50,
-      original_price: 34.00,
-      discount_percent: 22,
-      rating: 4.95,
-      review_count: 220,
-      image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 1.2,
-      estimated_delivery_mins: 12,
-      in_stock: 1,
-      stock_count: 30,
-      badge: 'Chef Special',
-      features_json: JSON.stringify([
-        'Fresh daily wild-caught Norwegian salmon',
-        'Active sub-zero cooling capsule dispatch',
-        'Includes authentic Shizuoka fresh wasabi'
-      ]),
-      specifications_json: JSON.stringify({ Pieces: '18 pieces', Diet: 'Gluten-conscious', Packaging: 'Cold-Lock Sealed' }),
-      dimensions: '25 x 18 x 4 cm',
-      weight_grams: 420,
+      id: 'prod_elec_2',
+      name: 'Syska 20000mAh Heavy Duty Power Bank',
+      slug: 'syska-20000mah-power-bank',
+      brand: 'Syska',
+      categoryId: 'cat_elec',
+      category: 'Electronics',
+      subCategory: 'Power Accessories',
+      description: 'High-density 20000mAh external battery pack with 22.5W two-way fast charging and LED digital battery level display.',
+      price: 1499.00,
+      originalPrice: 2499.00,
+      discountPercent: 40,
+      rating: 4.8,
+      reviewCount: 218,
+      inStock: 1,
+      stockCount: 35,
+      isDroneEligible: 1,
+      weightGrams: 420,
+      dimensions: '14.2 x 6.8 x 2.8 cm',
+      deliveryMins: 12,
+      badge: 'High Capacity',
+      featured: 1,
+      tags: JSON.stringify(['powerbank', 'syska', 'battery', 'fast-charge']),
+      image: 'https://images.unsplash.com/photo-1609592424368-45097df6db82?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1609592424368-45097df6db82?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Capacity': '20000mAh', 'Output': '22.5W Fast Charge', 'Ports': 'Micro-USB, Type-C, USB-A', 'Weight': '420g' })
     },
     {
       id: 'prod_med_1',
-      name: 'AeroFirst Rapid First Aid & Trauma Burn Kit',
-      slug: 'aerofirst-rapid-first-aid-trauma-burn-kit',
-      brand: 'AeroMed Safety Corp',
-      category_id: 'cat_med',
-      sub_category: 'Emergency Supplies',
-      description: 'Hospital-grade emergency trauma pack certified for rapid aerial dispatch. Contains sterile trauma bandages, burn hydrogels, tourniquet, antiseptic wipes, shears, instant cold packs, and emergency instructions.',
-      price: 34.99,
-      original_price: 49.99,
-      discount_percent: 30,
-      rating: 4.9,
-      review_count: 142,
-      image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 2.0,
-      estimated_delivery_mins: 9,
-      in_stock: 1,
-      stock_count: 85,
-      badge: 'Critical Urgent',
-      features_json: JSON.stringify([
-        'High-priority aerial flight dispatch',
-        'Complete burn gel & trauma wound coverage',
-        'Waterproof hermetic sealing'
-      ]),
-      specifications_json: JSON.stringify({ Standard: 'OSHA & ANSI Compliant', Pieces: '64 items', Expiry: '2028-12' }),
-      dimensions: '22 x 15 x 8 cm',
-      weight_grams: 650,
+      name: 'Apollo Rapid Emergency First-Aid Trauma Kit',
+      slug: 'apollo-rapid-emergency-first-aid-trauma-kit',
+      brand: 'Apollo Pharmacy',
+      categoryId: 'cat_med',
+      category: 'Medicine',
+      subCategory: 'Emergency Care',
+      description: 'Sterile hospital-grade emergency trauma pack with tourniquet, antiseptics, sterile gauze dressings, and burn shield.',
+      price: 499.00,
+      originalPrice: 699.00,
+      discountPercent: 28,
+      rating: 5.0,
+      reviewCount: 512,
+      inStock: 1,
+      stockCount: 75,
+      isDroneEligible: 1,
+      weightGrams: 450,
+      dimensions: '18 x 12 x 8 cm',
+      deliveryMins: 8,
+      badge: 'Urgent Dispatch',
+      featured: 1,
+      tags: JSON.stringify(['trauma', 'first-aid', 'apollo', 'sterile', 'emergency']),
+      image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Certification': 'ISO 13485 / Apollo Healthcare', 'Contents': '38 Sterile Items', 'Drop Method': 'Shock-Absorbing Pod', 'Weight': '450g' })
     },
     {
       id: 'prod_med_2',
-      name: 'Glucofast Instant Glucose Monitor & 50 Test Strips',
-      slug: 'glucofast-instant-glucose-monitor-50-test-strips',
-      brand: 'AeroMed Diagnostics',
-      category_id: 'cat_med',
-      sub_category: 'Diagnostic Health',
-      description: 'High-precision blood glucose monitoring device with Bluetooth 5.2 cloud sync. Delivers accurate readings in under 5 seconds with zero coding required. Includes 50 sterile test strips and lancing device.',
-      price: 44.50,
-      original_price: 59.99,
-      discount_percent: 26,
+      name: 'Amrutanjan Rapid Pain Relief & Vaporub Duo Pack',
+      slug: 'amrutanjan-rapid-pain-relief-duo',
+      brand: 'Amrutanjan Health',
+      categoryId: 'cat_med',
+      category: 'Medicine',
+      subCategory: 'Pain Care',
+      description: 'Trusted ayurvedic pain balm and eucalyptus chest rub for headache, congestion, and muscular fatigue.',
+      price: 199.00,
+      originalPrice: 260.00,
+      discountPercent: 23,
       rating: 4.8,
-      review_count: 96,
-      image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 1.0,
-      estimated_delivery_mins: 11,
-      in_stock: 1,
-      stock_count: 40,
-      badge: 'Trending',
-      features_json: JSON.stringify([
-        '5-second rapid measurement',
-        'Bluetooth sync to smartphone health apps',
-        'Includes 50 calibrated test strips'
-      ]),
-      specifications_json: JSON.stringify({ Battery: 'CR2032 included', Memory: '500 readings', Connectivity: 'Bluetooth 5.2' }),
-      dimensions: '10 x 6 x 2 cm',
-      weight_grams: 180,
-    },
-    {
-      id: 'prod_med_3',
-      name: 'BioShield Rapid Antihistamine & Allergy Relief (30 Caps)',
-      slug: 'bioshield-rapid-antihistamine-allergy-relief-30-caps',
-      brand: 'BioShield Pharma',
-      category_id: 'cat_med',
-      sub_category: 'Pharmacy',
-      description: 'Non-drowsy 24h fast relief tablets for acute seasonal pollen, dust, animal dander, and respiratory allergic irritation. Fast dissolving softgels.',
-      price: 16.50,
-      original_price: 22.00,
-      discount_percent: 25,
-      rating: 4.7,
-      review_count: 88,
-      image: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 0.5,
-      estimated_delivery_mins: 10,
-      in_stock: 1,
-      stock_count: 120,
-      badge: 'Best Seller',
-      features_json: JSON.stringify([
-        'Non-drowsy 24h active formula',
-        'Fast acting within 15 minutes',
-        'Doctor recommended active ingredients'
-      ]),
-      specifications_json: JSON.stringify({ Quantity: '30 softgels', Dosage: '1 capsule per 24h', Expiry: '2027-06' }),
-      dimensions: '8 x 4 x 4 cm',
-      weight_grams: 85,
+      reviewCount: 420,
+      inStock: 1,
+      stockCount: 90,
+      isDroneEligible: 1,
+      weightGrams: 150,
+      dimensions: '10 x 6 x 5 cm',
+      deliveryMins: 9,
+      badge: 'Essential',
+      featured: 0,
+      tags: JSON.stringify(['pain-relief', 'balm', 'ayurvedic', 'amrutanjan']),
+      image: 'https://images.unsplash.com/photo-1550572017-ed200f5e5a43?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1550572017-ed200f5e5a43?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Form': 'Herbal Balm & Rub', 'Net Volume': '50g + 30g', 'Active Herbs': 'Pudina, Gandhapura, Eucalyptus' })
     },
     {
       id: 'prod_groc_1',
-      name: 'Organic Whole Fair-Trade Coffee Beans (1kg)',
-      slug: 'organic-whole-fair-trade-coffee-beans-1kg',
-      brand: 'Sierra Summit Roasters',
-      category_id: 'cat_groc',
-      sub_category: 'Coffee & Tea',
-      description: 'Single-origin Ethiopian Yirgacheffe medium roast. Notes of bergamot, dark chocolate, and wild blueberry. Freshly roasted within 48 hours of aerial dispatch.',
-      price: 18.99,
-      original_price: 24.50,
-      discount_percent: 22,
-      rating: 4.85,
-      review_count: 195,
-      image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 1.5,
-      estimated_delivery_mins: 15,
-      in_stock: 1,
-      stock_count: 65,
-      badge: 'Fresh Roast',
-      features_json: JSON.stringify([
-        '100% USDA Organic & Fair Trade',
-        'Aromatically sealed one-way valve bag',
-        'Medium roast Ethiopian Yirgacheffe'
-      ]),
-      specifications_json: JSON.stringify({ Weight: '1000g / 2.2 lbs', Roast: 'Medium', Origin: 'Ethiopia' }),
-      dimensions: '14 x 9 x 24 cm',
-      weight_grams: 1020,
+      name: 'Coimbatore Authentic Filter Coffee Blend (500g)',
+      slug: 'coimbatore-authentic-filter-coffee-blend-500g',
+      brand: 'Kovai Coffee Works',
+      categoryId: 'cat_groc',
+      category: 'Groceries',
+      subCategory: 'Beverages',
+      description: 'Traditional 80:20 plantation peaberry and chicory roast freshly grounded for a rich aromatic South Indian morning cup.',
+      price: 340.00,
+      originalPrice: 420.00,
+      discountPercent: 19,
+      rating: 4.9,
+      reviewCount: 680,
+      inStock: 1,
+      stockCount: 65,
+      isDroneEligible: 1,
+      weightGrams: 520,
+      dimensions: '16 x 10 x 6 cm',
+      deliveryMins: 11,
+      badge: 'Local Favorite',
+      featured: 1,
+      tags: JSON.stringify(['coffee', 'filter-coffee', 'coimbatore', 'south-indian']),
+      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Roast': 'Medium-Dark', 'Blend Ratio': '80% Coffee : 20% Chicory', 'Origin': 'Western Ghats / Anamalai Hills' })
     },
     {
-      id: 'prod_elec_1',
-      name: 'VoltWave 100W GaN Pro Fast Charger & 240W Cable',
-      slug: 'voltwave-100w-gan-pro-fast-charger-240w-cable',
-      brand: 'VoltWave Technologies',
-      category_id: 'cat_elec',
-      sub_category: 'Charging & Power',
-      description: 'Ultra-compact Gallium Nitride (GaN III) fast wall charger with 3x USB-C and 1x USB-A ports. Powers MacBook Pro 16", iPad, and iPhone simultaneously at peak speeds. Includes 2m braided 240W PD cable.',
-      price: 39.99,
-      original_price: 54.99,
-      discount_percent: 27,
+      id: 'prod_groc_2',
+      name: 'Aavin Fresh Farm Pasteurized Pure Milk (1L x 2)',
+      slug: 'aavin-fresh-farm-pure-milk-2l',
+      brand: 'Aavin Tamil Nadu',
+      categoryId: 'cat_groc',
+      category: 'Groceries',
+      subCategory: 'Dairy',
+      description: 'Chilled pasteurized homogenized cow milk delivered in insulated flight thermal pods direct from local dairy union.',
+      price: 120.00,
+      originalPrice: 130.00,
+      discountPercent: 8,
       rating: 4.9,
-      review_count: 240,
-      image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 1.0,
-      estimated_delivery_mins: 14,
-      in_stock: 1,
-      stock_count: 70,
-      badge: 'Tech Choice',
-      features_json: JSON.stringify([
-        '100W total output via GaN III technology',
-        'Charges 4 devices simultaneously',
-        'Includes 240W braided silicone USB-C cable'
-      ]),
-      specifications_json: JSON.stringify({ Output: '100W Max', Ports: '3x USB-C, 1x USB-A', Warranty: '2 Years' }),
-      dimensions: '6.5 x 6.5 x 3.2 cm',
-      weight_grams: 220,
+      reviewCount: 1100,
+      inStock: 1,
+      stockCount: 120,
+      isDroneEligible: 1,
+      weightGrams: 1050,
+      dimensions: '20 x 14 x 10 cm',
+      deliveryMins: 10,
+      badge: 'Fresh Daily',
+      featured: 1,
+      tags: JSON.stringify(['milk', 'aavin', 'fresh', 'dairy', 'coimbatore']),
+      image: 'https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Volume': '2 Litres (1L x 2)', 'Fat Content': '4.5% Standardized', 'Temperature': 'Chilled 4°C Pod' })
+    },
+    {
+      id: 'prod_food_1',
+      name: 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)',
+      slug: 'anand-bhavan-ghee-mysore-pak-400g',
+      brand: 'Sri Anand Bhavan',
+      categoryId: 'cat_food',
+      category: 'Food',
+      subCategory: 'Traditional Sweets',
+      description: 'Melt-in-mouth traditional Coimbatore sweet crafted with pure desi ghee, gram flour, and cardamom.',
+      price: 420.00,
+      originalPrice: 480.00,
+      discountPercent: 12,
+      rating: 5.0,
+      reviewCount: 390,
+      inStock: 1,
+      stockCount: 40,
+      isDroneEligible: 1,
+      weightGrams: 450,
+      dimensions: '18 x 14 x 5 cm',
+      deliveryMins: 13,
+      badge: 'Popular',
+      featured: 1,
+      tags: JSON.stringify(['sweets', 'mysore-pak', 'ghee', 'coimbatore', 'anand-bhavan']),
+      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Weight': '400g Net', 'Ingredients': 'Pure Desi Ghee, Gram Flour, Sugar, Cardamom', 'Shelf Life': '15 Days' })
+    },
+    {
+      id: 'prod_food_2',
+      name: 'Kovai Crispy Masala Dosa & Sambar Breakfast Box',
+      slug: 'kovai-crispy-masala-dosa-breakfast-box',
+      brand: 'Kovai Kitchen Direct',
+      categoryId: 'cat_food',
+      category: 'Food',
+      subCategory: 'Breakfast Combos',
+      description: 'Crisp golden dosa filled with spiced potato masala, served steaming hot at 65°C with coconut chutney and piping hot sambar.',
+      price: 180.00,
+      originalPrice: 220.00,
+      discountPercent: 18,
+      rating: 4.8,
+      reviewCount: 520,
+      inStock: 1,
+      stockCount: 30,
+      isDroneEligible: 1,
+      weightGrams: 550,
+      dimensions: '22 x 18 x 8 cm',
+      deliveryMins: 12,
+      badge: 'Hot Pod',
+      featured: 1,
+      tags: JSON.stringify(['dosa', 'breakfast', 'south-indian', 'hot-meal']),
+      image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&auto=format&fit=crop&q=80',
+      images: JSON.stringify(['https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Packaging': 'Thermal Lock 65°C Pod', 'Includes': '2x Dosa, Sambar (200ml), Chutney', 'Weight': '550g' })
     },
     {
       id: 'prod_doc_1',
-      name: 'Tamper-Evident Notary & Contract Courier Dispatch',
-      slug: 'tamper-evident-notary-contract-courier-dispatch',
-      brand: 'SkyNav Secure Courier',
-      category_id: 'cat_doc',
-      sub_category: 'Legal Logistics',
-      description: 'RFID-sealed, military-grade ballistic nylon document pouch with dual-custody OTP biometric verification. Ideal for closing real estate deeds, legal filings, and sensitive corporate affidavits.',
-      price: 29.00,
-      original_price: 38.00,
-      discount_percent: 23,
-      rating: 4.95,
-      review_count: 84,
+      name: 'Biometric Sealed Legal Document Security Pouch',
+      slug: 'biometric-sealed-legal-document-pouch',
+      brand: 'SkyNav Secure',
+      categoryId: 'cat_doc',
+      category: 'Documents',
+      subCategory: 'Legal Courier',
+      description: 'Tamper-evident waterproof polymer envelope with dynamic QR seal, tracked end-to-end for contracts, property deeds, and certificates.',
+      price: 250.00,
+      originalPrice: 350.00,
+      discountPercent: 28,
+      rating: 4.9,
+      reviewCount: 160,
+      inStock: 1,
+      stockCount: 100,
+      isDroneEligible: 1,
+      weightGrams: 120,
+      dimensions: '32 x 24 x 1 cm',
+      deliveryMins: 8,
+      badge: 'Secure Seal',
+      featured: 0,
+      tags: JSON.stringify(['document', 'legal', 'secure', 'confidential']),
       image: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 1.5,
-      estimated_delivery_mins: 11,
-      in_stock: 1,
-      stock_count: 50,
-      badge: 'High Security',
-      features_json: JSON.stringify([
-        'RFID tamper-evident physical locking mechanism',
-        'Chain-of-custody cryptographic delivery audit log',
-        'Point-to-point direct non-stop flight corridor'
-      ]),
-      specifications_json: JSON.stringify({ Security: 'Level 4 Vault Seal', Capacity: 'Up to 150 legal pages', Insurance: 'Included $10,000' }),
-      dimensions: '35 x 26 x 3 cm',
-      weight_grams: 310,
+      images: JSON.stringify(['https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Security': 'Dynamic Handover OTP', 'Capacity': 'Up to 50 A4 Sheets', 'Waterproofing': 'IP68 Enclosure' })
     },
     {
-      id: 'prod_other_1',
-      name: 'AeroShield Carbon Umbrella & Titanium EDC Multi-Tool',
-      slug: 'aeroshield-carbon-umbrella-titanium-edc-multi-tool',
-      brand: 'AeroShield Essentials',
-      category_id: 'cat_other',
-      sub_category: 'Weather & Tools',
-      description: 'Wind-tunnel tested carbon fiber canopy resistant to 90 km/h gusts. Paired with a grade-5 titanium grade pocket EDC multi-tool with knife, pliers, wire cutter, and screwdriver.',
-      price: 49.00,
-      original_price: 65.00,
-      discount_percent: 24,
+      id: 'prod_oth_1',
+      name: 'Kovai Heritage Cold-Pressed Sesame Gingelly Oil (500ml)',
+      slug: 'kovai-heritage-sesame-gingelly-oil-500ml',
+      brand: 'Heritage Kovai Organics',
+      categoryId: 'cat_other',
+      category: 'Other',
+      subCategory: 'Cooking Essentials',
+      description: 'Wood-pressed authentic unrefined gingelly oil extracted with palm jaggery, ideal for South Indian traditional cooking.',
+      price: 260.00,
+      originalPrice: 320.00,
+      discountPercent: 19,
       rating: 4.8,
-      review_count: 112,
+      reviewCount: 290,
+      inStock: 1,
+      stockCount: 55,
+      isDroneEligible: 1,
+      weightGrams: 520,
+      dimensions: '18 x 7 x 7 cm',
+      deliveryMins: 11,
+      badge: 'Organic',
+      featured: 0,
+      tags: JSON.stringify(['oil', 'gingelly', 'sesame', 'cold-pressed', 'organic']),
       image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
-      images_json: JSON.stringify([
-        'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80'
-      ]),
-      is_drone_eligible: 1,
-      max_payload_kg: 1.5,
-      estimated_delivery_mins: 15,
-      in_stock: 1,
-      stock_count: 40,
-      badge: 'Bestseller',
-      features_json: JSON.stringify([
-        'Hydrophobic Teflon coated nano-fabric',
-        'Grade-5 aerospace titanium construction',
-        'Includes rugged ballistic carrying holster'
-      ]),
-      specifications_json: JSON.stringify({ WindRating: 'Category 1 gale resistant', Material: 'Toray Carbon & Titanium', Weight: '390g' }),
-      dimensions: '28 x 6 x 6 cm',
-      weight_grams: 390,
+      images: JSON.stringify(['https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80']),
+      specs: JSON.stringify({ 'Extraction': 'Traditional Wood Vaagai Chekku', 'Net Volume': '500ml', 'Purity': '100% Raw Unfiltered' })
     }
   ];
 
   for (const p of products) {
-    prodStmt.run(
-      p.id, p.name, p.slug, p.brand, p.category_id, p.sub_category, p.description,
-      p.price, p.original_price, p.discount_percent, p.rating, p.review_count,
-      p.image, p.images_json, p.is_drone_eligible, p.max_payload_kg,
-      p.estimated_delivery_mins, p.in_stock, p.stock_count, p.badge,
-      p.features_json, p.specifications_json, p.dimensions, p.weight_grams
+    productStmt.run(
+      p.id, p.name, p.slug, p.brand, p.categoryId, p.subCategory, p.description, p.price,
+      p.originalPrice, p.discountPercent, p.rating, p.reviewCount, p.inStock, p.stockCount,
+      p.isDroneEligible, p.weightGrams, p.dimensions, p.deliveryMins,
+      p.badge, p.tags, p.specs, p.image, p.images
     );
   }
 
-  // 6. SEED SAVED CUSTOMER ADDRESSES
+  // 6. SEED SAVED CUSTOMER ADDRESSES IN COIMBATORE / CHINNIYAMPALAYAM
   const addrStmt = db.prepare(`
     INSERT INTO addresses (id, customer_id, label, name, phone, building, street, area, city, state, postal_code, latitude, longitude, instructions, is_default, drop_zone_type)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -480,17 +424,17 @@ export const seedDatabase = async () => {
     'addr_1',
     userId,
     'Home',
-    'Alex Mercer',
-    '+1 (555) 248-7790',
-    'Apt 4B, Apex Heights',
-    '742 Evergreen Terrace',
-    'Skyline District',
-    'San Francisco',
-    'CA',
-    '94107',
-    37.7749,
-    -122.4194,
-    'Lower package onto the marked AstroTurf pad in backyard lawn. Call if wind is high.',
+    'SkyNav Customer',
+    '+91 98422 10002',
+    '42, Royal Residency',
+    'Avinashi Road',
+    'Chinniyampalayam',
+    'Coimbatore',
+    'Tamil Nadu',
+    '641062',
+    11.0550,
+    77.0650,
+    'Backyard lawn landing pad marked with high-visibility SkyNav drone beacon.',
     1,
     'Lawn'
   );
@@ -499,41 +443,22 @@ export const seedDatabase = async () => {
     'addr_2',
     userId,
     'Office',
-    'Alex Mercer (Work)',
-    '+1 (555) 248-7790',
-    'Horizon Tower 3, Floor 14',
-    '500 Howard Street',
-    'SoMa Tech Corridor',
-    'San Francisco',
-    'CA',
-    '94105',
-    37.7885,
-    -122.3972,
-    'Designated rooftop drone landing beacon #2. Reception security will notify upon ping.',
+    'SkyNav Customer (Tech Office)',
+    '+91 98422 10002',
+    'Tidel Park Tech Center, 4th Floor',
+    'Civil Aerodrome Post',
+    'Peelamedu',
+    'Coimbatore',
+    'Tamil Nadu',
+    '641014',
+    11.0280,
+    77.0260,
+    'Designated rooftop drone landing pad on tower roof. Security clearance active.',
     0,
     'Rooftop Pad'
   );
 
-  addrStmt.run(
-    'addr_test_1',
-    testUserId,
-    'Home',
-    'Test Customer',
-    '+1 (555) 789-0123',
-    'Apt 12B, Sky Tower',
-    '100 Market Street',
-    'Downtown Corridor',
-    'San Francisco',
-    'CA',
-    '94105',
-    37.7897,
-    -122.3969,
-    'Private lawn drop zone marked with optical drone landing beacon.',
-    1,
-    'Lawn'
-  );
-
-  // 6B. SEED INITIAL REAL DATABASE-BACKED ORDERS
+  // 7. SEED INITIAL DATABASE-BACKED ORDERS
   const orderStmt = db.prepare(`
     INSERT INTO orders (
       id, customer_id, subtotal, delivery_fee, tax, discount, total,
@@ -555,25 +480,25 @@ export const seedDatabase = async () => {
 
   // ORD-1001 (Delivered past order)
   const addrSnapshot1 = JSON.stringify({
-    name: 'Test Customer',
-    phone: '+1 (555) 789-0123',
-    building: 'Apt 12B, Sky Tower',
-    street: '100 Market Street',
-    area: 'Downtown Corridor',
-    city: 'San Francisco',
-    state: 'CA',
-    postalCode: '94105',
+    name: 'SkyNav Customer',
+    phone: '+91 98422 10002',
+    building: '42, Royal Residency',
+    street: 'Avinashi Road',
+    area: 'Chinniyampalayam',
+    city: 'Coimbatore',
+    state: 'Tamil Nadu',
+    postalCode: '641062',
     dropZoneType: 'Lawn'
   });
 
   orderStmt.run(
     'ORD-1001',
-    testUserId,
-    56.98,
-    3.99,
-    4.56,
-    5.04,
-    60.49,
+    userId,
+    919.00,
+    49.00,
+    45.95,
+    0,
+    1013.95,
     'Credit Card',
     'Paid',
     'Delivered',
@@ -589,46 +514,17 @@ export const seedDatabase = async () => {
     new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
   );
 
-  orderItemStmt.run('item_1001_1', 'ORD-1001', 'prod_food_1', 'Artisan Woodfired Truffle Mushroom Pizza (12")', 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', 21.99, 1, 21.99, 580);
-  orderItemStmt.run('item_1001_2', 'ORD-1001', 'prod_med_1', 'AeroFirst Rapid First Aid & Trauma Burn Kit', 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=600&auto=format&fit=crop&q=80', 34.99, 1, 34.99, 650);
+  orderItemStmt.run('item_1001_1', 'ORD-1001', 'prod_food_1', 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)', 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', 420.00, 1, 420.00, 450);
+  orderItemStmt.run('item_1001_2', 'ORD-1001', 'prod_med_1', 'Apollo Rapid Emergency First-Aid Trauma Kit', 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80', 499.00, 1, 499.00, 450);
 
   statusHistoryStmt.run('hist_1001_1', 'ORD-1001', null, 'Order Placed', 'Order placed successfully.', 1, '-2 days');
-  statusHistoryStmt.run('hist_1001_2', 'ORD-1001', 'Order Placed', 'Order Confirmed', 'Payment confirmed.', 1, '-2 days');
-  statusHistoryStmt.run('hist_1001_3', 'ORD-1001', 'Order Confirmed', 'Preparing', 'Items packed at fulfillment hub.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_2', 'ORD-1001', 'Order Placed', 'Order Confirmed', 'Payment confirmed via Razorpay.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_3', 'ORD-1001', 'Order Confirmed', 'Preparing', 'Items packed at SkyHub Chinniyampalayam.', 1, '-2 days');
   statusHistoryStmt.run('hist_1001_4', 'ORD-1001', 'Preparing', 'Drone Assigned', 'SkyNav Falcon-02 assigned to delivery.', 1, '-2 days');
-  statusHistoryStmt.run('hist_1001_5', 'ORD-1001', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via corridor.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_5', 'ORD-1001', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via Chinniyampalayam corridor.', 1, '-2 days');
   statusHistoryStmt.run('hist_1001_6', 'ORD-1001', 'Drone Launched', 'Delivered', 'Autonomous payload tether lowered successfully.', 1, '-2 days');
 
-  // ORD-1002 (Active Pending Dispatch order)
-  orderStmt.run(
-    'ORD-1002',
-    testUserId,
-    39.99,
-    3.99,
-    3.20,
-    0,
-    47.18,
-    'Credit Card',
-    'Paid',
-    'Pending Dispatch',
-    'express',
-    addrSnapshot1,
-    'Priority dispatch to terrace drop zone.',
-    'Lawn',
-    '3195',
-    1,
-    '12 mins',
-    '-1 hour',
-    '-1 hour',
-    null
-  );
-
-  orderItemStmt.run('item_1002_1', 'ORD-1002', 'prod_elec_1', 'VoltWave 100W GaN Pro Fast Charger & 240W Cable', 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', 39.99, 1, 39.99, 220);
-
-  statusHistoryStmt.run('hist_1002_1', 'ORD-1002', null, 'Order Placed', 'Order placed via express aerial dispatch.', 1, '-1 hour');
-  statusHistoryStmt.run('hist_1002_2', 'ORD-1002', 'Order Placed', 'Pending Dispatch', 'Awaiting drone launch clearance.', 1, '-50 minutes');
-
-  // 7. SEED INITIAL SAMPLE REVIEWS
+  // 8. SEED INITIAL SAMPLE REVIEWS
   const revStmt = db.prepare(`
     INSERT INTO reviews (id, product_id, customer_id, author_name, author_avatar, rating, title, comment, verified_purchase, helpful_count)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -638,46 +534,46 @@ export const seedDatabase = async () => {
     'rev_1',
     'prod_food_1',
     userId,
-    'Marcus Vance',
+    'Suresh Natarajan',
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     5.0,
-    'Pizza was piping hot! Unreal speed.',
-    'Arrived in 13 minutes straight to my backyard lawn pad. The crust was crisp and the truffle aroma filled the room.',
+    'Mysore Pak arrived fresh and delicious!',
+    'Arrived in 11 minutes straight to my Chinniyampalayam lawn pad. The ghee aroma and freshness was unmatched.',
     1,
-    14
+    24
   );
 
   revStmt.run(
     'rev_2',
     'prod_med_1',
     userId,
-    'Dr. Elena Rostova',
+    'Dr. K. Senthil',
     'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
     5.0,
-    'Lifesaver emergency dispatch',
-    'We needed clean sterile burn dressings immediately for a kitchen accident. Drone landed smoothly in under 10 minutes.',
+    'Lifesaving emergency delivery',
+    'Urgent trauma kit needed during an emergency at home. Flown from SkyHub Chinniyampalayam in 8 minutes.',
     1,
-    28
+    42
   );
 
-  // 8. SEED FAQS
+  // 9. SEED FAQS
   const faqStmt = db.prepare(`
     INSERT INTO faqs (id, question, answer, category)
     VALUES (?, ?, ?, ?)
   `);
 
   const faqs = [
-    { id: 'faq_1', q: 'How does autonomous drone delivery work?', a: 'Once your order is confirmed, our automated fulfillment hub packs your items into an aerodynamically sealed cargo pod and assigns an electric autonomous drone. The drone navigates certified aerial corridors at 120m altitude and gently lowers the package to your selected landing zone using sonar tether precision.', cat: 'Delivery' },
-    { id: 'faq_2', q: 'Where does the drone land?', a: 'You can choose between a private lawn, designated rooftop pad, driveway, or balcony landing zone. Our drones use LiDAR obstacle sensing and precision optical beacons to deliver contactless and safe drop-offs.', cat: 'Drop Zones' },
-    { id: 'faq_3', q: 'What happens in rainy or windy weather?', a: 'Our aircraft operate in wind speeds up to 45 km/h and light rain. If severe weather exceeds certified FAA safety thresholds, the system will automatically notify you and either reroute to the nearest safe ground hub or delay until winds calm down.', cat: 'Safety' },
-    { id: 'faq_4', q: 'What is the maximum payload weight?', a: 'SkyNav standard drones carry up to 4.5 kg (10 lbs). If your basket exceeds this weight, our system automatically schedules a tandem multi-drone flight or heavy-lift carrier.', cat: 'Orders' },
+    { id: 'faq_1', q: 'How does autonomous drone delivery work in Coimbatore?', a: 'Once your order is confirmed, our SkyHub Chinniyampalayam hub packs your items into an aerodynamically sealed cargo pod and assigns an electric autonomous drone. The drone navigates certified DGCA aerial corridors at 100m altitude and gently lowers the package to your selected landing zone using sonar tether precision.', cat: 'Delivery' },
+    { id: 'faq_2', q: 'Where can the drone land?', a: 'You can choose between a private lawn, designated rooftop pad, driveway, or balcony landing zone. Our drones use LiDAR obstacle sensing and precision optical beacons to deliver contactless and safe drop-offs.', cat: 'Drop Zones' },
+    { id: 'faq_3', q: 'What is the drone delivery service radius?', a: 'Our service radius extends up to 12 km from SkyHub Chinniyampalayam, covering Chinniyampalayam, Neelambur, Peelamedu, Hope College, Singanallur, Kalapatti, and surrounding Coimbatore regions.', cat: 'Service Area' },
+    { id: 'faq_4', q: 'What is the maximum payload weight?', a: 'SkyNav standard drones carry up to 5.0 kg. If your basket exceeds this weight, our system automatically schedules a tandem multi-drone flight or heavy-lift carrier.', cat: 'Orders' },
   ];
 
   for (const f of faqs) {
     faqStmt.run(f.id, f.q, f.a, f.cat);
   }
 
-  // 9. SEED DEFAULT NOTIFICATIONS
+  // 10. SEED DEFAULT NOTIFICATIONS
   const notifStmt = db.prepare(`
     INSERT INTO notifications (id, customer_id, title, message, type, is_read, order_id, event_id, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?))
@@ -687,7 +583,7 @@ export const seedDatabase = async () => {
     'notif_1',
     userId,
     'Welcome to SkyNav Aero Store',
-    'Your customer account is verified and ready for instant aerial deliveries.',
+    'Your customer account is active and ready for autonomous drone deliveries in Coimbatore.',
     'system',
     0,
     null,
@@ -698,8 +594,8 @@ export const seedDatabase = async () => {
   notifStmt.run(
     'notif_2',
     userId,
-    'San Francisco Sky Corridor Active',
-    'Optimal flight weather detected. Average delivery time is currently 12 minutes.',
+    'SkyHub Chinniyampalayam Corridor Active',
+    'Clear skies across Coimbatore. Average delivery time is currently 10–14 minutes.',
     'promo',
     0,
     null,
@@ -707,7 +603,7 @@ export const seedDatabase = async () => {
     '-30 minutes'
   );
 
-  console.log('✅ Database seeded successfully with 6 categories, 9 rich products, drones, hubs, user, and drop zones!');
+  console.log('✅ Customer Database seeded successfully with Indian Products (INR), Categories, Drones, SkyHub Chinniyampalayam, customer@skynav, and Saved Coimbatore Addresses!');
 };
 
 // If run directly via tsx

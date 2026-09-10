@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
 export const seedAdminDatabase = async () => {
-  console.log('🌱 Initializing schema and seeding SkyNav Admin database...');
+  console.log('🌱 Initializing schema and seeding SkyNav Admin database (Coimbatore / Chinniyampalayam)...');
   initDb();
 
   // Clear existing records
@@ -31,8 +31,8 @@ export const seedAdminDatabase = async () => {
   `);
 
   // 1. SINGLE FULL-ACCESS ADMIN ACCOUNT
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@skynav.com').trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@skynav').trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || 'skynav@123';
   const passwordHash = await bcrypt.hash(adminPassword, 10);
   const adminStmt = db.prepare(`
     INSERT INTO admin_users (id, name, email, password_hash, role, phone, avatar, status)
@@ -41,11 +41,11 @@ export const seedAdminDatabase = async () => {
 
   adminStmt.run(
     'ADM-01',
-    'Rajesh Sharma',
+    'SkyNav Administrator',
     adminEmail,
     passwordHash,
     'admin',
-    '+1 (555) 019-2831',
+    '+91 98422 10001',
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
     'Active'
   );
@@ -57,19 +57,19 @@ export const seedAdminDatabase = async () => {
   `);
 
   const categories = [
-    { id: 'cat_food', name: 'Hot Meals & Food', slug: 'Food', desc: 'Fresh chef-crafted pizzas, sushi, burgers & artisan delicacies delivered hot.', img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', icon: 'Pizza', order: 1 },
+    { id: 'cat_food', name: 'Hot Meals & Food', slug: 'Food', desc: 'Fresh chef-crafted meals, authentic South Indian breakfast & delicacies delivered hot.', img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', icon: 'Pizza', order: 1 },
     { id: 'cat_med', name: 'Medicine & Health', slug: 'Medicine', desc: 'Emergency trauma packs, test kits, inhalers, analgesics & prescription refills.', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80', icon: 'Pill', order: 2 },
-    { id: 'cat_groc', name: 'Fresh Groceries', slug: 'Groceries', desc: 'Organic produce, artisan coffee, bakery bread, dairy & gourmet pantry staples.', img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80', icon: 'ShoppingBag', order: 3 },
-    { id: 'cat_elec', name: 'Tech & Electronics', slug: 'Electronics', desc: 'High-speed GaN chargers, ANC earbuds, MagSafe accessories & cables.', img: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', icon: 'Zap', order: 4 },
+    { id: 'cat_groc', name: 'Fresh Groceries', slug: 'Groceries', desc: 'Aavin fresh dairy, Nilgiris tea, organic farm produce & pantry staples.', img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80', icon: 'ShoppingBag', order: 3 },
+    { id: 'cat_elec', name: 'Tech & Electronics', slug: 'Electronics', desc: 'High-speed GaN chargers, heavy-duty power banks & durable USB-C cables.', img: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', icon: 'Zap', order: 4 },
     { id: 'cat_doc', name: 'Instant Documents', slug: 'Documents', desc: 'Secure biometric sealed pouches, legal contracts, notary briefs & deeds.', img: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80', icon: 'FileText', order: 5 },
-    { id: 'cat_other', name: 'Daily Essentials', slug: 'Other', desc: 'Weather gear, titanium tools, emergency battery pods & home lifestyle.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80', icon: 'Sparkles', order: 6 },
+    { id: 'cat_other', name: 'Daily Essentials', slug: 'Other', desc: 'Heritage cold-pressed oils, air care, emergency pods & home lifestyle.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80', icon: 'Sparkles', order: 6 },
   ];
 
   for (const c of categories) {
     catStmt.run(c.id, c.name, c.slug, c.desc, c.img, c.icon, c.order);
   }
 
-  // 3. PRODUCTS (Admin Source of Truth)
+  // 3. PRODUCTS (Admin Source of Truth - INR Prices)
   const prodStmt = db.prepare(`
     INSERT INTO products (
       id, name, slug, brand, category_id, sub_category, description, price,
@@ -79,47 +79,15 @@ export const seedAdminDatabase = async () => {
 
   const products = [
     {
-      id: 'prod_food_1',
-      name: 'Artisan Woodfired Truffle Mushroom Pizza (12")',
-      slug: 'artisan-woodfired-truffle-mushroom-pizza-12',
-      brand: 'Bella Napoli Aero Kitchen',
-      category_id: 'cat_food',
-      sub_category: 'Italian Gourmet',
-      description: 'Hand-stretched sourdough pizza with black truffle puree, wild cremini mushrooms, and buffalo mozzarella.',
-      price: 21.99,
-      stock_count: 45,
-      weight_grams: 850,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
-      badge: 'Popular'
-    },
-    {
-      id: 'prod_med_1',
-      name: 'Rapid Response First-Aid Trauma Kit',
-      slug: 'rapid-response-first-aid-trauma-kit',
-      brand: 'AeroRescue Medical',
-      category_id: 'cat_med',
-      sub_category: 'Emergency Care',
-      description: 'Compact emergency trauma response pack with sterile dressings, tourniquet, burn gel, and CPR shield.',
-      price: 34.50,
-      stock_count: 80,
-      weight_grams: 450,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80',
-      badge: 'Urgent Dispatch'
-    },
-    {
       id: 'prod_elec_1',
-      name: 'Anker 65W GaN High-Speed Fast Charger',
-      slug: 'anker-65w-gan-fast-charger',
-      brand: 'Anker Innovations',
+      name: 'BoAt Storm GaN 65W Rapid Dual-Port Fast Charger',
+      slug: 'boat-storm-gan-65w-rapid-fast-charger',
+      brand: 'boAt',
       category_id: 'cat_elec',
       sub_category: 'Charging & Power',
-      description: 'Ultra-compact Gallium Nitride 65W fast charger with dual USB-C and single USB-A power delivery.',
-      price: 29.99,
-      stock_count: 60,
+      description: 'Ultra-compact Gallium Nitride 65W fast charger with dual Type-C and USB-A power delivery for Indian smartphones and laptops.',
+      price: 1299.00,
+      stock_count: 50,
       weight_grams: 180,
       is_drone_eligible: 1,
       is_active: 1,
@@ -127,20 +95,148 @@ export const seedAdminDatabase = async () => {
       badge: 'Best Seller'
     },
     {
-      id: 'prod_groc_1',
-      name: 'Organic Artisan Cold Brew Blend Beans (12oz)',
-      slug: 'organic-artisan-cold-brew-blend',
-      brand: 'Blue Bottle Aero Lab',
-      category_id: 'cat_groc',
-      sub_category: 'Artisan Beverages',
-      description: 'Whole-bean organic roast with rich tasting notes of dark chocolate, bourbon vanilla, and hazelnut.',
-      price: 18.50,
+      id: 'prod_elec_2',
+      name: 'Syska 20000mAh Heavy Duty Power Bank',
+      slug: 'syska-20000mah-power-bank',
+      brand: 'Syska',
+      category_id: 'cat_elec',
+      sub_category: 'Power Accessories',
+      description: 'High-density 20000mAh external battery pack with 22.5W two-way fast charging and LED digital battery level display.',
+      price: 1499.00,
       stock_count: 35,
-      weight_grams: 340,
+      weight_grams: 420,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1609592424368-45097df6db82?w=600&auto=format&fit=crop&q=80',
+      badge: 'High Capacity'
+    },
+    {
+      id: 'prod_med_1',
+      name: 'Apollo Rapid Emergency First-Aid Trauma Kit',
+      slug: 'apollo-rapid-emergency-first-aid-trauma-kit',
+      brand: 'Apollo Pharmacy',
+      category_id: 'cat_med',
+      sub_category: 'Emergency Care',
+      description: 'Sterile hospital-grade emergency trauma pack with tourniquet, antiseptics, sterile gauze dressings, and burn shield.',
+      price: 499.00,
+      stock_count: 75,
+      weight_grams: 450,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80',
+      badge: 'Urgent Dispatch'
+    },
+    {
+      id: 'prod_med_2',
+      name: 'Amrutanjan Rapid Pain Relief & Vaporub Duo Pack',
+      slug: 'amrutanjan-rapid-pain-relief-duo',
+      brand: 'Amrutanjan Health',
+      category_id: 'cat_med',
+      sub_category: 'Pain Care',
+      description: 'Trusted ayurvedic pain balm and eucalyptus chest rub for headache, congestion, and muscular fatigue.',
+      price: 199.00,
+      stock_count: 90,
+      weight_grams: 150,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1550572017-ed200f5e5a43?w=600&auto=format&fit=crop&q=80',
+      badge: 'Essential'
+    },
+    {
+      id: 'prod_groc_1',
+      name: 'Coimbatore Authentic Filter Coffee Blend (500g)',
+      slug: 'coimbatore-authentic-filter-coffee-blend-500g',
+      brand: 'Kovai Coffee Works',
+      category_id: 'cat_groc',
+      sub_category: 'Beverages',
+      description: 'Traditional 80:20 plantation peaberry and chicory roast freshly grounded for a rich aromatic South Indian morning cup.',
+      price: 340.00,
+      stock_count: 65,
+      weight_grams: 520,
       is_drone_eligible: 1,
       is_active: 1,
       image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80',
-      badge: 'Staff Pick'
+      badge: 'Local Favorite'
+    },
+    {
+      id: 'prod_groc_2',
+      name: 'Aavin Fresh Farm Pasteurized Pure Milk (1L x 2)',
+      slug: 'aavin-fresh-farm-pure-milk-2l',
+      brand: 'Aavin Tamil Nadu',
+      category_id: 'cat_groc',
+      sub_category: 'Dairy',
+      description: 'Chilled pasteurized homogenized cow milk delivered in insulated flight thermal pods direct from local dairy union.',
+      price: 120.00,
+      stock_count: 120,
+      weight_grams: 1050,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?w=600&auto=format&fit=crop&q=80',
+      badge: 'Fresh Daily'
+    },
+    {
+      id: 'prod_food_1',
+      name: 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)',
+      slug: 'anand-bhavan-ghee-mysore-pak-400g',
+      brand: 'Sri Anand Bhavan',
+      category_id: 'cat_food',
+      sub_category: 'Traditional Sweets',
+      description: 'Melt-in-mouth traditional Coimbatore sweet crafted with pure desi ghee, gram flour, and cardamom.',
+      price: 420.00,
+      stock_count: 40,
+      weight_grams: 450,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
+      badge: 'Popular'
+    },
+    {
+      id: 'prod_food_2',
+      name: 'Kovai Crispy Masala Dosa & Sambar Breakfast Box',
+      slug: 'kovai-crispy-masala-dosa-breakfast-box',
+      brand: 'Kovai Kitchen Direct',
+      category_id: 'cat_food',
+      sub_category: 'Breakfast Combos',
+      description: 'Crisp golden dosa filled with spiced potato masala, served steaming hot at 65°C with coconut chutney and piping hot sambar.',
+      price: 180.00,
+      stock_count: 30,
+      weight_grams: 550,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&auto=format&fit=crop&q=80',
+      badge: 'Hot Pod'
+    },
+    {
+      id: 'prod_doc_1',
+      name: 'Biometric Sealed Legal Document Security Pouch',
+      slug: 'biometric-sealed-legal-document-pouch',
+      brand: 'SkyNav Secure',
+      category_id: 'cat_doc',
+      sub_category: 'Legal Courier',
+      description: 'Tamper-evident waterproof polymer envelope with dynamic QR seal, tracked end-to-end for contracts, property deeds, and certificates.',
+      price: 250.00,
+      stock_count: 100,
+      weight_grams: 120,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80',
+      badge: 'Secure Seal'
+    },
+    {
+      id: 'prod_oth_1',
+      name: 'Kovai Heritage Cold-Pressed Sesame Gingelly Oil (500ml)',
+      slug: 'kovai-heritage-sesame-gingelly-oil-500ml',
+      brand: 'Heritage Kovai Organics',
+      category_id: 'cat_other',
+      sub_category: 'Cooking Essentials',
+      description: 'Wood-pressed authentic unrefined gingelly oil extracted with palm jaggery, ideal for South Indian traditional cooking.',
+      price: 260.00,
+      stock_count: 55,
+      weight_grams: 520,
+      is_drone_eligible: 1,
+      is_active: 1,
+      image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
+      badge: 'Organic'
     }
   ];
 
@@ -148,10 +244,10 @@ export const seedAdminDatabase = async () => {
     prodStmt.run(p.id, p.name, p.slug, p.brand, p.category_id, p.sub_category, p.description, p.price, p.stock_count, p.weight_grams, p.is_drone_eligible, p.is_active, p.image, p.badge);
   }
 
-  // 4. 40 REALISTIC FLEET DRONES
+  // 4. 40 FLEET DRONES AROUND CHINNIYAMPALAYAM HUB
   const droneModels = ['SKYNAV X1', 'SKYNAV X2', 'SKYNAV Cargo', 'SKYNAV VTOL', 'SKYNAV Heavy Cargo'];
-  const hubLat = 37.7625;
-  const hubLng = -122.4480;
+  const hubLat = 11.0550;
+  const hubLng = 77.0650;
 
   const droneStmt = db.prepare(`
     INSERT INTO drones (
@@ -165,9 +261,9 @@ export const seedAdminDatabase = async () => {
     const model = droneModels[(i - 1) % droneModels.length];
     const capacity = model.includes('Heavy') ? 15.0 : model.includes('Cargo') ? 8.5 : model.includes('VTOL') ? 5.0 : 4.5;
     
-    // Spread coordinates around the central hub
+    // Spread coordinates around Chinniyampalayam hub
     const angle = (i / 40) * 2 * Math.PI;
-    const distOffset = 0.005 + (i % 5) * 0.003;
+    const distOffset = 0.004 + (i % 5) * 0.002;
     const lat = hubLat + Math.sin(angle) * distOffset;
     const lng = hubLng + Math.cos(angle) * distOffset;
 
@@ -176,7 +272,7 @@ export const seedAdminDatabase = async () => {
       `SkyNav Unit ${i}`,
       model,
       `SN-SKY-${80000 + i}`,
-      `FAA-REG-${10000 + i}`,
+      `UIN-IND-SKY-${10000 + i}`,
       'available',
       Math.min(100, 85 + (i * 3) % 16),
       92 + (i % 8),
@@ -187,16 +283,16 @@ export const seedAdminDatabase = async () => {
     );
   }
 
-  // 5. GEOFENCE ZONES
+  // 5. GEOFENCE ZONES (Coimbatore / Tamil Nadu DGCA)
   const geoStmt = db.prepare(`
     INSERT INTO geofence_zones (id, name, type, coordinates_json, bounds_radius_meters, active, max_altitude_meters, description)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  geoStmt.run('GEO-01', 'SFO Airport Exclusion Zone', 'nofly', JSON.stringify([[37.6213, -122.3790]]), 6200, 1, 3000, 'FAA Class B Airport Exclusion Corridor');
-  geoStmt.run('GEO-02', 'Presidio Military Coastal Zone', 'restricted', JSON.stringify([[37.7989, -122.4662]]), 2100, 1, 1200, 'Federal Security Reservation & Military Reserve');
-  geoStmt.run('GEO-03', 'Downtown SF High-Density Corridor', 'delivery', JSON.stringify([[37.7897, -122.3969]]), 3500, 1, 120, 'Primary Autonomous Delivery Flight Corridor');
-  geoStmt.run('GEO-04', 'UCSF Medical Heliport Caution Area', 'caution', JSON.stringify([[37.7631, -122.4580]]), 1000, 1, 350, 'Emergency Medevac Helicopter Transit Corridor');
+  geoStmt.run('GEO-01', 'Coimbatore International Airport (CJB) Exclusion Buffer', 'nofly', JSON.stringify([[11.0298, 77.0434]]), 5000, 1, 3000, 'DGCA UAS Rules 2021 Class D Airspace Corridor');
+  geoStmt.run('GEO-02', 'Sulur Air Force Station (AFS Sulur) Military Zone', 'restricted', JSON.stringify([[11.0136, 77.1611]]), 6000, 1, 4000, 'MoD IAF Defense Flight Training Range & Red Zone');
+  geoStmt.run('GEO-03', 'Avinashi Road High-Density Delivery Corridor', 'delivery', JSON.stringify([[11.0550, 77.0650]]), 12000, 1, 120, 'Primary Autonomous Delivery Flight Corridor');
+  geoStmt.run('GEO-04', 'CMCH & PSG Hospitals Medical Heliport Caution Area', 'caution', JSON.stringify([[11.0250, 77.0300]]), 1200, 1, 350, 'Emergency Medevac Helicopter Transit Corridor');
 
   // 6. MAINTENANCE RECORDS
   const maintStmt = db.prepare(`
@@ -204,9 +300,9 @@ export const seedAdminDatabase = async () => {
     VALUES (?, ?, ?, ?, date('now', '+3 days'), 'Scheduled', ?, ?)
   `);
 
-  maintStmt.run('MNT-01', 'D-005', 'Rotor blade leading-edge micro-pitting detected during preflight inspection', 'Medium', 'Vikram Singh', 'Scheduled 100-cycle rotor replacement.');
+  maintStmt.run('MNT-01', 'D-005', 'Rotor blade leading-edge micro-pitting detected during preflight inspection', 'Medium', 'Muthukumar K', 'Scheduled 100-cycle rotor replacement.');
   maintStmt.run('MNT-02', 'D-012', 'LiDAR obstacle sensor calibration drift (+1.2cm variance)', 'Low', 'Fleet Tech A', 'Sensor array software zero-point recalibration.');
-  maintStmt.run('MNT-03', 'D-024', 'Battery cell #4 internal resistance higher than nominal (+8%)', 'High', 'Vikram Singh', 'Replace smart battery power pack module.');
+  maintStmt.run('MNT-03', 'D-024', 'Battery cell #4 internal resistance higher than nominal (+8%)', 'High', 'Muthukumar K', 'Replace smart battery power pack module.');
 
   // 7. OPERATIONAL ORDERS & MISSIONS
   const opOrderStmt = db.prepare(`
@@ -229,35 +325,35 @@ export const seedAdminDatabase = async () => {
   `);
 
   const items1 = JSON.stringify([
-    { productId: 'prod_food_1', name: 'Artisan Woodfired Truffle Mushroom Pizza (12")', quantity: 1, price: 21.99 },
-    { productId: 'prod_med_1', name: 'Rapid Response First-Aid Trauma Kit', quantity: 1, price: 34.99 }
+    { productId: 'prod_food_1', name: 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)', quantity: 1, price: 420.00 },
+    { productId: 'prod_med_1', name: 'Apollo Rapid Emergency First-Aid Trauma Kit', quantity: 1, price: 499.00 }
   ]);
 
   const items2 = JSON.stringify([
-    { productId: 'prod_elec_1', name: 'Anker 65W GaN High-Speed Fast Charger', quantity: 1, price: 39.99 }
+    { productId: 'prod_elec_1', name: 'BoAt Storm GaN 65W Rapid Dual-Port Fast Charger', quantity: 1, price: 1299.00 }
   ]);
 
   // ORD-1001: Delivered
   opOrderStmt.run(
     'ORD-1001',
     'ORD-1001',
-    'Test Customer',
-    '+1 (555) 789-0123',
+    'SkyNav Customer',
+    '+91 98422 10002',
     'Food & Trauma Kit Pod',
-    1.23,
+    0.90,
     items1,
-    'SkyHub Aero Fulfillment Central #1 (37.7625, -122.4480)',
-    37.7625,
-    -122.4480,
-    '100 Market Street, San Francisco, CA',
-    37.7897,
-    -122.3969,
+    'SkyHub Chinniyampalayam (11.0550, 77.0650)',
+    11.0550,
+    77.0650,
+    '42, Avinashi Road, Chinniyampalayam, Coimbatore, Tamil Nadu, 641062',
+    11.0550,
+    77.0650,
     'standard',
     'delivered',
     'D-002',
     'MSN-1001',
     '7842',
-    60.49,
+    968.00,
     '-2 days',
     '-2 days'
   );
@@ -267,13 +363,13 @@ export const seedAdminDatabase = async () => {
     'ORD-1001',
     'ORD-1001',
     'D-002',
-    JSON.stringify([[37.7625, -122.4480], [37.7750, -122.4200], [37.7897, -122.3969]]),
-    JSON.stringify([[37.7625, -122.4480], [37.7750, -122.4200], [37.7897, -122.3969]]),
-    5.4,
-    14,
+    JSON.stringify([[11.0550, 77.0650], [11.0530, 77.0620], [11.0550, 77.0650]]),
+    JSON.stringify([[11.0550, 77.0650], [11.0530, 77.0620], [11.0550, 77.0650]]),
+    2.4,
+    8,
     'delivered',
-    37.7897,
-    -122.3969,
+    11.0550,
+    77.0650,
     0,
     0,
     45,
@@ -288,23 +384,23 @@ export const seedAdminDatabase = async () => {
   opOrderStmt.run(
     'ORD-1002',
     'ORD-1002',
-    'Test Customer',
-    '+1 (555) 789-0123',
+    'SkyNav Customer',
+    '+91 98422 10002',
     'High-Speed Tech Pod',
-    0.22,
+    0.18,
     items2,
-    'SkyHub Aero Fulfillment Central #1 (37.7625, -122.4480)',
-    37.7625,
-    -122.4480,
-    '100 Market Street, San Francisco, CA',
-    37.7897,
-    -122.3969,
+    'SkyHub Chinniyampalayam (11.0550, 77.0650)',
+    11.0550,
+    77.0650,
+    'Tidel Park Tech Center, Peelamedu, Coimbatore, Tamil Nadu, 641014',
+    11.0280,
+    77.0260,
     'express',
     'pending_dispatch',
     null,
     null,
     '3195',
-    47.18,
+    1387.00,
     '-1 hour',
     '-1 hour'
   );
@@ -315,9 +411,9 @@ export const seedAdminDatabase = async () => {
     VALUES (?, ?, ?, ?, ?)
   `);
 
-  notifStmt.run('NOTIF-01', 'Fleet Readiness 100%', 'All 40 autonomous delivery drones telemetry links operational.', 'success', 0);
-  notifStmt.run('NOTIF-02', 'Weather Advisory', 'Wind gusts 14 kt at Hub #1. All operations within safe flight envelope.', 'info', 0);
-  notifStmt.run('NOTIF-03', 'Airspace Clearance', 'FAA Part 107 authorization renewed for Bay Area operational corridor.', 'info', 1);
+  notifStmt.run('NOTIF-01', 'Fleet Readiness 100%', 'All 40 autonomous delivery drones connected to SkyHub Chinniyampalayam.', 'success', 0);
+  notifStmt.run('NOTIF-02', 'Weather Advisory', 'Coimbatore region: Wind speed 12 km/h, clear visibility. Optimal flight conditions.', 'info', 0);
+  notifStmt.run('NOTIF-03', 'Airspace Clearance', 'DGCA Digital Sky automated corridor authorization active for Coimbatore operational zone.', 'info', 1);
 
   // 9. AUDIT LOGS
   const auditStmt = db.prepare(`
@@ -325,9 +421,9 @@ export const seedAdminDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  auditStmt.run('LOG-01', 'Rajesh Sharma', 'super_admin', 'SYSTEM_INITIALIZATION', 'System', 'CORE', 'Info', 'SkyNav Autonomous Drone System initialized');
+  auditStmt.run('LOG-01', 'SkyNav Administrator', 'admin', 'SYSTEM_INITIALIZATION', 'System', 'CORE', 'Info', 'SkyNav Autonomous Drone System initialized for Coimbatore, Tamil Nadu, India');
 
-  console.log('✅ SkyNav Admin Database seeded with Admins, Products, Categories, 40 Drones, Geofences, Orders, Missions, Maintenance & Alerts.');
+  console.log('✅ SkyNav Admin Database seeded with single Admin (admin@skynav), Indian Products, Categories, 40 Drones, Coimbatore Geofences, Orders & Missions.');
 };
 
 seedAdminDatabase().catch((err) => {

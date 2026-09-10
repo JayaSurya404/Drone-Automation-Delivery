@@ -29,24 +29,42 @@ async function runE2EIntegrationTest() {
   console.log('  ✔ Admin Backend (port 5001): HEALTHY');
   passedSteps++;
 
-  // 2. Admin creates a new product
-  console.log('\n▶ Step 2: Admin Creates Product (Authoritative Source of Truth)...');
-  const testProductSlug = `trauma-kit-${Date.now()}`;
+  // 2. Admin Authentication & Product Creation
+  console.log('\n▶ Step 2: Admin Login & Product Creation (Authoritative Source of Truth)...');
+  const adminLoginRes = await fetch(`${ADMIN_API}/api/admin/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'admin@skynav',
+      password: 'skynav@123',
+    }),
+  });
+  if (!adminLoginRes.ok) {
+    const err = await adminLoginRes.text();
+    throw new Error(`Admin login failed: ${err}`);
+  }
+  const { token: adminToken, user: adminUser } = await adminLoginRes.json();
+  console.log(`  ✔ Authenticated as Admin: ${adminUser.name} (${adminUser.email})`);
+
+  const testProductSlug = `cbe-gan-charger-${Date.now()}`;
   const newProductPayload = {
-    name: `Aero Trauma Kit Pro ${Date.now().toString().slice(-4)}`,
+    name: `Coimbatore Smart GaN Fast Charger ${Date.now().toString().slice(-4)}`,
     slug: testProductSlug,
-    category: 'Medicine & Health',
-    price: 49.99,
-    weightGrams: 420,
-    description: 'Autonomous rapid-dispatch trauma kit with FAA Class-B certified seal.',
-    stockCount: 60,
+    category: 'Electronics',
+    price: 1299,
+    weightGrams: 220,
+    description: 'Autonomous high-efficiency 65W GaN fast charger with surge protection.',
+    stockCount: 45,
     isAvailable: true,
-    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500',
+    image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=500',
   };
 
   const createProdRes = await fetch(`${ADMIN_API}/api/admin/products`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${adminToken}`,
+    },
     body: JSON.stringify(newProductPayload),
   });
 
@@ -68,7 +86,7 @@ async function runE2EIntegrationTest() {
   if (!matchedProd) {
     throw new Error('Product created in Admin was NOT synchronized to Customer Database!');
   }
-  console.log(`  ✔ Product successfully synchronized to Customer Catalog! ID=${matchedProd.id}, Price=$${matchedProd.price}`);
+  console.log(`  ✔ Product successfully synchronized to Customer Catalog! ID=${matchedProd.id}, Price=₹${matchedProd.price}`);
   passedSteps++;
 
   // 4. Customer Login
@@ -77,8 +95,8 @@ async function runE2EIntegrationTest() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: 'alex.mercer@skynav.io',
-      password: 'Password123!',
+      email: 'customer@skynav',
+      password: 'skynav@123',
     }),
   });
   if (!loginRes.ok) {
@@ -116,35 +134,35 @@ async function runE2EIntegrationTest() {
       },
     ],
     customAddress: {
-      id: 'addr_test_sf',
-      name: 'Alex Mercer',
-      phone: '+1 (555) 248-7790',
-      street: '450 Mission Street',
-      building: 'Salesforce Tower Suite 42',
-      city: 'San Francisco',
-      state: 'CA',
-      postalCode: '94105',
-      latitude: 37.7897,
-      longitude: -122.3969,
+      id: 'addr_test_cbe',
+      name: 'Customer SkyNav',
+      phone: '+91 98765 43210',
+      street: '142 Avinashi Road',
+      building: 'Tech Corridor Block 4',
+      city: 'Coimbatore',
+      state: 'Tamil Nadu',
+      postalCode: '641062',
+      latitude: 11.0550,
+      longitude: 77.0650,
       dropZoneType: 'Rooftop Helipad',
-      clearanceRadiusMeters: 4.5,
+      clearanceRadiusMeters: 5.0,
     },
     deliveryAddress: {
-      id: 'addr_test_sf',
-      name: 'Alex Mercer',
-      phone: '+1 (555) 248-7790',
-      street: '450 Mission Street',
-      building: 'Salesforce Tower Suite 42',
-      city: 'San Francisco',
-      state: 'CA',
-      postalCode: '94105',
-      latitude: 37.7897,
-      longitude: -122.3969,
+      id: 'addr_test_cbe',
+      name: 'Customer SkyNav',
+      phone: '+91 98765 43210',
+      street: '142 Avinashi Road',
+      building: 'Tech Corridor Block 4',
+      city: 'Coimbatore',
+      state: 'Tamil Nadu',
+      postalCode: '641062',
+      latitude: 11.0550,
+      longitude: 77.0650,
       dropZoneType: 'Rooftop Helipad',
-      clearanceRadiusMeters: 4.5,
+      clearanceRadiusMeters: 5.0,
     },
     deliverySpeed: 'express',
-    paymentMethod: 'Credit Card',
+    paymentMethod: 'UPI',
   };
 
   const checkoutRes = await fetch(`${CUSTOMER_API}/api/checkout/orders`, {

@@ -183,7 +183,7 @@ export const RegisterPage: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <Input
             label="Full Name"
             placeholder="John Doe"
@@ -198,8 +198,8 @@ export const RegisterPage: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <Input
               label="Email Address"
-              type="email"
-              placeholder="john@example.com"
+              type="text"
+              placeholder="customer@skynav"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               leftIcon={<Mail size={18} />}
@@ -209,7 +209,7 @@ export const RegisterPage: React.FC = () => {
             />
             <Input
               label="Mobile Phone"
-              placeholder="+1 (555) 000-0000"
+              placeholder="+91 98422 00000"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               leftIcon={<Phone size={18} />}

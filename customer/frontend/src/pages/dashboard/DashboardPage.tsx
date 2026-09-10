@@ -96,17 +96,17 @@ const SPEED_FILTER_OPTIONS = [
 const TESTIMONIALS = [
   {
     id: 't_1',
-    author: 'Elena Rostova',
-    role: 'Verified Customer · San Francisco',
+    author: 'Priya Sundaram',
+    role: 'Verified Customer · Chinniyampalayam',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
     rating: 5,
-    title: 'Pizza arrived steaming hot in 13 minutes!',
-    content: 'Unbelievable experience. The pizza crust was crispy and cheese melted. The drone hovered quietly and lowered the thermal pod right on my lawn pad.',
+    title: 'Food arrived steaming hot in 13 minutes!',
+    content: 'Unbelievable experience. The meal was piping hot and fresh. The drone hovered quietly and lowered the thermal pod right on my lawn pad in Chinniyampalayam.',
   },
   {
     id: 't_2',
-    author: 'Jason Vance',
-    role: 'Verified Customer · SoMa Tech Hub',
+    author: 'Karthik Narayanan',
+    role: 'Verified Customer · Peelamedu Tech Corridor',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     rating: 5,
     title: 'Emergency GaN charger saved my presentation',
@@ -114,12 +114,12 @@ const TESTIMONIALS = [
   },
   {
     id: 't_3',
-    author: 'Dr. Sarah Lin',
-    role: 'Healthcare Professional · Pacific Heights',
+    author: 'Dr. Ananya Ramachandran',
+    role: 'Healthcare Professional · Singanallur',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
     rating: 5,
     title: 'The cleanest emergency medical drops',
-    content: 'Fast, sterile, and perfectly tracked with real-time GPS telemetry. This is the future of urban delivery logistics.',
+    content: 'Fast, sterile, and perfectly tracked with real-time GPS telemetry. This is the future of urban delivery logistics in Coimbatore.',
   },
 ];
 

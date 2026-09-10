@@ -24,7 +24,7 @@ export const LoginScreen: React.FC = () => {
   const { login } = useAuth();
 
   const [view, setView] = useState<'login' | 'forgot' | 'verify'>('login');
-  const [email, setEmail] = useState('admin@skynav.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -53,20 +53,19 @@ export const LoginScreen: React.FC = () => {
 
   const strengthScore = getStrengthScore();
 
-
-
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isLoading) return;
 
     const cleanEmail = email.trim();
     if (!cleanEmail) {
-      setEmailError('Please enter a valid email address.');
+      setEmailError('Please enter your admin identifier or email.');
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      setEmailError('Please enter a valid email format (e.g. admin@skynav.com).');
+    const isDevAdmin = cleanEmail.toLowerCase() === 'admin@skynav';
+    const emailRegex = /^[^\s@]+@[^\s@]+(\.[^\s@]+)?$/;
+    if (!isDevAdmin && !emailRegex.test(cleanEmail)) {
+      setEmailError('Please enter a valid identifier (e.g. admin@skynav).');
       return;
     }
     setEmailError('');
@@ -175,7 +174,7 @@ export const LoginScreen: React.FC = () => {
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -183,7 +182,7 @@ export const LoginScreen: React.FC = () => {
                     setGeneralError('');
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                  placeholder="admin@skynav.com"
+                  placeholder="admin@skynav"
                   className={`w-full bg-slate-950 border ${
                     emailError ? 'border-red-500 focus:ring-red-500' : 'border-slate-800 focus:ring-cyan-500'
                   } rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:ring-2`}

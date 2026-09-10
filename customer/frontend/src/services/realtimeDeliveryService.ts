@@ -4,11 +4,11 @@ import { api } from './api';
 
 type EventListener = (event: RealtimeCustomerEvent) => void;
 
-// SkyHub Central Fulfillment Center
+// SkyHub Chinniyampalayam Fulfillment Center
 const DEFAULT_HUB: HubLocation = {
-  name: 'SkyHub Aero Fulfillment Central #1',
-  latitude: 37.7625,
-  longitude: -122.4480,
+  name: 'SkyHub Chinniyampalayam',
+  latitude: 11.0550,
+  longitude: 77.0650,
 };
 
 class RealtimeDeliveryService {
@@ -174,8 +174,8 @@ class RealtimeDeliveryService {
 
   // Fallback sync helper
   public getLiveTrackingSnapshot(order: CustomerOrder): LiveTrackingState {
-    const destLat = order.deliveryAddress?.latitude || 37.7749;
-    const destLng = order.deliveryAddress?.longitude || -122.4194;
+    const destLat = order.deliveryAddress?.latitude || 11.0550;
+    const destLng = order.deliveryAddress?.longitude || 77.0650;
 
     return {
       orderId: order.id,

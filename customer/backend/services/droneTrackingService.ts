@@ -427,9 +427,9 @@ class DroneTrackingService {
     } catch {}
 
     const hub = queryOne<any>('SELECT hub_name, hub_latitude, hub_longitude FROM delivery_zones LIMIT 1') || {
-      hub_name: 'SkyHub Aero Fulfillment Central #1',
-      hub_latitude: 37.7625,
-      hub_longitude: -122.4480,
+      hub_name: 'SkyHub Chinniyampalayam',
+      hub_latitude: 11.0550,
+      hub_longitude: 77.0650,
     };
 
     return {

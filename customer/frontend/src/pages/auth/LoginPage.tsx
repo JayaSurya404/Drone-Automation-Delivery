@@ -154,11 +154,11 @@ export const LoginPage: React.FC = () => {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <Input
             label="Customer Email Address"
-            type="email"
-            placeholder="you@example.com"
+            type="text"
+            placeholder="customer@skynav"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail size={18} />}
