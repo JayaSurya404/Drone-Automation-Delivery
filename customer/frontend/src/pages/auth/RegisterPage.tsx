@@ -47,15 +47,9 @@ export const RegisterPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await register(formData);
-      if (res.requiresVerification) {
-        setRegisteredEmail(formData.email.trim());
-        setIsRegistered(true);
-        showToast('Confirmation Email Sent ✉️', `Check ${formData.email.trim()} to verify your account.`, 'info');
-      } else {
-        showToast('Account Created 🎉', 'Welcome to SkyNav!', 'success');
-        navigate('/dashboard');
-      }
+      await register(formData);
+      showToast('Account Created 🎉', 'Welcome to SkyNav!', 'success');
+      navigate('/dashboard');
     } catch (err: any) {
       setErrors({ form: err.message || 'Registration failed. Please check your information.' });
     } finally {

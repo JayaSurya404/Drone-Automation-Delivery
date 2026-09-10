@@ -21,9 +21,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (user && !user.isVerified && user.accountStatus === 'pending_verification') {
-    return <Navigate to="/verify-account" replace />;
-  }
+
 
   return <>{children}</>;
 };

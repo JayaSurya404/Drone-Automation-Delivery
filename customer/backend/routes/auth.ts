@@ -62,26 +62,13 @@ router.post('/register', async (req, res): Promise<void> => {
 
     const userId = `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const passwordHash = await bcrypt.hash(password, 10);
-    const verificationCode = generate6DigitCode();
-    const codeHash = await bcrypt.hash(verificationCode, 8);
-    const tokenId = `tok_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    // Dispatch verification email first
-    const emailResult = await sendVerificationEmail(cleanEmail, name.trim(), verificationCode);
-
-    if (!emailResult.success) {
-      res.status(500).json({
-        error: emailResult.error || 'We could not send the verification email. Please check your email configuration or try again.',
-      });
-      return;
-    }
-
-    // Transaction to create pending user, notification preferences, cart, wishlist, and token
+    // Transaction to create active user, notification preferences, cart, wishlist, and welcome notification
     db.transaction(() => {
-      // Create user in pending_verification state
+      // Create user in active verified state immediately
       runCommand(`
         INSERT INTO users (id, name, email, phone, password_hash, is_verified, account_status)
-        VALUES (?, ?, ?, ?, ?, 0, 'pending_verification')
+        VALUES (?, ?, ?, ?, ?, 1, 'active')
       `, [userId, name.trim(), cleanEmail, phone.trim(), passwordHash]);
 
       // Create notification preferences
@@ -94,11 +81,11 @@ router.post('/register', async (req, res): Promise<void> => {
       runCommand(`INSERT INTO carts (id, customer_id) VALUES (?, ?)`, [`cart_${userId}`, userId]);
       runCommand(`INSERT INTO wishlists (id, customer_id) VALUES (?, ?)`, [`wish_${userId}`, userId]);
 
-      // Insert verification token (10-minute expiry)
+      // Welcome Notification
       runCommand(`
-        INSERT INTO verification_tokens (id, user_id, type, code_hash, expires_at, attempt_count, max_attempts)
-        VALUES (?, ?, 'email_verification', ?, datetime('now', '+10 minutes'), 0, 5)
-      `, [tokenId, userId, codeHash]);
+        INSERT INTO notifications (id, customer_id, title, message, type, is_read, event_id)
+        VALUES (?, ?, 'Welcome to SkyNav 🎉', 'Your customer account is active and ready for autonomous drone deliveries.', 'system', 0, ?)
+      `, [`notif_welcome_${userId}`, userId, `evt_welcome_${userId}`]);
     })();
 
     const user = queryOne<any>(
@@ -106,19 +93,23 @@ router.post('/register', async (req, res): Promise<void> => {
       [userId]
     );
 
+    const prefs = queryOne<any>(
+      'SELECT email_updates as emailUpdates, sms_alerts as smsAlerts, drone_proximity_sound as droneProximitySound FROM notification_preferences WHERE user_id = ?',
+      [userId]
+    );
+
     const token = generateToken(userId, cleanEmail);
 
     res.status(201).json({
-      message: 'Account created. We have sent a 6-digit verification code to your email address.',
+      message: 'Account created successfully! Welcome to SkyNav.',
       user: {
         ...user,
-        isVerified: false,
+        isVerified: true,
+        notificationPreferences: prefs || { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
       },
       token,
-      requiresVerification: true,
+      requiresVerification: false,
       email: cleanEmail,
-      previewUrl: emailResult.previewUrl || undefined,
-      devVerificationCode: process.env.NODE_ENV !== 'production' ? verificationCode : undefined,
     });
   } catch (err: any) {
     console.error('Register error:', err);
@@ -362,16 +353,11 @@ router.post('/login', async (req, res): Promise<void> => {
       return;
     }
 
-    // If user has not verified email yet, prompt them to verify
+    // Auto-activate any legacy unverified user accounts so email verification is never required
     if (userRow.is_verified === 0 || userRow.account_status === 'pending_verification') {
-      const tempToken = generateToken(userRow.id, userRow.email);
-      res.status(403).json({
-        error: 'Please verify your email address to access your account.',
-        requiresVerification: true,
-        email: userRow.email,
-        token: tempToken,
-      });
-      return;
+      runCommand(`UPDATE users SET is_verified = 1, account_status = 'active', updated_at = datetime('now') WHERE id = ?`, [userRow.id]);
+      userRow.is_verified = 1;
+      userRow.account_status = 'active';
     }
 
     const token = generateToken(userRow.id, userRow.email);

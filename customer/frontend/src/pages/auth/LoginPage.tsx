@@ -95,11 +95,7 @@ export const LoginPage: React.FC = () => {
 
       navigate(from, { replace: true });
     } catch (err: any) {
-      if (err.requiresVerification) {
-        navigate('/verify-account', { state: { email: err.email || email.trim() } });
-      } else {
-        setError(err.message || 'Invalid email or password. Please check your credentials.');
-      }
+      setError(err.message || 'Invalid email or password. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }

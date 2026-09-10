@@ -242,7 +242,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : 'Registration successful! Please check your email inbox to verify your account.',
         };
       } else {
-        return await api.auth.register(payload);
+        const res = await api.auth.register(payload);
+        if (res.user && res.token) {
+          setUser(res.user);
+          setToken(res.token);
+          storage.set(storage.keys.AUTH_USER, res.user);
+          storage.set(storage.keys.AUTH_TOKEN, res.token);
+        }
+        return {
+          ...res,
+          requiresVerification: false,
+        };
       }
     } finally {
       setIsLoading(false);
@@ -332,7 +342,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return updated;
   };
 
-  const isAuthenticated = Boolean(user && user.isVerified && token);
+  const isAuthenticated = Boolean(user && token);
 
   return (
     <AuthContext.Provider
