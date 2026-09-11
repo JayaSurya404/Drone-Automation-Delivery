@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Order, Drone } from '../../types/skynav';
 import { mockStore } from '../../services/mockDataStore';
 import { Modal } from '../common/Modal';
@@ -18,36 +18,61 @@ export const DroneAssignmentModal: React.FC<DroneAssignmentModalProps> = ({
   order,
   onAssigned,
 }) => {
+  // Hooks MUST be called unconditionally at the top level
   const [selectedDroneId, setSelectedDroneId] = useState<string | null>(null);
-
-  if (!order) return null;
-
-  const allDrones = mockStore.getDrones();
-
-  // Evaluate candidate drones
-  const candidateDrones = allDrones.map((drone) => {
-    const isPayloadCompatible = (order.packageWeightKg || 1.0) <= drone.payloadCapacity;
-    const isBatterySufficient = drone.battery >= 35;
-    const isAvailable = drone.status === 'available';
-    const isHealthy = drone.batteryHealth >= 80;
-
-    const isEligible = isPayloadCompatible && isBatterySufficient && isAvailable && isHealthy;
-
-    return {
-      drone,
-      isEligible,
-      isPayloadCompatible,
-      isBatterySufficient,
-      isAvailable,
-      isHealthy,
-    };
-  });
-
   const [isAssigning, setIsAssigning] = useState(false);
-  const recommendation = mockStore.getRecommendedDrone(order);
+  const [allDrones, setAllDrones] = useState<Drone[]>(() => mockStore.getDrones());
+
+  // Subscribe to store updates for live drone availability
+  useEffect(() => {
+    return mockStore.subscribe(() => {
+      setAllDrones([...mockStore.getDrones()]);
+    });
+  }, []);
+
+  // Reset selection when modal opens or order changes
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedDroneId(null);
+      setIsAssigning(false);
+    }
+  }, [isOpen, order?.id]);
+
+  // Evaluate candidate drones safely
+  const { candidateDrones, recommendation } = useMemo(() => {
+    if (!order) {
+      return {
+        candidateDrones: [],
+        recommendation: { drone: null, score: 0, reasons: [] },
+      };
+    }
+
+    const packageWeight = order.packageWeightKg ?? 1.0;
+    const candidates = allDrones.map((drone) => {
+      const isPayloadCompatible = packageWeight <= (drone.payloadCapacity ?? 5.0);
+      const isBatterySufficient = (drone.battery ?? 0) >= 35;
+      const isAvailable = drone.status === 'available';
+      const isHealthy = (drone.batteryHealth ?? 100) >= 80;
+      const isEligible = isPayloadCompatible && isBatterySufficient && isAvailable && isHealthy;
+
+      return {
+        drone,
+        isEligible,
+        isPayloadCompatible,
+        isBatterySufficient,
+        isAvailable,
+        isHealthy,
+      };
+    });
+
+    const rec = mockStore.getRecommendedDrone(order);
+    return { candidateDrones: candidates, recommendation: rec };
+  }, [allDrones, order]);
+
   const recommendedDrone = recommendation.drone;
 
   const handleAssign = async () => {
+    if (!order) return;
     const droneIdToAssign = selectedDroneId || recommendedDrone?.id;
     if (!droneIdToAssign) return;
 
@@ -56,10 +81,15 @@ export const DroneAssignmentModal: React.FC<DroneAssignmentModalProps> = ({
       await mockStore.assignDroneToOrder(order.id, droneIdToAssign);
       if (onAssigned) onAssigned();
       onClose();
+    } catch (err) {
+      console.error('Error assigning drone:', err);
     } finally {
       setIsAssigning(false);
     }
   };
+
+  // Safe early return ONLY after all hooks have been invoked
+  if (!isOpen || !order) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Assign Autonomous Drone — Order #${order.id}`} maxWidth="max-w-2xl">

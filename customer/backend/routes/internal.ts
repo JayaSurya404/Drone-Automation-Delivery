@@ -182,6 +182,27 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
         orderId,
         order.status,
       ]);
+
+      const startCoord = payload.plannedRoute?.[0] || [11.0550, 77.0650];
+      droneTrackingService.ingestTelemetryUpdate({
+        customerOrderId: orderId,
+        missionId: payload.missionId,
+        droneId: payload.droneId,
+        droneName: payload.droneName,
+        status: 'Out for Delivery',
+        currentLocation: {
+          latitude: startCoord[0],
+          longitude: startCoord[1],
+          altitudeMeters: 20,
+          speedKmh: 30,
+          bearing: 0,
+        },
+        remainingDistanceKm: payload.distanceKm || 4.2,
+        estimatedArrivalMins: payload.estimatedDurationMins || 10,
+        progressPercent: 5,
+        timestamp: new Date().toISOString(),
+        handoverOtp: order.delivery_otp,
+      });
     } else if (eventType === 'DELIVERY_TOUCHDOWN') {
       const payload = data as DeliveryTouchdownPayload;
       runCommand(`

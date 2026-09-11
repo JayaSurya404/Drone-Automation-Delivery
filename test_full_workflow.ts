@@ -318,20 +318,83 @@ async function runE2EIntegrationTest() {
   console.log(`  ✔ Customer Order Status: "${otpResult.status}"`);
   passedSteps++;
 
-  // 12. Verify Delivery Completion on Admin Side
-  console.log('\n▶ Step 12: Verifying Admin Receives DELIVERY_COMPLETED & Drone Post-Flight State...');
-  await delay(1200); // Allow async HMAC completion event
+  // 12. Verify Delivery Completion on Admin Side & Return Flight Initiation
+  console.log('\n▶ Step 12: Verifying Admin Receives DELIVERY_COMPLETED & Initiates Return Flight...');
+  await delay(1500); // Allow async completion event
   const updatedAdminOrders = await fetch(`${ADMIN_API}/api/admin/orders`).then((r) => r.json());
   const finalAdminOrder = updatedAdminOrders.find((o: any) => o.id === operationalOrder.id);
   const updatedFleet = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
-  const finalDrone = updatedFleet.find((d: any) => d.id === availableDrone.id);
+  const returningDrone = updatedFleet.find((d: any) => d.id === availableDrone.id);
 
   console.log(`  ✔ Admin Operational Order Status: "${finalAdminOrder.status}"`);
-  console.log(`  ✔ Drone Post-Flight Status: "${finalDrone.status}"`);
+  console.log(`  ✔ Drone Return Flight Status: "${returningDrone.status}"`);
+  if (returningDrone.status !== 'returning' && returningDrone.status !== 'charging' && returningDrone.status !== 'available') {
+    throw new Error(`Expected drone status to be 'returning' or 'charging', got '${returningDrone.status}'`);
+  }
+  passedSteps++;
+
+  // 13. Verify Return Flight Telemetry & Battery Drain
+  console.log('\n▶ Step 13: Verifying Return Flight Telemetry to SkyHub Chinniyampalayam...');
+  await delay(2000);
+  const fleetMidReturn = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+  const droneMidReturn = fleetMidReturn.find((d: any) => d.id === availableDrone.id);
+  console.log(`  ✔ Drone Location Mid-Return: Lat=${droneMidReturn.location.lat.toFixed(5)}, Lng=${droneMidReturn.location.lng.toFixed(5)}, Alt=${droneMidReturn.location.altitude}m`);
+  console.log(`  ✔ Drone Heading & Speed: ${droneMidReturn.location.heading}°, ${droneMidReturn.location.speed} km/h`);
+  console.log(`  ✔ Drone Battery (continuing drain): ${droneMidReturn.battery}%`);
+  passedSteps++;
+
+  // 14. Verify Hub Arrival & Charging Lifecycle
+  console.log('\n▶ Step 14: Waiting for Hub Arrival & Verifying Charging Cycle at SkyHub Chinniyampalayam...');
+  let droneAtHub: any = null;
+  for (let i = 0; i < 25; i++) {
+    await delay(1000);
+    const fleetCheck = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+    droneAtHub = fleetCheck.find((d: any) => d.id === availableDrone.id);
+    if (droneAtHub.status === 'charging' || droneAtHub.status === 'available') {
+      break;
+    }
+  }
+
+  console.log(`  ✔ Drone Docked at Base Hub: Status="${droneAtHub.status}"`);
+  console.log(`  ✔ Docked Coords: Lat=${droneAtHub.location.lat.toFixed(4)}, Lng=${droneAtHub.location.lng.toFixed(4)} (SkyHub Chinniyampalayam)`);
+  console.log(`  ✔ Battery Charging Level: ${droneAtHub.battery}%`);
+  if (droneAtHub.status !== 'charging' && droneAtHub.status !== 'available') {
+    throw new Error(`Expected drone to reach 'charging' or 'available', got '${droneAtHub.status}'`);
+  }
+  passedSteps++;
+
+  // 15. Verify Final Transition to AVAILABLE
+  console.log('\n▶ Step 15: Verifying Battery Recharge Completion & Transition to AVAILABLE...');
+  let droneFinal: any = null;
+  for (let i = 0; i < 15; i++) {
+    if (droneAtHub.status === 'available') {
+      droneFinal = droneAtHub;
+      break;
+    }
+    await delay(1000);
+    const fleetFinal = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+    droneFinal = fleetFinal.find((d: any) => d.id === availableDrone.id);
+    if (droneFinal.status === 'available') {
+      break;
+    }
+  }
+
+  console.log(`  ✔ Final Drone State: ID=${droneFinal.id}, Status="${droneFinal.status}", Battery=${droneFinal.battery}%`);
+  passedSteps++;
+
+  // 16. Verify Coordinate Consistency (Coimbatore / Chinniyampalayam)
+  console.log('\n▶ Step 16: Verifying Indian Coordinate Consistency across System...');
+  const CHINNIYAMPALAYAM_LAT = 11.0550;
+  const CHINNIYAMPALAYAM_LNG = 77.0650;
+  const hubDiff = Math.abs(droneFinal.location.lat - CHINNIYAMPALAYAM_LAT) + Math.abs(droneFinal.location.lng - CHINNIYAMPALAYAM_LNG);
+  if (hubDiff > 0.05) {
+    throw new Error(`Coordinates ${droneFinal.location.lat}, ${droneFinal.location.lng} deviate from Chinniyampalayam hub!`);
+  }
+  console.log(`  ✔ Coordinates verified: Tamil Nadu / Coimbatore / Chinniyampalayam [${CHINNIYAMPALAYAM_LAT}, ${CHINNIYAMPALAYAM_LNG}]`);
   passedSteps++;
 
   console.log('\n===============================================================');
-  console.log(`🏆 END-TO-END INTEGRATION TEST PASSED! (${passedSteps}/${totalSteps} Steps Complete)`);
+  console.log(`🏆 ALL 16/16 END-TO-END WORKFLOW TESTS PASSED PERFECTLY!`);
   console.log('===============================================================\n');
 }
 

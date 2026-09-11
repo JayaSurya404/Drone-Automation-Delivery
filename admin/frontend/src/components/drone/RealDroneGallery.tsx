@@ -49,31 +49,17 @@ export const REAL_DRONE_MODELS = [
   },
 ];
 
-export const RealDroneGallery: React.FC<RealDroneGalleryProps> = ({ onDroneTouch, className = '' }) => {
+export const RealDroneGallery: React.FC<RealDroneGalleryProps> = ({ className = '' }) => {
   const [activeIdx, setActiveIdx] = useState(0);
-  const [isTouched, setIsTouched] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const currentDrone = REAL_DRONE_MODELS[activeIdx];
-
-  const handleTouch = () => {
-    setIsTouched(true);
-    setTimeout(() => setIsTouched(false), 800);
-    if (onDroneTouch) {
-      onDroneTouch();
-    }
-  };
 
   return (
     <div className={`relative flex flex-col items-center justify-center ${className}`}>
       {/* 3D Glassmorphism Frame Container */}
       <div
-        onClick={handleTouch}
-        className={`relative w-full max-w-lg rounded-3xl overflow-hidden cursor-pointer group transition-all duration-500 transform ${
-          isTouched
-            ? 'scale-105 rotate-x-12 rotate-y-6 shadow-[0_25px_60px_rgba(6,182,212,0.5)]'
-            : 'hover:scale-[1.02] hover:-translate-y-1 shadow-2xl'
-        } border border-slate-700/60 bg-slate-900/90 backdrop-blur-xl`}
+        className="relative w-full max-w-lg rounded-3xl overflow-hidden group transition-all duration-500 hover:scale-[1.01] shadow-2xl border border-slate-700/60 bg-slate-900/90 backdrop-blur-xl"
       >
         {/* Real Commercial Drone Photo */}
         <div className="relative h-72 w-full overflow-hidden bg-slate-950">
@@ -106,13 +92,6 @@ export const RealDroneGallery: React.FC<RealDroneGalleryProps> = ({ onDroneTouch
 
             <div className="bg-cyan-500/20 backdrop-blur-md border border-cyan-500/40 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-black text-cyan-300">
               {currentDrone.model}
-            </div>
-          </div>
-
-          {/* Interactive Touch Prompt */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950/40 backdrop-blur-xs">
-            <div className="px-4 py-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-black text-xs flex items-center gap-2 shadow-xl shadow-cyan-500/40 animate-pulse">
-              <Sparkles className="w-4 h-4" /> Touch Drone To Auto-Fill Sign In
             </div>
           </div>
 

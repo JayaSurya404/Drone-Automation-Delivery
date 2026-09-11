@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LeafletMapProvider } from '../../services/mapProvider';
 import { DroneLocation, HubLocation } from '../../types/tracking';
 import { api } from '../../services/api';
-import { Maximize2, ShieldAlert } from 'lucide-react';
+import { Maximize2, ShieldAlert, Navigation } from 'lucide-react';
 
 interface DroneLiveMapProps {
   droneLocation: DroneLocation;
@@ -27,8 +27,45 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapProviderRef = useRef<LeafletMapProvider | null>(null);
   const [isAirspaceVisible, setIsAirspaceVisible] = useState<boolean>(true);
+  const [isAutoFollow, setIsAutoFollow] = useState<boolean>(true);
+  const [isUserInteracted, setIsUserInteracted] = useState<boolean>(false);
 
   const hasInitialFitRef = useRef<boolean>(false);
+  const lastCameraUpdateRef = useRef<{ timestamp: number; band: number }>({ timestamp: 0, band: -1 });
+
+  // Helper to calculate approximate distance in km
+  const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Center/Fit to active delivery (drone + destination + route)
+  const fitActiveDelivery = useCallback(() => {
+    if (!mapProviderRef.current) return;
+    const points: [number, number][] = [];
+    if (destinationLocation?.latitude && destinationLocation?.longitude) {
+      points.push([destinationLocation.latitude, destinationLocation.longitude]);
+    }
+    if (droneLocation?.latitude && droneLocation?.longitude) {
+      points.push([droneLocation.latitude, droneLocation.longitude]);
+    }
+    if (flightRoute && flightRoute.length > 0) {
+      points.push(...flightRoute);
+    } else if (hubLocation?.latitude && hubLocation?.longitude) {
+      points.push([hubLocation.latitude, hubLocation.longitude]);
+    }
+
+    if (points.length > 0) {
+      mapProviderRef.current.fitBounds(points, [60, 60], 16);
+    }
+  }, [destinationLocation, droneLocation, flightRoute, hubLocation]);
 
   // Initialize Map Once on Mount
   useEffect(() => {
@@ -68,6 +105,12 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
           provider.updateDronePosition(droneLocation);
         }
 
+        // Listen for user panning/zooming to avoid fighting user camera
+        provider.onUserInteraction?.(() => {
+          setIsAutoFollow(false);
+          setIsUserInteracted(true);
+        });
+
         // Fetch and draw active No-Fly Zones
         try {
           const { zones } = await api.airspace.getZones();
@@ -78,6 +121,7 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
           console.warn('Could not load NFZ zones for live map:', e);
         }
 
+        // Authoritative Initial Framing: DRONE + DESTINATION + ROUTE
         const fitPoints: [number, number][] = [];
         if (destinationLocation?.latitude && destinationLocation?.longitude) {
           fitPoints.push([destinationLocation.latitude, destinationLocation.longitude]);
@@ -85,12 +129,14 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
         if (droneLocation?.latitude && droneLocation?.longitude) {
           fitPoints.push([droneLocation.latitude, droneLocation.longitude]);
         }
-        if (hubLocation?.latitude && hubLocation?.longitude) {
+        if (flightRoute && flightRoute.length > 0) {
+          fitPoints.push(...flightRoute);
+        } else if (hubLocation?.latitude && hubLocation?.longitude) {
           fitPoints.push([hubLocation.latitude, hubLocation.longitude]);
         }
 
         if (fitPoints.length > 0) {
-          provider.fitBounds(fitPoints);
+          provider.fitBounds(fitPoints, [60, 60], 16);
           hasInitialFitRef.current = true;
         }
       });
@@ -120,11 +166,11 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
         destinationLocation.address
       );
       if (!hasInitialFitRef.current) {
-        handleRecenter();
+        fitActiveDelivery();
         hasInitialFitRef.current = true;
       }
     }
-  }, [destinationLocation?.latitude, destinationLocation?.longitude, destinationLocation?.address]);
+  }, [destinationLocation?.latitude, destinationLocation?.longitude, destinationLocation?.address, fitActiveDelivery]);
 
   // Update flight route polyline when available
   useEffect(() => {
@@ -133,12 +179,46 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     }
   }, [flightRoute]);
 
-  // Smoothly update drone position marker without snapping the user's camera view
+  // Dynamic Camera Auto-Follow & Smooth Drone Marker Updates
   useEffect(() => {
-    if (mapProviderRef.current && droneLocation?.latitude && droneLocation?.longitude) {
-      mapProviderRef.current.updateDronePosition(droneLocation);
+    if (!mapProviderRef.current || !droneLocation?.latitude || !droneLocation?.longitude) return;
+
+    // 1. Always update drone marker smoothly
+    mapProviderRef.current.updateDronePosition(droneLocation);
+
+    // 2. Intelligent dynamic auto-framing (only if user hasn't paused auto-follow)
+    if (isAutoFollow && !isUserInteracted && destinationLocation?.latitude && destinationLocation?.longitude) {
+      const distKm = getDistanceKm(
+        droneLocation.latitude,
+        droneLocation.longitude,
+        destinationLocation.latitude,
+        destinationLocation.longitude
+      );
+
+      // Distance bands:
+      // Band 0: > 2.0 km - wide corridor view
+      // Band 1: 0.5 km to 2.0 km - medium approach view
+      // Band 2: <= 0.5 km - tight touchdown landing focus
+      const currentBand = distKm <= 0.5 ? 2 : distKm <= 2.0 ? 1 : 0;
+      const now = Date.now();
+      const lastUpdate = lastCameraUpdateRef.current;
+
+      // Adjust camera when distance band changes or at least 6s elapsed
+      if (lastUpdate.band !== currentBand || now - lastUpdate.timestamp >= 6000) {
+        lastCameraUpdateRef.current = { timestamp: now, band: currentBand };
+
+        const boundsPoints: [number, number][] = [
+          [droneLocation.latitude, droneLocation.longitude],
+          [destinationLocation.latitude, destinationLocation.longitude],
+        ];
+
+        const padding: [number, number] = currentBand === 2 ? [80, 80] : currentBand === 1 ? [70, 70] : [60, 60];
+        const maxZoom = currentBand === 2 ? 17 : currentBand === 1 ? 16 : 15;
+
+        mapProviderRef.current.fitBounds(boundsPoints, padding, maxZoom);
+      }
     }
-  }, [droneLocation.latitude, droneLocation.longitude, droneLocation.bearing]);
+  }, [droneLocation.latitude, droneLocation.longitude, droneLocation.bearing, isAutoFollow, isUserInteracted, destinationLocation]);
 
   const handleToggleAirspace = () => {
     const nextState = !isAirspaceVisible;
@@ -148,24 +228,12 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     }
   };
 
-  const handleRecenter = () => {
-    if (mapProviderRef.current) {
-      const points: [number, number][] = [];
-      if (destinationLocation?.latitude && destinationLocation?.longitude) {
-        points.push([destinationLocation.latitude, destinationLocation.longitude]);
-      }
-      if (droneLocation?.latitude && droneLocation?.longitude) {
-        points.push([droneLocation.latitude, droneLocation.longitude]);
-      }
-      if (hubLocation?.latitude && hubLocation?.longitude) {
-        points.push([hubLocation.latitude, hubLocation.longitude]);
-      }
-      if (flightRoute && flightRoute.length > 0) {
-        points.push(...flightRoute);
-      }
-      if (points.length > 0) {
-        mapProviderRef.current.fitBounds(points);
-      }
+  const handleToggleFollow = () => {
+    const nextFollow = !isAutoFollow;
+    setIsAutoFollow(nextFollow);
+    if (nextFollow) {
+      setIsUserInteracted(false);
+      fitActiveDelivery();
     }
   };
 
@@ -176,7 +244,7 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
       {/* Floating Status Badge */}
       <div className="map-overlay-badge">
         <span className="pulse-dot cyan" />
-        <span>Live Autonomous Flight Path</span>
+        <span>{isAutoFollow ? 'Auto-Tracking Flight' : 'Free Camera View'}</span>
       </div>
 
       {/* Floating Airspace Radar Controls */}
@@ -194,12 +262,24 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
 
       {/* Floating Controls */}
       <div className="map-controls-floating">
+        {/* Toggle Auto-Follow Drone Camera */}
+        <button
+          type="button"
+          className={`map-btn ${isAutoFollow ? 'active' : ''}`}
+          onClick={handleToggleFollow}
+          title={isAutoFollow ? 'Auto-following drone (Click to unlock camera)' : 'Follow Drone & Center Delivery'}
+          aria-label="Toggle Drone Follow"
+        >
+          <Navigation size={18} />
+        </button>
+
+        {/* Fit Entire Active Delivery Corridor */}
         <button
           type="button"
           className="map-btn"
-          onClick={handleRecenter}
-          title="Fit flight bounds"
-          aria-label="Fit flight bounds"
+          onClick={fitActiveDelivery}
+          title="Fit full flight route"
+          aria-label="Fit full flight route"
         >
           <Maximize2 size={18} />
         </button>

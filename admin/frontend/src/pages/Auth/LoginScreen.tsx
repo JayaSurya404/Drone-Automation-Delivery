@@ -136,7 +136,7 @@ export const LoginScreen: React.FC = () => {
 
           {/* Local Photorealistic Commercial Drone Showcase */}
           <div className="my-5">
-            <RealDroneGallery onDroneTouch={() => handleSubmit()} />
+            <RealDroneGallery />
           </div>
 
           <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 font-mono">

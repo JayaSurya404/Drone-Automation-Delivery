@@ -183,6 +183,13 @@
   box-shadow: var(--shadow-lg);
 }
 
+.map-btn.active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+}
+
 /* ─── Location Picker Map ─── */
 .location-picker-wrapper {
   position: relative;

@@ -24,7 +24,8 @@ export interface IMapProvider {
   setNoFlyZones(zones: NoFlyZone[]): void;
   setClearanceRadius(radiusMeters: number, isEligible?: boolean): void;
   toggleAirspaceLayer(visible: boolean): void;
-  fitBounds(coordinates: [number, number][]): void;
+  fitBounds(coordinates: [number, number][], padding?: [number, number], maxZoom?: number): void;
+  onUserInteraction?(callback: () => void): void;
   invalidateSize(): void;
   destroy(): void;
 }
@@ -335,7 +336,12 @@ export class LeafletMapProvider implements IMapProvider {
     }
   }
 
-  public fitBounds(coordinates: [number, number][]): void {
+  public onUserInteraction(callback: () => void): void {
+    if (!this.mapInstance) return;
+    this.mapInstance.on('dragstart zoomstart movestart', callback);
+  }
+
+  public fitBounds(coordinates: [number, number][], padding: [number, number] = [60, 60], maxZoom: number = 16): void {
     if (!this.mapInstance || !this.L || !coordinates || coordinates.length === 0) return;
     const validCoords = coordinates.filter(
       (c) => Array.isArray(c) && c.length === 2 && !isNaN(c[0]) && !isNaN(c[1]) && (c[0] !== 0 || c[1] !== 0)
@@ -345,7 +351,7 @@ export class LeafletMapProvider implements IMapProvider {
       this.invalidateSize();
       const bounds = this.L.latLngBounds(validCoords);
       if (bounds.isValid && bounds.isValid()) {
-        this.mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        this.mapInstance.fitBounds(bounds, { padding, maxZoom, animate: true });
       }
     } catch (e) {
       console.warn('Error fitting map bounds:', e);

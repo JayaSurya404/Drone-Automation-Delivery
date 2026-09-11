@@ -358,21 +358,35 @@ class MockDataStore {
   public getPayments() { return this.payments; }
 
   // Smart Drone Recommendation Engine
-  public getRecommendedDrone(order: Order) {
+  public getRecommendedDrone(order: Order | null) {
+    if (!order || !this.drones || this.drones.length === 0) {
+      return {
+        drone: this.drones?.[0] || null,
+        score: 0,
+        reasons: ['No drones available in fleet'],
+      };
+    }
+
+    const packageWeight = order.packageWeightKg ?? 1.0;
     const available = this.drones.filter((d) => d.status === 'available');
     if (available.length === 0) {
+      const fallback = this.drones[0];
       return {
-        drone: this.drones[0],
-        score: 75,
-        reasons: ['Highest available battery', 'Payload verified'],
+        drone: fallback,
+        score: 50,
+        reasons: [
+          `Battery reserve: ${fallback.battery}%`,
+          `Payload capacity: ${fallback.payloadCapacity} kg`,
+          'Status: ' + fallback.status,
+        ],
       };
     }
 
     const scored = available.map((d) => {
-      let score = (d.battery / 100) * 40;
-      score += (d.payloadCapacity >= (order.packageWeightKg || 1) ? 30 : 0);
-      score += (d.batteryHealth / 100) * 20;
-      score += (d.issuesCount === 0 ? 10 : 0);
+      let score = ((d.battery ?? 0) / 100) * 40;
+      score += ((d.payloadCapacity ?? 5) >= packageWeight ? 30 : 0);
+      score += ((d.batteryHealth ?? 100) / 100) * 20;
+      score += ((d.issuesCount ?? 0) === 0 ? 10 : 0);
       return { drone: d, score: Math.round(score) };
     });
 
@@ -381,7 +395,7 @@ class MockDataStore {
 
     const reasons = [
       `Highest battery level (${top.drone.battery}%)`,
-      `Optimal payload capacity (${top.drone.payloadCapacity} kg vs ${order.packageWeightKg} kg)`,
+      `Optimal payload capacity (${top.drone.payloadCapacity} kg vs ${packageWeight} kg)`,
       `Excellent health rating (${top.drone.batteryHealth}%)`,
       'Ready for immediate autonomous dispatch',
     ];

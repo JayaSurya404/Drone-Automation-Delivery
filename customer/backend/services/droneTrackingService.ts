@@ -421,16 +421,27 @@ class DroneTrackingService {
       route = [];
     }
 
-    let addressData: any = {};
-    try {
-      addressData = JSON.parse(delivery.delivery_address_json);
-    } catch {}
-
     const hub = queryOne<any>('SELECT hub_name, hub_latitude, hub_longitude FROM delivery_zones LIMIT 1') || {
       hub_name: 'SkyHub Chinniyampalayam',
       hub_latitude: 11.0550,
       hub_longitude: 77.0650,
     };
+
+    if ((!route || route.length === 0) && delivery.destination_latitude && delivery.destination_longitude) {
+      route = this.generateFlightRoute(
+        hub.hub_latitude,
+        hub.hub_longitude,
+        delivery.destination_latitude,
+        delivery.destination_longitude,
+        24
+      );
+    }
+
+    let addressData: any = {};
+    try {
+      addressData = JSON.parse(delivery.delivery_address_json);
+    } catch {}
+
 
     return {
       orderId: delivery.order_id,
