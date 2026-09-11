@@ -366,7 +366,7 @@ class TelemetryEngine {
         ret.currentIndex = ret.totalPoints - 1;
         const hubCoord = ret.hubCoords;
 
-        // Reached SkyHub Chinniyampalayam!
+        // Reached SkyHub Kurumbapalayam!
         runCommand(`
           UPDATE drones SET
             latitude = ?,
@@ -515,12 +515,12 @@ class TelemetryEngine {
 
     if (order.drone_id) {
       const drone = queryOne<any>('SELECT * FROM drones WHERE id = ?', [order.drone_id]);
-      const hubLat = order.pickup_lat || 11.0550;
-      const hubLng = order.pickup_lng || 77.0650;
-      const startLat = order.destination_lat || 11.0550;
-      const startLng = order.destination_lng || 77.0650;
+      const hubLat = order.pickup_lat || 11.1132;
+      const hubLng = order.pickup_lng || 77.0277;
+      const startLat = order.destination_lat || 11.1132;
+      const startLng = order.destination_lng || 77.0277;
 
-      // Generate return flight route from destination back to SkyHub Chinniyampalayam
+      // Generate return flight route from destination back to SkyHub Kurumbapalayam
       const returnRoute = this.generateFlightRoute(startLat, startLng, hubLat, hubLng, 18);
 
       runCommand(`
@@ -544,13 +544,13 @@ class TelemetryEngine {
         currentIndex: 0,
         totalPoints: returnRoute.length,
         hubCoords: [hubLat, hubLng],
-        hubName: 'SkyHub Chinniyampalayam',
+        hubName: 'SkyHub Kurumbapalayam',
       });
 
       this.broadcastToAdmin('DRONE_STATUS_CHANGED', {
         droneId: order.drone_id,
         status: 'returning',
-        message: `Delivery completed via OTP. Drone ${order.drone_id} ascending and returning to SkyHub Chinniyampalayam.`,
+        message: `Delivery completed via OTP. Drone ${order.drone_id} ascending and returning to SkyHub Kurumbapalayam.`,
       });
     }
 

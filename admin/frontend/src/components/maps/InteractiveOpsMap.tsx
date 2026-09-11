@@ -75,8 +75,8 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
     weatherAlerts: true,
   });
 
-  // Default Coimbatore Ops Hub
-  const defaultCenter: [number, number] = [11.0168, 76.9558];
+  // Default SkyHub Kurumbapalayam Ops Base
+  const defaultCenter: [number, number] = [11.1132, 77.0277];
 
   // Initialize Leaflet map
   useEffect(() => {
@@ -268,6 +268,36 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
 
     if (!layers.activeDrones) return;
 
+    // Render SkyHub Kurumbapalayam Central Operating Base Station
+    const hubIcon = L.divIcon({
+      className: 'custom-hub-marker',
+      html: `
+        <div class="relative flex flex-col items-center cursor-pointer group">
+          <div class="absolute -inset-2 rounded-full bg-cyan-500/25 animate-pulse"></div>
+          <div class="w-9 h-9 rounded-xl bg-slate-900/95 border-2 border-cyan-400 shadow-2xl flex items-center justify-center text-cyan-400 font-bold">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+          </div>
+          <div class="mt-1 px-2 py-0.5 rounded bg-slate-900/90 border border-cyan-500/40 text-[10px] font-bold text-cyan-300 font-mono shadow whitespace-nowrap">
+            SkyHub Kurumbapalayam Base
+          </div>
+        </div>
+      `,
+      iconSize: [36, 48],
+      iconAnchor: [18, 24],
+    });
+    const hubMarker = L.marker([11.1132, 77.0277], { icon: hubIcon, zIndexOffset: 400 });
+    hubMarker.bindTooltip(`
+      <div class="p-1.5 text-xs font-sans">
+        <div class="font-bold text-cyan-300">SkyHub Kurumbapalayam Base</div>
+        <div class="text-[10px] text-slate-300">Authoritative Home Hub • 40 Fleet Units</div>
+        <div class="text-[10px] text-emerald-400">DGCA UAS Operational Air Corridor</div>
+      </div>
+    `, { sticky: true });
+    group.addLayer(hubMarker);
+
     drones.forEach((drone) => {
       const isSelected = selectedDrone?.id === drone.id;
       const isDeviation = drone.id === 'D-024';
@@ -284,6 +314,24 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
         : drone.status === 'available'
         ? '#10b981'
         : '#94a3b8';
+
+      // Base Apron Slot Positioning:
+      // When idle at Kurumbapalayam hub, position neatly on the flight deck apron
+      const isAtHub = Math.abs(drone.location.lat - 11.1132) < 0.001 &&
+                      Math.abs(drone.location.lng - 77.0277) < 0.001 &&
+                      (drone.location.altitude === 0 || !drone.location.altitude);
+
+      let displayLat = drone.location.lat;
+      let displayLng = drone.location.lng;
+
+      if (isAtHub) {
+        const droneIndex = parseInt(drone.id.replace(/\D/g, ''), 10) || 1;
+        const ring = droneIndex <= 20 ? 1 : 2;
+        const angle = (droneIndex % 20) * (Math.PI / 10);
+        const radius = ring === 1 ? 0.0004 : 0.00075;
+        displayLat = 11.1132 + Math.sin(angle) * radius;
+        displayLng = 77.0277 + Math.cos(angle) * radius;
+      }
 
       const droneHtml = `
         <div class="relative flex items-center justify-center cursor-pointer group">
@@ -318,7 +366,7 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
         iconAnchor: [16, 16],
       });
 
-      const marker = L.marker([drone.location.lat, drone.location.lng], { icon: customIcon });
+      const marker = L.marker([displayLat, displayLng], { icon: customIcon });
 
       marker.on('click', () => {
         setSelectedDrone(drone);

@@ -97,11 +97,11 @@ const TESTIMONIALS = [
   {
     id: 't_1',
     author: 'Priya Sundaram',
-    role: 'Verified Customer · Chinniyampalayam',
+    role: 'Verified Customer · Kurumbapalayam',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
     rating: 5,
     title: 'Food arrived steaming hot in 13 minutes!',
-    content: 'Unbelievable experience. The meal was piping hot and fresh. The drone hovered quietly and lowered the thermal pod right on my lawn pad in Chinniyampalayam.',
+    content: 'Unbelievable experience. The meal was piping hot and fresh. The drone hovered quietly and lowered the thermal pod right on my lawn pad in Kurumbapalayam.',
   },
   {
     id: 't_2',

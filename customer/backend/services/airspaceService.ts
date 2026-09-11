@@ -165,10 +165,10 @@ class AirspaceService {
         }
       }
     } else {
-      // Default fallback hub: SkyHub Chinniyampalayam
-      minDistanceMeters = this.calculateDistanceMeters(11.0550, 77.0650, lat, lng);
+      // Default fallback hub: SkyHub Kurumbapalayam
+      minDistanceMeters = this.calculateDistanceMeters(11.1132, 77.0277, lat, lng);
       nearestHub = {
-        hub_name: 'SkyHub Chinniyampalayam',
+        hub_name: 'SkyHub Kurumbapalayam',
         radius_km: 12.0,
       };
     }

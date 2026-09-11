@@ -265,8 +265,8 @@ router.get('/customers', (_req: Request, res: Response): void => {
           successfulDeliveries: 0,
           status: 'Active',
           joinedDate: ord.created_at || '2026-01-01',
-          defaultAddress: ord.destination_address || 'Chinniyampalayam, Coimbatore, Tamil Nadu',
-          defaultCoords: { lat: 11.0550, lng: 77.0650 },
+          defaultAddress: ord.destination_address || 'Kurumbapalayam, Coimbatore, Tamil Nadu',
+          defaultCoords: { lat: 11.1132, lng: 77.0277 },
         });
       }
       const c = customerMap.get(name);

@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
 export const seedAdminDatabase = async () => {
-  console.log('🌱 Initializing schema and seeding SkyNav Admin database (Coimbatore / Chinniyampalayam)...');
+  console.log('🌱 Initializing schema and seeding SkyNav Admin database (Coimbatore / Kurumbapalayam)...');
   initDb();
 
   // Clear existing records
@@ -244,10 +244,10 @@ export const seedAdminDatabase = async () => {
     prodStmt.run(p.id, p.name, p.slug, p.brand, p.category_id, p.sub_category, p.description, p.price, p.stock_count, p.weight_grams, p.is_drone_eligible, p.is_active, p.image, p.badge);
   }
 
-  // 4. 40 FLEET DRONES AROUND CHINNIYAMPALAYAM HUB
+  // 4. 40 FLEET DRONES AT SKYHUB KURUMBAPALAYAM
   const droneModels = ['SKYNAV X1', 'SKYNAV X2', 'SKYNAV Cargo', 'SKYNAV VTOL', 'SKYNAV Heavy Cargo'];
-  const hubLat = 11.0550;
-  const hubLng = 77.0650;
+  const hubLat = 11.1132;
+  const hubLng = 77.0277;
 
   const droneStmt = db.prepare(`
     INSERT INTO drones (
@@ -261,11 +261,10 @@ export const seedAdminDatabase = async () => {
     const model = droneModels[(i - 1) % droneModels.length];
     const capacity = model.includes('Heavy') ? 15.0 : model.includes('Cargo') ? 8.5 : model.includes('VTOL') ? 5.0 : 4.5;
     
-    // Spread coordinates around Chinniyampalayam hub
-    const angle = (i / 40) * 2 * Math.PI;
-    const distOffset = 0.004 + (i % 5) * 0.002;
-    const lat = hubLat + Math.sin(angle) * distOffset;
-    const lng = hubLng + Math.cos(angle) * distOffset;
+    // Authoritative Hub: All idle drones stay at SkyHub Kurumbapalayam
+    // 34 Available, 6 Charging at the hub docking bays
+    const status = i <= 34 ? 'available' : 'charging';
+    const battery = status === 'charging' ? 45 + (i % 30) : Math.min(100, 85 + (i * 3) % 16);
 
     droneStmt.run(
       id,
@@ -273,13 +272,13 @@ export const seedAdminDatabase = async () => {
       model,
       `SN-SKY-${80000 + i}`,
       `UIN-IND-SKY-${10000 + i}`,
-      'available',
-      Math.min(100, 85 + (i * 3) % 16),
+      status,
+      battery,
       92 + (i % 8),
       40 + (i * 12) % 100,
       capacity,
-      parseFloat(lat.toFixed(6)),
-      parseFloat(lng.toFixed(6))
+      hubLat,
+      hubLng
     );
   }
 
@@ -291,7 +290,7 @@ export const seedAdminDatabase = async () => {
 
   geoStmt.run('GEO-01', 'Coimbatore International Airport (CJB) Exclusion Buffer', 'nofly', JSON.stringify([[11.0298, 77.0434]]), 5000, 1, 3000, 'DGCA UAS Rules 2021 Class D Airspace Corridor');
   geoStmt.run('GEO-02', 'Sulur Air Force Station (AFS Sulur) Military Zone', 'restricted', JSON.stringify([[11.0136, 77.1611]]), 6000, 1, 4000, 'MoD IAF Defense Flight Training Range & Red Zone');
-  geoStmt.run('GEO-03', 'Avinashi Road High-Density Delivery Corridor', 'delivery', JSON.stringify([[11.0550, 77.0650]]), 12000, 1, 120, 'Primary Autonomous Delivery Flight Corridor');
+  geoStmt.run('GEO-03', 'Kurumbapalayam Operations & Delivery Corridor', 'delivery', JSON.stringify([[11.1132, 77.0277]]), 12000, 1, 120, 'Primary Autonomous Delivery Flight Corridor for Kurumbapalayam & Coimbatore North');
   geoStmt.run('GEO-04', 'CMCH & PSG Hospitals Medical Heliport Caution Area', 'caution', JSON.stringify([[11.0250, 77.0300]]), 1200, 1, 350, 'Emergency Medevac Helicopter Transit Corridor');
 
   // 6. MAINTENANCE RECORDS
@@ -342,12 +341,12 @@ export const seedAdminDatabase = async () => {
     'Food & Trauma Kit Pod',
     0.90,
     items1,
-    'SkyHub Chinniyampalayam (11.0550, 77.0650)',
-    11.0550,
-    77.0650,
-    '42, Avinashi Road, Chinniyampalayam, Coimbatore, Tamil Nadu, 641062',
-    11.0550,
-    77.0650,
+    'SkyHub Kurumbapalayam (11.1132, 77.0277)',
+    11.1132,
+    77.0277,
+    'Tech Corridor Block 4, Kalapatti Main Road, Coimbatore, Tamil Nadu, 641048',
+    11.0725,
+    77.0345,
     'standard',
     'delivered',
     'D-002',
@@ -363,13 +362,13 @@ export const seedAdminDatabase = async () => {
     'ORD-1001',
     'ORD-1001',
     'D-002',
-    JSON.stringify([[11.0550, 77.0650], [11.0530, 77.0620], [11.0550, 77.0650]]),
-    JSON.stringify([[11.0550, 77.0650], [11.0530, 77.0620], [11.0550, 77.0650]]),
-    2.4,
-    8,
+    JSON.stringify([[11.1132, 77.0277], [11.0928, 77.0311], [11.0725, 77.0345]]),
+    JSON.stringify([[11.1132, 77.0277], [11.0928, 77.0311], [11.0725, 77.0345]]),
+    4.6,
+    11,
     'delivered',
-    11.0550,
-    77.0650,
+    11.1132,
+    77.0277,
     0,
     0,
     45,
@@ -389,12 +388,12 @@ export const seedAdminDatabase = async () => {
     'High-Speed Tech Pod',
     0.18,
     items2,
-    'SkyHub Chinniyampalayam (11.0550, 77.0650)',
-    11.0550,
-    77.0650,
-    'Tidel Park Tech Center, Peelamedu, Coimbatore, Tamil Nadu, 641014',
-    11.0280,
-    77.0260,
+    'SkyHub Kurumbapalayam (11.1132, 77.0277)',
+    11.1132,
+    77.0277,
+    'Tech Corridor Block 4, Kalapatti Main Road, Coimbatore, Tamil Nadu, 641048',
+    11.0725,
+    77.0345,
     'express',
     'pending_dispatch',
     null,
@@ -411,9 +410,9 @@ export const seedAdminDatabase = async () => {
     VALUES (?, ?, ?, ?, ?)
   `);
 
-  notifStmt.run('NOTIF-01', 'Fleet Readiness 100%', 'All 40 autonomous delivery drones connected to SkyHub Chinniyampalayam.', 'success', 0);
-  notifStmt.run('NOTIF-02', 'Weather Advisory', 'Coimbatore region: Wind speed 12 km/h, clear visibility. Optimal flight conditions.', 'info', 0);
-  notifStmt.run('NOTIF-03', 'Airspace Clearance', 'DGCA Digital Sky automated corridor authorization active for Coimbatore operational zone.', 'info', 1);
+  notifStmt.run('NOTIF-01', 'Fleet Readiness 100%', 'All 40 autonomous delivery drones connected to SkyHub Kurumbapalayam.', 'success', 0);
+  notifStmt.run('NOTIF-02', 'Weather Advisory', 'Kurumbapalayam / Coimbatore: Wind speed 11 km/h, clear visibility. Optimal flight conditions.', 'info', 0);
+  notifStmt.run('NOTIF-03', 'Airspace Clearance', 'DGCA Digital Sky automated corridor authorization active for Kurumbapalayam operational zone.', 'info', 1);
 
   // 9. AUDIT LOGS
   const auditStmt = db.prepare(`
@@ -421,9 +420,9 @@ export const seedAdminDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  auditStmt.run('LOG-01', 'SkyNav Administrator', 'admin', 'SYSTEM_INITIALIZATION', 'System', 'CORE', 'Info', 'SkyNav Autonomous Drone System initialized for Coimbatore, Tamil Nadu, India');
+  auditStmt.run('LOG-01', 'SkyNav Administrator', 'admin', 'SYSTEM_INITIALIZATION', 'System', 'CORE', 'Info', 'SkyNav Autonomous Drone System initialized for Kurumbapalayam, Coimbatore, Tamil Nadu, India');
 
-  console.log('✅ SkyNav Admin Database seeded with single Admin (admin@skynav), Indian Products, Categories, 40 Drones, Coimbatore Geofences, Orders & Missions.');
+  console.log('✅ SkyNav Admin Database seeded with single Admin (admin@skynav), Indian Products, Categories, 40 Drones at SkyHub Kurumbapalayam, Geofences, Orders & Missions.');
 };
 
 seedAdminDatabase().catch((err) => {

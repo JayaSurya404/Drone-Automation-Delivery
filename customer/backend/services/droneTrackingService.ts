@@ -422,9 +422,9 @@ class DroneTrackingService {
     }
 
     const hub = queryOne<any>('SELECT hub_name, hub_latitude, hub_longitude FROM delivery_zones LIMIT 1') || {
-      hub_name: 'SkyHub Chinniyampalayam',
-      hub_latitude: 11.0550,
-      hub_longitude: 77.0650,
+      hub_name: 'SkyHub Kurumbapalayam',
+      hub_latitude: 11.1132,
+      hub_longitude: 77.0277,
     };
 
     if ((!route || route.length === 0) && delivery.destination_latitude && delivery.destination_longitude) {

@@ -161,6 +161,7 @@ export const TrackingPage: React.FC = () => {
 
         if ((event.type === 'DELIVERY_COMPLETED' || event.status === 'Delivered') && !hasCelebrated) {
           setHasCelebrated(true);
+          realtimeDeliveryService.disconnect();
           confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 }, colors: ['#0284c7', '#10b981', '#6366f1', '#f59e0b'] });
           setTimeout(() => setIsRatingOpen(true), 1500);
         }
@@ -281,6 +282,42 @@ export const TrackingPage: React.FC = () => {
             {statusInfo.sub}
           </div>
         </div>
+      ) : isDelivered ? (
+        <div className="delivery-complete-hero card glass-panel" style={{
+          textAlign: 'center',
+          padding: 'clamp(2.5rem, 5vw, 4rem) 2rem',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 60%, #ecfdf5 100%)',
+          borderRadius: 'var(--radius-2xl)',
+          border: '1px solid rgba(16,185,129,0.25)',
+          marginBottom: '1.5rem',
+          boxShadow: 'var(--shadow-card)'
+        }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', color: '#059669', boxShadow: '0 0 20px rgba(16,185,129,0.2)' }}>
+            <CheckCircle2 size={46} />
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.8rem', background: '#dcfce7', borderRadius: 'var(--radius-full)', color: '#15803d', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+            ✓ OTP Verified & Handover Complete
+          </div>
+          <h2 style={{ fontSize: 'clamp(1.6rem, 3.2vw, 2.25rem)', fontWeight: 900, marginBottom: '0.5rem', color: '#065f46', letterSpacing: '-0.03em' }}>
+            Package Delivered Successfully! 🎉
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: '440px', margin: '0 auto 1.5rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
+            Autonomous payload tether lowered gently at your designated landing zone. Safe flight concluded.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <Button variant="primary" size="lg" onClick={() => setIsRatingOpen(true)} leftIcon={<Sparkles size={17} />}>
+              Rate Delivery
+            </Button>
+            <Link to={`/orders/${order.id}`}>
+              <Button variant="secondary" size="lg">
+                View Order Receipt
+              </Button>
+            </Link>
+            <Button variant="ghost" size="lg" onClick={() => navigate('/products')}>
+              Shop Again
+            </Button>
+          </div>
+        </div>
       ) : (
         /* ═══════════════════════════════════
            CINEMATIC MAP HERO
@@ -350,31 +387,6 @@ export const TrackingPage: React.FC = () => {
                 <div className="tracking-stat-label">Speed</div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════
-          DELIVERED SUCCESS BANNER
-      ═══════════════════════════════════ */}
-      {isDelivered && (
-        <div className="delivery-complete-card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#059669' }}>
-            <CheckCircle2 size={38} />
-          </div>
-          <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 900, marginBottom: '0.35rem', color: '#065f46', letterSpacing: '-0.03em' }}>
-            Delivered! 🎉
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', maxWidth: '380px', margin: '0 auto 1.75rem', fontSize: '0.95rem' }}>
-            Package safely released at your drop zone. Thank you for flying with SkyNav!
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <Button variant="primary" size="lg" onClick={() => setIsRatingOpen(true)} leftIcon={<Sparkles size={17} />}>
-              Rate Delivery
-            </Button>
-            <Button variant="secondary" size="lg" onClick={() => navigate('/products')}>
-              Order Again
-            </Button>
           </div>
         </div>
       )}
@@ -484,6 +496,7 @@ export const TrackingPage: React.FC = () => {
               onVerifySuccess={() => {
                 setOrder(prev => prev ? { ...prev, status: 'Delivered' } : null);
                 setTrackingState(prev => prev ? { ...prev, orderStatus: 'Delivered', isCompleted: true } : null);
+                realtimeDeliveryService.disconnect();
                 showToast('Delivery Completed', 'Package release authenticated successfully!', 'success');
                 if (!hasCelebrated) {
                   setHasCelebrated(true);

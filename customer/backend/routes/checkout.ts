@@ -165,13 +165,13 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
 
     // Hub coordinates
     const hub = queryOne<any>('SELECT * FROM delivery_zones LIMIT 1') || {
-      hub_latitude: 11.0550,
-      hub_longitude: 77.0650,
-      hub_name: 'SkyHub Chinniyampalayam',
+      hub_latitude: 11.1132,
+      hub_longitude: 77.0277,
+      hub_name: 'SkyHub Kurumbapalayam',
     };
 
-    const targetLat = destLat || 11.0550;
-    const targetLng = destLng || 77.0650;
+    const targetLat = destLat || 11.1132;
+    const targetLng = destLng || 77.0277;
     const flightRoute = droneTrackingService.generateFlightRoute(hub.hub_latitude, hub.hub_longitude, targetLat, targetLng);
     const initialDistanceKm = droneTrackingService.calculateDistanceKm(hub.hub_latitude, hub.hub_longitude, targetLat, targetLng);
 

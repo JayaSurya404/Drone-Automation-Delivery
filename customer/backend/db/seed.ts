@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
 export const seedDatabase = async () => {
-  console.log('🌱 Initializing schema and seeding SkyNav Customer database (Coimbatore / Chinniyampalayam)...');
+  console.log('🌱 Initializing schema and seeding SkyNav Customer database (Coimbatore / Kurumbapalayam)...');
   initDb();
 
   // Clear existing records
@@ -76,9 +76,9 @@ export const seedDatabase = async () => {
   zoneStmt.run(
     'zone_coimbatore_cbe',
     'Coimbatore Urban Autonomous Flight Corridor',
-    'SkyHub Chinniyampalayam',
-    11.0550,
-    77.0650,
+    'SkyHub Kurumbapalayam',
+    11.1132,
+    77.0277,
     12.0,
     5.0,
     49.00,
@@ -86,17 +86,17 @@ export const seedDatabase = async () => {
     'ACTIVE'
   );
 
-  // 3. SEED DRONES FLEET AROUND CHINNIYAMPALAYAM
+  // 3. SEED DRONES FLEET AT SKYHUB KURUMBAPALAYAM
   const droneStmt = db.prepare(`
     INSERT INTO drones (id, identifier, model, status, battery_level, latitude, longitude, altitude, heading, speed_kmh, max_payload_kg)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  droneStmt.run('drone_01', 'SkyNav Alpha-01', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 11.0550, 77.0650, 0, 0, 0, 4.5);
-  droneStmt.run('drone_02', 'SkyNav Falcon-02', 'AeroCarrier HeavyLift v5', 'AVAILABLE', 100, 11.0550, 77.0650, 0, 0, 0, 5.0);
-  droneStmt.run('drone_03', 'SkyNav Osprey-03', 'Osprey Rapid VTOL', 'AVAILABLE', 92, 11.0530, 77.0620, 0, 0, 0, 3.5);
-  droneStmt.run('drone_04', 'SkyNav Swift-04', 'SwiftCourier MedPod', 'AVAILABLE', 88, 11.0550, 77.0650, 0, 0, 0, 2.5);
-  droneStmt.run('drone_05', 'SkyNav Hawk-05', 'SkyNav Hawk Cargo-X', 'AVAILABLE', 95, 11.0530, 77.0620, 0, 0, 0, 4.0);
+  droneStmt.run('drone_01', 'SkyNav Alpha-01', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 11.1132, 77.0277, 0, 0, 0, 4.5);
+  droneStmt.run('drone_02', 'SkyNav Falcon-02', 'AeroCarrier HeavyLift v5', 'AVAILABLE', 100, 11.1132, 77.0277, 0, 0, 0, 5.0);
+  droneStmt.run('drone_03', 'SkyNav Osprey-03', 'Osprey Rapid VTOL', 'AVAILABLE', 92, 11.1132, 77.0277, 0, 0, 0, 3.5);
+  droneStmt.run('drone_04', 'SkyNav Swift-04', 'SwiftCourier MedPod', 'AVAILABLE', 88, 11.1132, 77.0277, 0, 0, 0, 2.5);
+  droneStmt.run('drone_05', 'SkyNav Hawk-05', 'SkyNav Hawk Cargo-X', 'AVAILABLE', 95, 11.1132, 77.0277, 0, 0, 0, 4.0);
 
   // 4. SEED CATEGORIES
   const categoryStmt = db.prepare(`
@@ -414,7 +414,7 @@ export const seedDatabase = async () => {
     );
   }
 
-  // 6. SEED SAVED CUSTOMER ADDRESSES IN COIMBATORE / CHINNIYAMPALAYAM
+  // 6. SEED SAVED CUSTOMER ADDRESSES IN COIMBATORE / KURUMBAPALAYAM
   const addrStmt = db.prepare(`
     INSERT INTO addresses (id, customer_id, label, name, phone, building, street, area, city, state, postal_code, latitude, longitude, instructions, is_default, drop_zone_type)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -426,14 +426,14 @@ export const seedDatabase = async () => {
     'Home',
     'SkyNav Customer',
     '+91 98422 10002',
-    '42, Royal Residency',
-    'Avinashi Road',
-    'Chinniyampalayam',
+    'Tech Corridor Block 4',
+    'Kalapatti Main Road',
+    'Kurumbapalayam / Kalapatti',
     'Coimbatore',
     'Tamil Nadu',
-    '641062',
-    11.0550,
-    77.0650,
+    '641048',
+    11.0725,
+    77.0345,
     'Backyard lawn landing pad marked with high-visibility SkyNav drone beacon.',
     1,
     'Lawn'
@@ -482,12 +482,12 @@ export const seedDatabase = async () => {
   const addrSnapshot1 = JSON.stringify({
     name: 'SkyNav Customer',
     phone: '+91 98422 10002',
-    building: '42, Royal Residency',
-    street: 'Avinashi Road',
-    area: 'Chinniyampalayam',
+    building: 'Tech Corridor Block 4',
+    street: 'Kalapatti Main Road',
+    area: 'Kurumbapalayam / Kalapatti',
     city: 'Coimbatore',
     state: 'Tamil Nadu',
-    postalCode: '641062',
+    postalCode: '641048',
     dropZoneType: 'Lawn'
   });
 
@@ -519,9 +519,9 @@ export const seedDatabase = async () => {
 
   statusHistoryStmt.run('hist_1001_1', 'ORD-1001', null, 'Order Placed', 'Order placed successfully.', 1, '-2 days');
   statusHistoryStmt.run('hist_1001_2', 'ORD-1001', 'Order Placed', 'Order Confirmed', 'Payment confirmed via Razorpay.', 1, '-2 days');
-  statusHistoryStmt.run('hist_1001_3', 'ORD-1001', 'Order Confirmed', 'Preparing', 'Items packed at SkyHub Chinniyampalayam.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_3', 'ORD-1001', 'Order Confirmed', 'Preparing', 'Items packed at SkyHub Kurumbapalayam.', 1, '-2 days');
   statusHistoryStmt.run('hist_1001_4', 'ORD-1001', 'Preparing', 'Drone Assigned', 'SkyNav Falcon-02 assigned to delivery.', 1, '-2 days');
-  statusHistoryStmt.run('hist_1001_5', 'ORD-1001', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via Chinniyampalayam corridor.', 1, '-2 days');
+  statusHistoryStmt.run('hist_1001_5', 'ORD-1001', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via Kurumbapalayam corridor.', 1, '-2 days');
   statusHistoryStmt.run('hist_1001_6', 'ORD-1001', 'Drone Launched', 'Delivered', 'Autonomous payload tether lowered successfully.', 1, '-2 days');
 
   // 8. SEED INITIAL SAMPLE REVIEWS
@@ -538,7 +538,7 @@ export const seedDatabase = async () => {
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     5.0,
     'Mysore Pak arrived fresh and delicious!',
-    'Arrived in 11 minutes straight to my Chinniyampalayam lawn pad. The ghee aroma and freshness was unmatched.',
+    'Arrived in 11 minutes straight to my lawn pad. The ghee aroma and freshness was unmatched.',
     1,
     24
   );
@@ -551,7 +551,7 @@ export const seedDatabase = async () => {
     'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
     5.0,
     'Lifesaving emergency delivery',
-    'Urgent trauma kit needed during an emergency at home. Flown from SkyHub Chinniyampalayam in 8 minutes.',
+    'Urgent trauma kit needed during an emergency at home. Flown from SkyHub Kurumbapalayam in 8 minutes.',
     1,
     42
   );
@@ -563,9 +563,9 @@ export const seedDatabase = async () => {
   `);
 
   const faqs = [
-    { id: 'faq_1', q: 'How does autonomous drone delivery work in Coimbatore?', a: 'Once your order is confirmed, our SkyHub Chinniyampalayam hub packs your items into an aerodynamically sealed cargo pod and assigns an electric autonomous drone. The drone navigates certified DGCA aerial corridors at 100m altitude and gently lowers the package to your selected landing zone using sonar tether precision.', cat: 'Delivery' },
+    { id: 'faq_1', q: 'How does autonomous drone delivery work in Coimbatore?', a: 'Once your order is confirmed, our SkyHub Kurumbapalayam hub packs your items into an aerodynamically sealed cargo pod and assigns an electric autonomous drone. The drone navigates certified DGCA aerial corridors at 100m altitude and gently lowers the package to your selected landing zone using sonar tether precision.', cat: 'Delivery' },
     { id: 'faq_2', q: 'Where can the drone land?', a: 'You can choose between a private lawn, designated rooftop pad, driveway, or balcony landing zone. Our drones use LiDAR obstacle sensing and precision optical beacons to deliver contactless and safe drop-offs.', cat: 'Drop Zones' },
-    { id: 'faq_3', q: 'What is the drone delivery service radius?', a: 'Our service radius extends up to 12 km from SkyHub Chinniyampalayam, covering Chinniyampalayam, Neelambur, Peelamedu, Hope College, Singanallur, Kalapatti, and surrounding Coimbatore regions.', cat: 'Service Area' },
+    { id: 'faq_3', q: 'What is the drone delivery service radius?', a: 'Our service radius extends up to 12 km from SkyHub Kurumbapalayam, covering Kurumbapalayam, Kalapatti, Peelamedu, Saravanampatti, Chinniyampalayam, and surrounding Coimbatore regions.', cat: 'Service Area' },
     { id: 'faq_4', q: 'What is the maximum payload weight?', a: 'SkyNav standard drones carry up to 5.0 kg. If your basket exceeds this weight, our system automatically schedules a tandem multi-drone flight or heavy-lift carrier.', cat: 'Orders' },
   ];
 
@@ -594,7 +594,7 @@ export const seedDatabase = async () => {
   notifStmt.run(
     'notif_2',
     userId,
-    'SkyHub Chinniyampalayam Corridor Active',
+    'SkyHub Kurumbapalayam Corridor Active',
     'Clear skies across Coimbatore. Average delivery time is currently 10–14 minutes.',
     'promo',
     0,
@@ -603,7 +603,7 @@ export const seedDatabase = async () => {
     '-30 minutes'
   );
 
-  console.log('✅ Customer Database seeded successfully with Indian Products (INR), Categories, Drones, SkyHub Chinniyampalayam, customer@skynav, and Saved Coimbatore Addresses!');
+  console.log('✅ Customer Database seeded successfully with Indian Products (INR), Categories, Drones, SkyHub Kurumbapalayam, customer@skynav, and Saved Coimbatore Addresses!');
 };
 
 // If run directly via tsx

@@ -133,17 +133,17 @@ async function runE2EIntegrationTest() {
         quantity: 1,
       },
     ],
-    customAddress: {
+    savedAddress: {
       id: 'addr_test_cbe',
       name: 'Customer SkyNav',
       phone: '+91 98765 43210',
-      street: '142 Avinashi Road',
+      street: 'Kalapatti Main Road',
       building: 'Tech Corridor Block 4',
       city: 'Coimbatore',
       state: 'Tamil Nadu',
-      postalCode: '641062',
-      latitude: 11.0550,
-      longitude: 77.0650,
+      postalCode: '641048',
+      latitude: 11.0725,
+      longitude: 77.0345,
       dropZoneType: 'Rooftop Helipad',
       clearanceRadiusMeters: 5.0,
     },
@@ -151,13 +151,13 @@ async function runE2EIntegrationTest() {
       id: 'addr_test_cbe',
       name: 'Customer SkyNav',
       phone: '+91 98765 43210',
-      street: '142 Avinashi Road',
+      street: 'Kalapatti Main Road',
       building: 'Tech Corridor Block 4',
       city: 'Coimbatore',
       state: 'Tamil Nadu',
-      postalCode: '641062',
-      latitude: 11.0550,
-      longitude: 77.0650,
+      postalCode: '641048',
+      latitude: 11.0725,
+      longitude: 77.0345,
       dropZoneType: 'Rooftop Helipad',
       clearanceRadiusMeters: 5.0,
     },
@@ -334,7 +334,7 @@ async function runE2EIntegrationTest() {
   passedSteps++;
 
   // 13. Verify Return Flight Telemetry & Battery Drain
-  console.log('\n▶ Step 13: Verifying Return Flight Telemetry to SkyHub Chinniyampalayam...');
+  console.log('\n▶ Step 13: Verifying Return Flight Telemetry to SkyHub Kurumbapalayam...');
   await delay(2000);
   const fleetMidReturn = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
   const droneMidReturn = fleetMidReturn.find((d: any) => d.id === availableDrone.id);
@@ -344,7 +344,7 @@ async function runE2EIntegrationTest() {
   passedSteps++;
 
   // 14. Verify Hub Arrival & Charging Lifecycle
-  console.log('\n▶ Step 14: Waiting for Hub Arrival & Verifying Charging Cycle at SkyHub Chinniyampalayam...');
+  console.log('\n▶ Step 14: Waiting for Hub Arrival & Verifying Charging Cycle at SkyHub Kurumbapalayam...');
   let droneAtHub: any = null;
   for (let i = 0; i < 25; i++) {
     await delay(1000);
@@ -356,7 +356,7 @@ async function runE2EIntegrationTest() {
   }
 
   console.log(`  ✔ Drone Docked at Base Hub: Status="${droneAtHub.status}"`);
-  console.log(`  ✔ Docked Coords: Lat=${droneAtHub.location.lat.toFixed(4)}, Lng=${droneAtHub.location.lng.toFixed(4)} (SkyHub Chinniyampalayam)`);
+  console.log(`  ✔ Docked Coords: Lat=${droneAtHub.location.lat.toFixed(4)}, Lng=${droneAtHub.location.lng.toFixed(4)} (SkyHub Kurumbapalayam)`);
   console.log(`  ✔ Battery Charging Level: ${droneAtHub.battery}%`);
   if (droneAtHub.status !== 'charging' && droneAtHub.status !== 'available') {
     throw new Error(`Expected drone to reach 'charging' or 'available', got '${droneAtHub.status}'`);
@@ -382,15 +382,15 @@ async function runE2EIntegrationTest() {
   console.log(`  ✔ Final Drone State: ID=${droneFinal.id}, Status="${droneFinal.status}", Battery=${droneFinal.battery}%`);
   passedSteps++;
 
-  // 16. Verify Coordinate Consistency (Coimbatore / Chinniyampalayam)
+  // 16. Verify Coordinate Consistency (Coimbatore / Kurumbapalayam)
   console.log('\n▶ Step 16: Verifying Indian Coordinate Consistency across System...');
-  const CHINNIYAMPALAYAM_LAT = 11.0550;
-  const CHINNIYAMPALAYAM_LNG = 77.0650;
-  const hubDiff = Math.abs(droneFinal.location.lat - CHINNIYAMPALAYAM_LAT) + Math.abs(droneFinal.location.lng - CHINNIYAMPALAYAM_LNG);
+  const KURUMBAPALAYAM_LAT = 11.1132;
+  const KURUMBAPALAYAM_LNG = 77.0277;
+  const hubDiff = Math.abs(droneFinal.location.lat - KURUMBAPALAYAM_LAT) + Math.abs(droneFinal.location.lng - KURUMBAPALAYAM_LNG);
   if (hubDiff > 0.05) {
-    throw new Error(`Coordinates ${droneFinal.location.lat}, ${droneFinal.location.lng} deviate from Chinniyampalayam hub!`);
+    throw new Error(`Coordinates ${droneFinal.location.lat}, ${droneFinal.location.lng} deviate from Kurumbapalayam hub!`);
   }
-  console.log(`  ✔ Coordinates verified: Tamil Nadu / Coimbatore / Chinniyampalayam [${CHINNIYAMPALAYAM_LAT}, ${CHINNIYAMPALAYAM_LNG}]`);
+  console.log(`  ✔ Coordinates verified: Tamil Nadu / Coimbatore / Kurumbapalayam [${KURUMBAPALAYAM_LAT}, ${KURUMBAPALAYAM_LNG}]`);
   passedSteps++;
 
   console.log('\n===============================================================');

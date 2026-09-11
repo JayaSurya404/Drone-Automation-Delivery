@@ -18,8 +18,8 @@ import {
   SystemNotification,
 } from '../types/skynav';
 
-// Center coordinates: Coimbatore Operations Command Hub (11.0168° N, 76.9558° E)
-export const BASE_CENTER = { lat: 11.0168, lng: 76.9558 };
+// Center coordinates: SkyHub Kurumbapalayam Operations Command Base (11.1132° N, 77.0277° E)
+export const BASE_CENTER = { lat: 11.1132, lng: 77.0277 };
 
 export const DRONE_MODELS = [
   'SKYNAV X1',
@@ -29,29 +29,16 @@ export const DRONE_MODELS = [
   'SKYNAV Heavy Cargo',
 ];
 
-// 40 Realistic Drones across Coimbatore Airspace
+// 40 Fleet Drones stationed at SkyHub Kurumbapalayam Base
 export const INITIAL_DRONES: Drone[] = Array.from({ length: 40 }).map((_, index) => {
   const num = index + 1;
   const id = `D-${num.toString().padStart(3, '0')}`;
   const model = DRONE_MODELS[index % DRONE_MODELS.length];
   
-  // Distribute statuses realistically
-  let status: DroneStatus = 'available';
-  if (index === 0) status = 'emergency'; // D-001
-  else if (index < 14) status = 'in_flight'; // 13 In Flight
-  else if (index < 17) status = 'returning'; // 3 Returning
-  else if (index < 29) status = 'available'; // 12 Available
-  else if (index < 35) status = 'charging'; // 6 Charging
-  else if (index < 38) status = 'maintenance'; // 3 Maintenance
-  else status = 'offline'; // 2 Offline
-
-  // Offset coords within 8-12km radius around Coimbatore Hub
-  const latOffset = (Math.sin(index * 1.7) * 0.045) + (Math.cos(index * 0.9) * 0.025);
-  const lngOffset = (Math.cos(index * 1.5) * 0.055) + (Math.sin(index * 0.8) * 0.02);
-
-  const battery = status === 'emergency' ? 7 : status === 'charging' ? 28 + (index * 6) % 55 : 62 + (index * 3) % 36;
-  const batteryHealth = 91 + ((index * 7) % 9);
-
+  // Real operating base: 34 Available at hub launchpad, 6 Charging at docking bays
+  const status: DroneStatus = index < 34 ? 'available' : 'charging';
+  const battery = status === 'charging' ? 42 + (index * 7) % 45 : 88 + (index * 3) % 13;
+  const batteryHealth = 92 + ((index * 7) % 8);
   const payloadCapacity = model === 'SKYNAV Heavy Cargo' ? 15.0 : model === 'SKYNAV Cargo' ? 8.5 : model === 'SKYNAV VTOL' ? 5.0 : model === 'SKYNAV X2' ? 4.5 : 2.5;
 
   return {
@@ -66,52 +53,23 @@ export const INITIAL_DRONES: Drone[] = Array.from({ length: 40 }).map((_, index)
     batteryCycles: 110 + (index * 14) % 240,
     temperature: 31 + (index % 8),
     payloadCapacity,
-    currentPayloadWeight: status === 'in_flight' ? +(1.1 + (index % 4) * 0.9).toFixed(1) : 0,
+    currentPayloadWeight: 0,
     location: {
-      lat: +(BASE_CENTER.lat + latOffset).toFixed(6),
-      lng: +(BASE_CENTER.lng + lngOffset).toFixed(6),
-      altitude: status === 'in_flight' || status === 'returning' ? 68 + (index * 4) % 45 : 0,
-      heading: (index * 45) % 360,
-      speed: status === 'in_flight' ? 34 + (index % 18) : status === 'returning' ? 42 : 0,
+      lat: BASE_CENTER.lat,
+      lng: BASE_CENTER.lng,
+      altitude: 0,
+      heading: 0,
+      speed: 0,
     },
     distanceTravelledKm: +(140 + index * 23.5).toFixed(1),
-    remainingDistanceKm: status === 'in_flight' ? +(1.4 + (index % 5) * 0.7).toFixed(1) : 0,
-    signalStrength: status === 'emergency' ? 28 : 92 + (index % 8),
-    currentMissionId: (status === 'in_flight' || status === 'returning' || status === 'emergency') ? `MS-${1000 + index}` : undefined,
+    remainingDistanceKm: 0,
+    signalStrength: 96 + (index % 5),
+    currentMissionId: undefined,
     lastServiceDate: '2026-08-15',
     nextServiceDate: '2026-09-15',
-    issuesCount: status === 'maintenance' ? 2 : status === 'emergency' ? 1 : 0,
+    issuesCount: 0,
   };
 });
-
-// Set specific known drones for showcase
-const d24 = INITIAL_DRONES.find((d) => d.id === 'D-024');
-if (d24) {
-  d24.status = 'in_flight';
-  d24.battery = 78;
-  d24.batteryHealth = 96;
-  d24.model = 'SKYNAV X1';
-  d24.currentMissionId = 'MS-10284';
-  d24.location = { lat: 11.0280, lng: 76.9680, altitude: 82, heading: 42, speed: 34 };
-}
-
-const d18 = INITIAL_DRONES.find((d) => d.id === 'D-018');
-if (d18) {
-  d18.status = 'in_flight';
-  d18.battery = 18;
-  d18.batteryHealth = 92;
-  d18.model = 'SKYNAV X2';
-  d18.currentMissionId = 'MS-10281';
-  d18.location = { lat: 11.0450, lng: 76.9420, altitude: 64, heading: 180, speed: 28 };
-}
-
-const d31 = INITIAL_DRONES.find((d) => d.id === 'D-031');
-if (d31) {
-  d31.status = 'maintenance';
-  d31.battery = 91;
-  d31.issuesCount = 2;
-  d31.model = 'SKYNAV Cargo';
-}
 
 // 15 Indian Merchants in Coimbatore & Tamil Nadu Hub
 export const MOCK_MERCHANTS: Merchant[] = [
@@ -301,18 +259,18 @@ export const INITIAL_MISSIONS: Mission[] = INITIAL_ORDERS
 export const INITIAL_GEOFENCES: GeofenceZone[] = [
   {
     id: 'GEO-01',
-    name: 'Coimbatore Urban Air Corridor (Primary)',
+    name: 'Kurumbapalayam Operations & Delivery Corridor',
     type: 'delivery',
     coordinates: [
-      [11.045, 76.925],
-      [11.045, 77.035],
-      [10.985, 77.035],
-      [10.985, 76.925],
+      [11.145, 77.000],
+      [11.145, 77.060],
+      [11.070, 77.060],
+      [11.070, 77.000],
     ],
-    boundsRadiusMeters: 4500,
+    boundsRadiusMeters: 12000,
     active: true,
     maxAltitudeMeters: 120,
-    description: 'Designated high-speed autonomous air corridor connecting Peelamedu, Gandhipuram, and RS Puram Hubs.',
+    description: 'Designated high-speed autonomous air corridor connecting Kurumbapalayam Hub to Kalapatti and North Coimbatore.',
   },
   {
     id: 'GEO-02',

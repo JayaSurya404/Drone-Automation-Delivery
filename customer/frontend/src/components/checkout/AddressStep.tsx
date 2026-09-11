@@ -65,17 +65,17 @@ export const AddressStep: React.FC<AddressStepProps> = ({
         const lat = parseFloat(pos.coords.latitude.toFixed(6));
         const lng = parseFloat(pos.coords.longitude.toFixed(6));
 
-        // Authoritative Hub: SkyHub Chinniyampalayam (11.0550, 77.0650)
-        const hubLat = 11.0550;
-        const hubLng = 77.0650;
+        // Authoritative Hub: SkyHub Kurumbapalayam (11.1132, 77.0277)
+        const hubLat = 11.1132;
+        const hubLng = 77.0277;
         const distKm = calculateDistanceKm(hubLat, hubLng, lat, lng);
         const eligible = distKm <= 12.0;
 
-        let detectedStreet = 'Avinashi Road';
-        let detectedArea = 'Chinniyampalayam';
+        let detectedStreet = 'Kalapatti Main Road';
+        let detectedArea = 'Kurumbapalayam';
         let detectedCity = 'Coimbatore';
         let detectedState = 'Tamil Nadu';
-        let detectedPostcode = '641062';
+        let detectedPostcode = '641048';
 
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
@@ -110,8 +110,8 @@ export const AddressStep: React.FC<AddressStepProps> = ({
 
         setServiceStatus({
           message: eligible
-            ? `Delivery available (${distKm} km from SkyHub Chinniyampalayam)`
-            : `Outside 12 km service radius from SkyHub Chinniyampalayam (${distKm} km away)`,
+            ? `Delivery available (${distKm} km from SkyHub Kurumbapalayam)`
+            : `Outside 12 km service radius from SkyHub Kurumbapalayam (${distKm} km away)`,
           isEligible: eligible,
           distanceKm: distKm,
         });
@@ -142,8 +142,8 @@ export const AddressStep: React.FC<AddressStepProps> = ({
       return;
     }
 
-    const finalLat = detectedCoords?.lat || 11.0550;
-    const finalLng = detectedCoords?.lng || 77.0650;
+    const finalLat = detectedCoords?.lat || 11.1132;
+    const finalLng = detectedCoords?.lng || 77.0277;
 
     const saved = await saveAddress({
       ...formData,
@@ -222,7 +222,7 @@ export const AddressStep: React.FC<AddressStepProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h4 style={{ margin: 0 }}>Enter Delivery Address</h4>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              SkyHub Chinniyampalayam 12 km delivery zone
+              SkyHub Kurumbapalayam 12 km delivery zone
             </span>
           </div>
 
@@ -270,7 +270,7 @@ export const AddressStep: React.FC<AddressStepProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '1rem' }}>
             <Input
               label="Area / Locality"
-              placeholder="e.g. Chinniyampalayam / Peelamedu"
+              placeholder="e.g. Kurumbapalayam / Kalapatti"
               value={formData.area}
               onChange={(e) => setFormData({ ...formData, area: e.target.value })}
             />

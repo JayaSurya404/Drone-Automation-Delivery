@@ -74,8 +74,8 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     const provider = new LeafletMapProvider();
     mapProviderRef.current = provider;
 
-    const initialLat = destinationLocation?.latitude || hubLocation?.latitude || 11.0550;
-    const initialLng = destinationLocation?.longitude || hubLocation?.longitude || 77.0650;
+    const initialLat = destinationLocation?.latitude || hubLocation?.latitude || 11.1132;
+    const initialLng = destinationLocation?.longitude || hubLocation?.longitude || 77.0277;
 
     provider
       .initialize({

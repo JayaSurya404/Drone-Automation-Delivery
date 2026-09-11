@@ -27,8 +27,8 @@ export const CheckoutPage: React.FC = () => {
 
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [address, setAddress] = useState<CustomerAddress | null>(selectedAddress);
-  const [lat, setLat] = useState<number>(selectedAddress?.latitude || 11.0550);
-  const [lng, setLng] = useState<number>(selectedAddress?.longitude || 77.0650);
+  const [lat, setLat] = useState<number>(selectedAddress?.latitude || 11.1132);
+  const [lng, setLng] = useState<number>(selectedAddress?.longitude || 77.0277);
   const [dropZoneType, setDropZoneType] = useState<string>(selectedAddress?.dropZoneType || 'Lawn');
   const [clearanceRadius, setClearanceRadius] = useState<ClearanceRadiusOption>(
     ((selectedAddress?.clearanceRadiusMeters as any) || 3.5) as ClearanceRadiusOption
