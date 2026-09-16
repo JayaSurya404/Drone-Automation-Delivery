@@ -283,17 +283,49 @@ async function runE2EIntegrationTest() {
   console.log(`  ✔ Mission Launched: Status="${launchResult.status}"`);
   passedSteps++;
 
-  // 10. Verify Authoritative Telemetry Streaming to Customer
-  console.log('\n▶ Step 10: Verifying Authoritative Flight Telemetry Flowing to Customer...');
-  await delay(2500); // Allow telemetry loop ticks
-  const liveTracking = await fetch(`${CUSTOMER_API}/api/tracking/${customerOrder.id}`, {
-    headers: { Authorization: `Bearer ${customerToken}` },
-  }).then((r) => r.json());
+  // 10. Track Outbound Flight Progression Until Touchdown at Customer Landing Zone
+  console.log('\n▶ Step 10: Tracking Outbound Autonomous Flight Telemetry Until Touchdown...');
+  let arrivedAtDestination = false;
+  let lastLat = 0;
+  let lastLng = 0;
 
-  console.log(`  ✔ Drone Live Position: Lat=${liveTracking.currentDroneLocation.latitude.toFixed(5)}, Lng=${liveTracking.currentDroneLocation.longitude.toFixed(5)}`);
-  console.log(`  ✔ Drone Altitude: ${liveTracking.currentDroneLocation.altitudeMeters}m`);
-  console.log(`  ✔ Drone Speed: ${liveTracking.currentDroneLocation.speedKmh} km/h`);
-  console.log(`  ✔ Remaining Distance: ${liveTracking.remainingDistanceKm} km, ETA: ${liveTracking.estimatedArrivalMins} mins`);
+  for (let tick = 1; tick <= 30; tick++) {
+    await delay(1000);
+    const tracking = await fetch(`${CUSTOMER_API}/api/tracking/${customerOrder.id}`, {
+      headers: { Authorization: `Bearer ${customerToken}` },
+    }).then((r) => r.json());
+
+    const fleet = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+    const drone = fleet.find((d: any) => d.id === availableDrone.id);
+
+    const cLat = tracking.currentDroneLocation?.latitude || 0;
+    const cLng = tracking.currentDroneLocation?.longitude || 0;
+    const distRem = tracking.remainingDistanceKm;
+
+    console.log(`  [Flight Tick ${tick}s] Admin: [${drone.location.lat.toFixed(5)}, ${drone.location.lng.toFixed(5)}] Alt=${drone.location.altitude}m | Cust: [${cLat.toFixed(5)}, ${cLng.toFixed(5)}] DistRem=${distRem}km Status="${tracking.orderStatus}"`);
+
+    // Verify coordinates match between Admin and Customer
+    const coordDiff = Math.abs(drone.location.lat - cLat) + Math.abs(drone.location.lng - cLng);
+    if (coordDiff > 0.005 && distRem > 0) {
+      console.warn(`  ⚠️ Minor coordinate drift between Admin & Customer: ${coordDiff.toFixed(6)}`);
+    }
+
+    if (distRem === 0 || drone.status === 'touchdown' || drone.location.altitude === 0 && tick > 15) {
+      arrivedAtDestination = true;
+      console.log(`\n  🎯 DRONE TOUCHDOWN AT CUSTOMER DESTINATION!`);
+      console.log(`  ✔ Clamped Destination Coords: [${drone.location.lat.toFixed(5)}, ${drone.location.lng.toFixed(5)}]`);
+      console.log(`  ✔ Drone Altitude: ${drone.location.altitude}m, Speed: ${drone.location.speed} km/h`);
+      console.log(`  ✔ Customer Order Status: "${tracking.orderStatus}"`);
+      break;
+    }
+
+    lastLat = drone.location.lat;
+    lastLng = drone.location.lng;
+  }
+
+  if (!arrivedAtDestination) {
+    throw new Error('Drone did not arrive at customer destination within 30 seconds!');
+  }
   passedSteps++;
 
   // 11. Customer Enters OTP to Verify Handover & Complete Delivery
@@ -320,7 +352,7 @@ async function runE2EIntegrationTest() {
 
   // 12. Verify Delivery Completion on Admin Side & Return Flight Initiation
   console.log('\n▶ Step 12: Verifying Admin Receives DELIVERY_COMPLETED & Initiates Return Flight...');
-  await delay(1500); // Allow async completion event
+  await delay(1200);
   const updatedAdminOrders = await fetch(`${ADMIN_API}/api/admin/orders`).then((r) => r.json());
   const finalAdminOrder = updatedAdminOrders.find((o: any) => o.id === operationalOrder.id);
   const updatedFleet = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
@@ -333,50 +365,49 @@ async function runE2EIntegrationTest() {
   }
   passedSteps++;
 
-  // 13. Verify Return Flight Telemetry & Battery Drain
-  console.log('\n▶ Step 13: Verifying Return Flight Telemetry to SkyHub Kurumbapalayam...');
-  await delay(2000);
-  const fleetMidReturn = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
-  const droneMidReturn = fleetMidReturn.find((d: any) => d.id === availableDrone.id);
-  console.log(`  ✔ Drone Location Mid-Return: Lat=${droneMidReturn.location.lat.toFixed(5)}, Lng=${droneMidReturn.location.lng.toFixed(5)}, Alt=${droneMidReturn.location.altitude}m`);
-  console.log(`  ✔ Drone Heading & Speed: ${droneMidReturn.location.heading}°, ${droneMidReturn.location.speed} km/h`);
-  console.log(`  ✔ Drone Battery (continuing drain): ${droneMidReturn.battery}%`);
-  passedSteps++;
+  // 13. Track Return Flight Telemetry to SkyHub Kurumbapalayam
+  console.log('\n▶ Step 13: Tracking Return Flight Telemetry to SkyHub Kurumbapalayam Base...');
+  let arrivedAtHub = false;
 
-  // 14. Verify Hub Arrival & Charging Lifecycle
-  console.log('\n▶ Step 14: Waiting for Hub Arrival & Verifying Charging Cycle at SkyHub Kurumbapalayam...');
-  let droneAtHub: any = null;
-  for (let i = 0; i < 25; i++) {
+  for (let tick = 1; tick <= 25; tick++) {
     await delay(1000);
     const fleetCheck = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
-    droneAtHub = fleetCheck.find((d: any) => d.id === availableDrone.id);
-    if (droneAtHub.status === 'charging' || droneAtHub.status === 'available') {
+    const droneCheck = fleetCheck.find((d: any) => d.id === availableDrone.id);
+
+    console.log(`  [Return Tick ${tick}s] Drone ${droneCheck.id}: [${droneCheck.location.lat.toFixed(5)}, ${droneCheck.location.lng.toFixed(5)}] Alt=${droneCheck.location.altitude}m Spd=${droneCheck.location.speed}km/h Status="${droneCheck.status}" Battery=${droneCheck.battery}%`);
+
+    if (droneCheck.status === 'charging' || droneCheck.status === 'available') {
+      arrivedAtHub = true;
+      console.log(`\n  🔌 DRONE SAFELY ARRIVED & DOCKED AT SKYHUB KURUMBAPALAYAM!`);
+      console.log(`  ✔ Docked Coords: [${droneCheck.location.lat.toFixed(5)}, ${droneCheck.location.lng.toFixed(5)}]`);
+      console.log(`  ✔ Drone Status: "${droneCheck.status}"`);
       break;
     }
   }
 
-  console.log(`  ✔ Drone Docked at Base Hub: Status="${droneAtHub.status}"`);
-  console.log(`  ✔ Docked Coords: Lat=${droneAtHub.location.lat.toFixed(4)}, Lng=${droneAtHub.location.lng.toFixed(4)} (SkyHub Kurumbapalayam)`);
-  console.log(`  ✔ Battery Charging Level: ${droneAtHub.battery}%`);
-  if (droneAtHub.status !== 'charging' && droneAtHub.status !== 'available') {
-    throw new Error(`Expected drone to reach 'charging' or 'available', got '${droneAtHub.status}'`);
+  if (!arrivedAtHub) {
+    throw new Error('Drone did not return and dock at hub within 25 seconds!');
   }
   passedSteps++;
 
-  // 15. Verify Final Transition to AVAILABLE
-  console.log('\n▶ Step 15: Verifying Battery Recharge Completion & Transition to AVAILABLE...');
+  // 14. Verify Charging Cycle
+  console.log('\n▶ Step 14: Verifying Charging Cycle at SkyHub Base Dock...');
+  await delay(2000);
+  const fleetCharging = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+  const droneCharging = fleetCharging.find((d: any) => d.id === availableDrone.id);
+  console.log(`  ✔ Battery Level during recharge: ${droneCharging.battery}% (Status: "${droneCharging.status}")`);
+  passedSteps++;
+
+  // 15. Verify Transition to AVAILABLE
+  console.log('\n▶ Step 15: Waiting for Battery to Reach Full Charge & Transition to AVAILABLE...');
   let droneFinal: any = null;
-  for (let i = 0; i < 15; i++) {
-    if (droneAtHub.status === 'available') {
-      droneFinal = droneAtHub;
+  for (let i = 0; i < 20; i++) {
+    const fleetFinal = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+    droneFinal = fleetFinal.find((d: any) => d.id === availableDrone.id);
+    if (droneFinal.status === 'available' && droneFinal.battery >= 90) {
       break;
     }
     await delay(1000);
-    const fleetFinal = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
-    droneFinal = fleetFinal.find((d: any) => d.id === availableDrone.id);
-    if (droneFinal.status === 'available') {
-      break;
-    }
   }
 
   console.log(`  ✔ Final Drone State: ID=${droneFinal.id}, Status="${droneFinal.status}", Battery=${droneFinal.battery}%`);

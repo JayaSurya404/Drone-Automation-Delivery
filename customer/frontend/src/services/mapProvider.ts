@@ -26,6 +26,8 @@ export interface IMapProvider {
   toggleAirspaceLayer(visible: boolean): void;
   fitBounds(coordinates: [number, number][], padding?: [number, number], maxZoom?: number): void;
   onUserInteraction?(callback: () => void): void;
+  getCenter?(): [number, number] | null;
+  getZoom?(): number | null;
   invalidateSize(): void;
   destroy(): void;
 }
@@ -67,14 +69,23 @@ export class LeafletMapProvider implements IMapProvider {
       attributionControl: false,
     });
 
-    // High quality light tile layer without watermark
-    const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    // High quality ESRI World Imagery satellite base layer + CartoDB labels matching Admin Satellite Map
+    this.L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics',
+      }
+    ).addTo(this.mapInstance);
 
-    this.L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      subdomains: ['a', 'b', 'c'],
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(this.mapInstance);
+    this.L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+      {
+        maxZoom: 19,
+        subdomains: ['a', 'b', 'c', 'd'],
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+      }
+    ).addTo(this.mapInstance);
 
     // Recalculate dimensions once mounted in DOM
     setTimeout(() => {
@@ -98,23 +109,26 @@ export class LeafletMapProvider implements IMapProvider {
   public updateDronePosition(location: DroneLocation): void {
     if (!this.mapInstance || !this.L) return;
 
+    const heading = location.bearing || 0;
     const customDroneHtml = `
-      <div class="drone-map-marker" style="transform: rotate(${location.bearing || 0}deg);">
-        <div class="drone-icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round"/>
-            <circle cx="12" cy="12" r="4" fill="#0ea5e9"/>
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <div style="position: absolute; inset: -6px; border-radius: 9999px; background-color: rgba(6, 182, 212, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9999px; border: 2px solid #06b6d4; background-color: rgba(15, 23, 42, 0.95); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
+          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; color: white; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
+            <path fill="#06b6d4" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
           </svg>
         </div>
-        <div class="drone-pulse-radar"></div>
+        <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; font-family: monospace; color: white; background-color: rgba(15, 23, 42, 0.92); border: 1px solid #06b6d4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">
+          ${location.altitudeMeters ? `${location.altitudeMeters}m • ` : ''}${location.speedKmh ? `${location.speedKmh} km/h` : 'Airborne'}
+        </div>
       </div>
     `;
 
     const icon = this.L.divIcon({
       className: 'custom-drone-leaflet-icon',
       html: customDroneHtml,
-      iconSize: [46, 46],
-      iconAnchor: [23, 23],
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
     });
 
     if (this.droneMarker) {
@@ -129,28 +143,32 @@ export class LeafletMapProvider implements IMapProvider {
     if (!this.mapInstance || !this.L) return;
 
     const customDestHtml = `
-      <div class="destination-map-marker">
-        <div class="landing-pad-box">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <div style="position: absolute; inset: -4px; border-radius: 9999px; background-color: rgba(16, 185, 129, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9999px; border: 2px solid #10b981; background-color: rgba(15, 23, 42, 0.95); box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.4);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
             <circle cx="12" cy="12" r="10"/>
             <path d="M12 8v8M8 12h8"/>
           </svg>
         </div>
-        <div class="landing-pad-pulse"></div>
+        <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 1px 6px; border-radius: 6px; font-size: 9px; font-weight: 700; color: #10b981; background-color: rgba(15, 23, 42, 0.92); border: 1px solid #10b981;">
+          Customer Landing Zone
+        </div>
       </div>
     `;
 
     const icon = this.L.divIcon({
       className: 'custom-dest-leaflet-icon',
       html: customDestHtml,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21],
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
     });
 
     this.currentDestCoords = [lat, lng];
 
     if (this.destMarker) {
       this.destMarker.setLatLng([lat, lng]);
+      this.destMarker.setIcon(icon);
     } else {
       this.destMarker = this.L.marker([lat, lng], {
         icon,
@@ -180,26 +198,32 @@ export class LeafletMapProvider implements IMapProvider {
     if (!this.mapInstance || !this.L) return;
 
     const customHubHtml = `
-      <div class="hub-map-marker">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-          <polyline points="9 22 9 12 15 12 15 22"/>
-        </svg>
+      <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+        <div style="width: 32px; height: 32px; border-radius: 10px; background-color: rgba(15, 23, 42, 0.95); border: 2px solid #06b6d4; display: flex; align-items: center; justify-content: center; color: #06b6d4; box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.5);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div style="margin-top: 2px; padding: 1px 6px; border-radius: 4px; background-color: rgba(15, 23, 42, 0.9); border: 1px solid rgba(6, 182, 212, 0.4); font-size: 9px; font-weight: 700; color: #06b6d4; font-family: monospace; white-space: nowrap;">
+          ${hub.name || 'SkyHub Kurumbapalayam'}
+        </div>
       </div>
     `;
 
     const icon = this.L.divIcon({
       className: 'custom-hub-leaflet-icon',
       html: customHubHtml,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
+      iconSize: [34, 46],
+      iconAnchor: [17, 23],
     });
 
     if (this.hubMarker) {
       this.hubMarker.setLatLng([hub.latitude, hub.longitude]);
+      this.hubMarker.setIcon(icon);
     } else {
       this.hubMarker = this.L.marker([hub.latitude, hub.longitude], { icon }).addTo(this.mapInstance);
-      this.hubMarker.bindTooltip(`📍 ${hub.name}`, { direction: 'top' });
+      this.hubMarker.bindTooltip(`📍 ${hub.name || 'SkyHub Kurumbapalayam'}`, { direction: 'top' });
     }
   }
 
@@ -356,6 +380,17 @@ export class LeafletMapProvider implements IMapProvider {
     } catch (e) {
       console.warn('Error fitting map bounds:', e);
     }
+  }
+
+  public getCenter(): [number, number] | null {
+    if (!this.mapInstance) return null;
+    const c = this.mapInstance.getCenter();
+    return [c.lat, c.lng];
+  }
+
+  public getZoom(): number | null {
+    if (!this.mapInstance) return null;
+    return this.mapInstance.getZoom();
   }
 
   public invalidateSize(): void {

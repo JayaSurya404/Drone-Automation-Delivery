@@ -107,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(storedToken);
           // Verify with database /auth/me
           try {
-            const me = await api.customer.getProfile();
+            const me = await api.auth.getProfile();
             if (mounted) {
               setUser(me);
               storage.set(storage.keys.AUTH_USER, me);

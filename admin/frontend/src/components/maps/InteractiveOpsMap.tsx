@@ -138,15 +138,12 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
     }
   }, [mapType]);
 
-  // Sync selected drone from props
+  // Sync selected drone from props (Without automatic camera movement)
   useEffect(() => {
     if (selectedDroneId) {
       const d = drones.find((dr) => dr.id === selectedDroneId);
       if (d) {
         setSelectedDrone(d);
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo([d.location.lat, d.location.lng], 15, { duration: 1.2 });
-        }
       }
     }
   }, [selectedDroneId, drones]);
@@ -298,6 +295,30 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
     `, { sticky: true });
     group.addLayer(hubMarker);
 
+    // Authoritative 2D Live Telemetry Synchronization Hook
+    const activeAirborneDrone =
+      drones.find((d) => d.status === 'in_flight' || d.status === 'returning' || (d.status as any) === 'touchdown') ||
+      drones.find((d) => d.id === 'D-001') ||
+      selectedDrone ||
+      drones[0];
+
+    if (typeof window !== 'undefined' && activeAirborneDrone) {
+      (window as any).__skynav2DDrone = {
+        droneId: activeAirborneDrone.id,
+        lat: activeAirborneDrone.location.lat,
+        lng: activeAirborneDrone.location.lng,
+        alt: activeAirborneDrone.location.altitude || 0,
+        speed: activeAirborneDrone.location.speed || 0,
+        heading: activeAirborneDrone.location.heading || 0,
+        status: activeAirborneDrone.status,
+        battery: activeAirborneDrone.battery,
+      };
+      (window as any).__skynav2DMapCamera = {
+        center: mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : null,
+        zoom: mapInstanceRef.current ? mapInstanceRef.current.getZoom() : null,
+      };
+    }
+
     drones.forEach((drone) => {
       const isSelected = selectedDrone?.id === drone.id;
       const isDeviation = drone.id === 'D-024';
@@ -316,10 +337,10 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
         : '#94a3b8';
 
       // Base Apron Slot Positioning:
-      // When idle at Kurumbapalayam hub, position neatly on the flight deck apron
-      const isAtHub = Math.abs(drone.location.lat - 11.1132) < 0.001 &&
-                      Math.abs(drone.location.lng - 77.0277) < 0.001 &&
-                      (drone.location.altitude === 0 || !drone.location.altitude);
+      // Only when idle/charging at Kurumbapalayam hub, position neatly on the flight deck apron
+      const isAtHub = (drone.status === 'available' || drone.status === 'charging' || drone.status === 'idle' || !drone.status) &&
+                      Math.abs(drone.location.lat - 11.1132) < 0.002 &&
+                      Math.abs(drone.location.lng - 77.0277) < 0.002;
 
       let displayLat = drone.location.lat;
       let displayLng = drone.location.lng;
@@ -371,9 +392,6 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
       marker.on('click', () => {
         setSelectedDrone(drone);
         if (onSelectDrone) onSelectDrone(drone);
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo([drone.location.lat, drone.location.lng], 15, { duration: 0.8 });
-        }
       });
 
       marker.bindTooltip(

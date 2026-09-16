@@ -138,6 +138,17 @@ export const TrackingPage: React.FC = () => {
         });
 
         if (event.location) {
+          if (typeof window !== 'undefined') {
+            (window as any).__skynavCustDrone = {
+              lat: event.location.latitude,
+              lng: event.location.longitude,
+              alt: event.location.altitudeMeters,
+              speed: event.location.speedKmh,
+              bearing: event.location.bearing,
+              status: event.status,
+            };
+          }
+
           setTrackingState(prev => {
             if (!prev) return null;
             return {

@@ -14,7 +14,11 @@ export const storage = {
     try {
       const item = localStorage.getItem(key);
       if (!item) return defaultValue;
-      return JSON.parse(item) as T;
+      try {
+        return JSON.parse(item) as T;
+      } catch {
+        return item as unknown as T;
+      }
     } catch (e) {
       console.warn(`Error reading localStorage key "${key}":`, e);
       return defaultValue;

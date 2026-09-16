@@ -13,7 +13,9 @@ interface ActiveMissionState {
   currentIndex: number;
   totalPoints: number;
   handoverOtp: string;
-  lastMilestoneTime: number;
+  destCoords: [number, number];
+  hubCoords: [number, number];
+  isTouchdown: boolean;
 }
 
 interface ActiveReturnFlight {
@@ -50,7 +52,7 @@ class TelemetryEngine {
     this.adminWsClients.add(ws);
     // Send immediate snapshot of fleet
     const drones = queryAll('SELECT * FROM drones');
-    const missions = queryAll("SELECT * FROM missions WHERE current_status IN ('in_flight', 'approaching')");
+    const missions = queryAll("SELECT * FROM missions WHERE current_status IN ('in_flight', 'approaching', 'touchdown')");
     ws.send(JSON.stringify({ type: 'FLEET_SNAPSHOT', data: { drones, missions } }));
 
     ws.on('close', () => {
@@ -58,7 +60,7 @@ class TelemetryEngine {
     });
   }
 
-  private broadcastToAdmin(event: string, data: any) {
+  public broadcastToAdmin(event: string, data: any) {
     const message = JSON.stringify({ type: event, data });
     for (const client of this.adminWsClients) {
       if (client.readyState === WebSocket.OPEN) {
@@ -67,7 +69,7 @@ class TelemetryEngine {
     }
   }
 
-  // Calculate distance between two lat/lng coordinates in km
+  // Calculate distance between two lat/lng coordinates in km (Haversine)
   public calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371; // Earth radius in km
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -77,7 +79,7 @@ class TelemetryEngine {
       Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return parseFloat((R * c).toFixed(2));
+    return parseFloat((R * c).toFixed(3));
   }
 
   // Calculate bearing in degrees
@@ -89,7 +91,7 @@ class TelemetryEngine {
     return Math.round(((Math.atan2(y, x) * 180) / Math.PI + 360) % 360);
   }
 
-  // Generate smooth waypoints
+  // Generate smooth waypoints guaranteeing start and exact destination
   public generateFlightRoute(
     startLat: number,
     startLng: number,
@@ -99,11 +101,19 @@ class TelemetryEngine {
   ): [number, number][] {
     const route: [number, number][] = [];
     for (let i = 0; i <= numSteps; i++) {
+      if (i === 0) {
+        route.push([startLat, startLng]);
+        continue;
+      }
+      if (i === numSteps) {
+        route.push([endLat, endLng]);
+        continue;
+      }
       const fraction = i / numSteps;
       const baseLat = startLat + (endLat - startLat) * fraction;
       const baseLng = startLng + (endLng - startLng) * fraction;
-      // Slight atmospheric arc deviation
-      const curve = Math.sin(fraction * Math.PI) * 0.002;
+      // Gentle atmospheric arc deviation
+      const curve = Math.sin(fraction * Math.PI) * 0.0015;
       route.push([
         parseFloat((baseLat + curve).toFixed(6)),
         parseFloat((baseLng + curve * 0.5).toFixed(6)),
@@ -115,7 +125,7 @@ class TelemetryEngine {
   // Start authoritative mission flight loop
   public launchMission(missionId: string) {
     const mission = queryOne<any>(`
-      SELECT m.*, o.customer_order_id, o.handover_otp, d.name as drone_name
+      SELECT m.*, o.customer_order_id, o.handover_otp, o.pickup_lat, o.pickup_lng, o.destination_lat, o.destination_lng, d.name as drone_name
       FROM missions m
       JOIN operational_orders o ON o.id = m.operational_order_id
       JOIN drones d ON d.id = m.drone_id
@@ -132,16 +142,26 @@ class TelemetryEngine {
     }
 
     if (route.length === 0) {
-      console.warn(`[TelemetryEngine] Mission ${missionId} has empty route`);
-      return;
+      const startLat = mission.pickup_lat || 11.1132;
+      const startLng = mission.pickup_lng || 77.0277;
+      const destLat = mission.destination_lat || 11.0725;
+      const destLng = mission.destination_lng || 77.0345;
+      route = this.generateFlightRoute(startLat, startLng, destLat, destLng, 24);
     }
+
+    const hubCoords: [number, number] = [mission.pickup_lat || 11.1132, mission.pickup_lng || 77.0277];
+    const destCoords: [number, number] = [mission.destination_lat || route[route.length - 1][0], mission.destination_lng || route[route.length - 1][1]];
 
     runCommand(`
       UPDATE missions SET
         current_status = 'in_flight',
-        start_time = datetime('now')
+        start_time = datetime('now'),
+        current_latitude = ?,
+        current_longitude = ?,
+        current_altitude = 15,
+        current_speed = 30
       WHERE id = ?
-    `, [missionId]);
+    `, [hubCoords[0], hubCoords[1], missionId]);
 
     runCommand(`
       UPDATE operational_orders SET
@@ -154,9 +174,13 @@ class TelemetryEngine {
       UPDATE drones SET
         status = 'in_flight',
         current_mission_id = ?,
+        latitude = ?,
+        longitude = ?,
+        altitude = 15,
+        speed = 30,
         updated_at = datetime('now')
       WHERE id = ?
-    `, [missionId, mission.drone_id]);
+    `, [missionId, hubCoords[0], hubCoords[1], mission.drone_id]);
 
     const state: ActiveMissionState = {
       missionId,
@@ -168,10 +192,23 @@ class TelemetryEngine {
       currentIndex: 0,
       totalPoints: route.length,
       handoverOtp: mission.handover_otp || '0000',
-      lastMilestoneTime: 0,
+      destCoords,
+      hubCoords,
+      isTouchdown: false,
     };
 
     this.activeMissions.set(missionId, state);
+
+    // Initial broadcast to Admin WS
+    this.broadcastToAdmin('DRONE_STATUS_CHANGED', {
+      droneId: mission.drone_id,
+      status: 'in_flight',
+      latitude: hubCoords[0],
+      longitude: hubCoords[1],
+      altitude: 15,
+      speed: 30,
+      message: `Drone ${mission.drone_id} airborne. Commencing outbound autonomous delivery flight.`,
+    });
 
     // Notify Customer Backend that mission is launched
     customerIntegrationClient.notifyMissionLaunched({
@@ -186,31 +223,47 @@ class TelemetryEngine {
       launchedAt: new Date().toISOString(),
     });
 
-    console.log(`🚀 [TelemetryEngine] Mission ${missionId} launched. Authoritative flight loop started.`);
+    console.log(`🚀 [TelemetryEngine] Mission ${missionId} launched. Authoritative flight loop active from [${hubCoords}] to [${destCoords}].`);
   }
 
   private startTicker() {
     this.tickerInterval = setInterval(() => {
       this.tick();
-    }, 1000); // 1-second physics tick
+    }, 1000); // 1-second authoritative physics tick
   }
 
   private tick() {
-    const now = Date.now();
+    const nowIso = new Date().toISOString();
 
     // ── 1. Outbound Mission Flight Loop ──
     for (const [missionId, state] of this.activeMissions.entries()) {
+      // If already touched down at destination, keep holding position at drop zone
+      if (state.isTouchdown) {
+        // Drone is at customer destination pad waiting for OTP
+        continue;
+      }
+
       state.currentIndex++;
+      const destCoord = state.destCoords;
+      const isLastStep = state.currentIndex >= state.totalPoints - 1;
+      
+      let currentCoord = state.route[Math.min(state.currentIndex, state.totalPoints - 1)];
+      let remainingKm = this.calculateDistanceKm(currentCoord[0], currentCoord[1], destCoord[0], destCoord[1]);
 
-      // Check if reached destination
-      if (state.currentIndex >= state.totalPoints - 1) {
+      // Check arrival condition: reached last waypoint index OR Euclidean distance <= 20 meters
+      if (isLastStep || remainingKm <= 0.025) {
         state.currentIndex = state.totalPoints - 1;
-        const finalCoord = state.route[state.currentIndex];
+        state.isTouchdown = true;
+        currentCoord = destCoord; // Exact clamp to customer pin
+        remainingKm = 0;
 
-        // Update DB
+        const prevCoord = state.route[state.currentIndex - 1] || currentCoord;
+        const bearing = this.calculateBearing(prevCoord[0], prevCoord[1], currentCoord[0], currentCoord[1]);
+
+        // 1. Update Database (using schema-compliant statuses: 'approaching' for mission, 'in_flight' with alt=0,spd=0 for drone)
         runCommand(`
           UPDATE missions SET
-            current_status = 'delivered',
+            current_status = 'approaching',
             current_latitude = ?,
             current_longitude = ?,
             current_altitude = 0,
@@ -218,7 +271,7 @@ class TelemetryEngine {
             remaining_distance_km = 0,
             eta_seconds = 0
           WHERE id = ?
-        `, [finalCoord[0], finalCoord[1], missionId]);
+        `, [currentCoord[0], currentCoord[1], missionId]);
 
         runCommand(`
           UPDATE operational_orders SET
@@ -236,49 +289,97 @@ class TelemetryEngine {
             status = 'in_flight',
             updated_at = datetime('now')
           WHERE id = ?
-        `, [finalCoord[0], finalCoord[1], state.droneId]);
+        `, [currentCoord[0], currentCoord[1], state.droneId]);
 
-        // Broadcast to Admin
+        const currentDrone = queryOne<any>('SELECT battery FROM drones WHERE id = ?', [state.droneId]);
+        const battery = currentDrone?.battery ?? 70;
+
+        // 2. Broadcast Final Touchdown Telemetry to Admin WS
+        this.broadcastToAdmin('TELEMETRY_UPDATE', {
+          missionId,
+          orderId: state.orderId,
+          droneId: state.droneId,
+          currentLocation: {
+            latitude: currentCoord[0],
+            longitude: currentCoord[1],
+            altitudeMeters: 0,
+            speedKmh: 0,
+            bearing,
+          },
+          battery,
+          latitude: currentCoord[0],
+          longitude: currentCoord[1],
+          altitude: 0,
+          speed: 0,
+          heading: bearing,
+          remainingDistanceKm: 0,
+          remainingKm: 0,
+          estimatedArrivalMins: 0,
+          progressPercent: 100,
+          status: 'TOUCHDOWN',
+          isCompleted: false,
+        });
+
         this.broadcastToAdmin('MISSION_TOUCHDOWN', {
           missionId,
           orderId: state.orderId,
           droneId: state.droneId,
-          coords: finalCoord,
+          coords: currentCoord,
           status: 'TOUCHDOWN',
         });
 
-        // Notify Customer Backend of touchdown
+        // 3. Notify Customer Backend: Touchdown + 100% Progress Milestone
         customerIntegrationClient.notifyDeliveryTouchdown({
           customerOrderId: state.customerOrderId,
           missionId,
           droneId: state.droneId,
-          arrivedAt: new Date().toISOString(),
+          arrivedAt: nowIso,
           requiresOtp: true,
           message: 'Drone has arrived at your designated landing zone. Enter OTP to receive package.',
         });
 
-        // Remove from active outbound tracking (now in DELIVERY_WAIT state awaiting OTP)
-        this.activeMissions.delete(missionId);
+        customerIntegrationClient.notifyTelemetryMilestone({
+          customerOrderId: state.customerOrderId,
+          missionId,
+          droneId: state.droneId,
+          droneName: state.droneName,
+          status: 'Arriving',
+          currentLocation: {
+            latitude: currentCoord[0],
+            longitude: currentCoord[1],
+            altitudeMeters: 0,
+            speedKmh: 0,
+            bearing,
+          },
+          remainingDistanceKm: 0,
+          estimatedArrivalMins: 0,
+          progressPercent: 100,
+          timestamp: nowIso,
+          handoverOtp: state.handoverOtp,
+        });
+
+        console.log(`🎯 [TelemetryEngine] Mission ${missionId} TOUCHDOWN at destination [${currentCoord[0]}, ${currentCoord[1]}]. Holding position for OTP.`);
         continue;
       }
 
-      // In-flight waypoint calculation
-      const currentCoord = state.route[state.currentIndex];
+      // Normal In-flight progression
       const prevCoord = state.route[state.currentIndex - 1] || currentCoord;
-      const destCoord = state.route[state.totalPoints - 1];
-
       const bearing = this.calculateBearing(prevCoord[0], prevCoord[1], currentCoord[0], currentCoord[1]);
-      const remainingKm = this.calculateDistanceKm(currentCoord[0], currentCoord[1], destCoord[0], destCoord[1]);
-      const progress = (state.currentIndex / state.totalPoints) * 100;
-      const speed = state.currentIndex < 3 || state.currentIndex > state.totalPoints - 3 ? 30 : 55;
-      const altitude = state.currentIndex < 3 ? 20 : state.currentIndex > state.totalPoints - 3 ? 12 : 75;
+      const progress = (state.currentIndex / (state.totalPoints - 1)) * 100;
+      
+      // Speed profile: smooth acceleration from 25 km/h to 55 km/h cruise, deceleration to 20 km/h on approach
+      const speed = state.currentIndex <= 2 ? 28 : state.currentIndex >= state.totalPoints - 3 ? 24 : 56;
+      // Altitude profile: takeoff climb (20m) -> cruise (75m) -> descent (15m)
+      const altitude = state.currentIndex <= 2 ? 22 : state.currentIndex >= state.totalPoints - 3 ? 14 : 75;
       const etaMins = Math.max(1, Math.round(remainingKm * 1.5));
       const etaSeconds = etaMins * 60;
 
       let customerStatus: CustomerOrderStatus = 'Out for Delivery';
-      if (progress >= 80 && progress < 95) {
+      if (progress < 12) {
+        customerStatus = 'Drone Launched';
+      } else if (progress >= 80 && progress < 94) {
         customerStatus = 'Near Destination';
-      } else if (progress >= 95) {
+      } else if (progress >= 94) {
         customerStatus = 'Arriving';
       }
 
@@ -294,7 +395,7 @@ class TelemetryEngine {
           eta_seconds = ?,
           current_status = ?
         WHERE id = ?
-      `, [currentCoord[0], currentCoord[1], altitude, speed, bearing, remainingKm, etaSeconds, progress >= 95 ? 'approaching' : 'in_flight', missionId]);
+      `, [currentCoord[0], currentCoord[1], altitude, speed, bearing, remainingKm, etaSeconds, progress >= 94 ? 'approaching' : 'in_flight', missionId]);
 
       runCommand(`
         UPDATE drones SET
@@ -304,11 +405,15 @@ class TelemetryEngine {
           heading = ?,
           speed = ?,
           battery = MAX(15, battery - 1),
+          status = 'in_flight',
           updated_at = datetime('now')
         WHERE id = ?
       `, [currentCoord[0], currentCoord[1], altitude, bearing, speed, state.droneId]);
 
-      // Broadcast 1Hz telemetry to Admin WebSocket
+      const currentDrone = queryOne<any>('SELECT battery FROM drones WHERE id = ?', [state.droneId]);
+      const battery = currentDrone?.battery ?? 85;
+
+      // 1. Broadcast 1Hz telemetry to Admin WebSocket
       this.broadcastToAdmin('TELEMETRY_UPDATE', {
         missionId,
         orderId: state.orderId,
@@ -320,7 +425,7 @@ class TelemetryEngine {
           speedKmh: speed,
           bearing,
         },
-        battery: queryOne<any>('SELECT battery FROM drones WHERE id = ?', [state.droneId])?.battery ?? 85,
+        battery,
         latitude: currentCoord[0],
         longitude: currentCoord[1],
         altitude,
@@ -331,40 +436,43 @@ class TelemetryEngine {
         estimatedArrivalMins: etaMins,
         progressPercent: parseFloat(progress.toFixed(1)),
         status: customerStatus,
+        isCompleted: false,
       });
 
-      // Push milestone telemetry to Customer Backend every 2.5s
-      if (now - state.lastMilestoneTime >= 2500 || state.lastMilestoneTime === 0) {
-        state.lastMilestoneTime = now;
-        customerIntegrationClient.notifyTelemetryMilestone({
-          customerOrderId: state.customerOrderId,
-          missionId,
-          droneId: state.droneId,
-          droneName: state.droneName,
-          status: customerStatus,
-          currentLocation: {
-            latitude: currentCoord[0],
-            longitude: currentCoord[1],
-            altitudeMeters: altitude,
-            speedKmh: speed,
-            bearing,
-          },
-          remainingDistanceKm: remainingKm,
-          estimatedArrivalMins: etaMins,
-          progressPercent: parseFloat(progress.toFixed(1)),
-          timestamp: new Date().toISOString(),
-          handoverOtp: state.handoverOtp,
-        });
-      }
+      // 2. Synchronized 1Hz Telemetry to Customer Backend
+      customerIntegrationClient.notifyTelemetryMilestone({
+        customerOrderId: state.customerOrderId,
+        missionId,
+        droneId: state.droneId,
+        droneName: state.droneName,
+        status: customerStatus,
+        currentLocation: {
+          latitude: currentCoord[0],
+          longitude: currentCoord[1],
+          altitudeMeters: altitude,
+          speedKmh: speed,
+          bearing,
+        },
+        remainingDistanceKm: remainingKm,
+        estimatedArrivalMins: etaMins,
+        progressPercent: parseFloat(progress.toFixed(1)),
+        timestamp: nowIso,
+        handoverOtp: state.handoverOtp,
+      });
     }
 
     // ── 2. Return-To-Hub Flight Loop ──
     for (const [droneId, ret] of this.activeReturnFlights.entries()) {
       ret.currentIndex++;
+      const isLastReturnStep = ret.currentIndex >= ret.totalPoints - 1;
+      const hubCoord = ret.hubCoords;
 
-      if (ret.currentIndex >= ret.totalPoints - 1) {
+      let currentCoord = ret.returnRoute[Math.min(ret.currentIndex, ret.totalPoints - 1)];
+      let remainingKm = this.calculateDistanceKm(currentCoord[0], currentCoord[1], hubCoord[0], hubCoord[1]);
+
+      if (isLastReturnStep || remainingKm <= 0.025) {
         ret.currentIndex = ret.totalPoints - 1;
-        const hubCoord = ret.hubCoords;
+        currentCoord = hubCoord; // Exact clamp to hub pad
 
         // Reached SkyHub Kurumbapalayam!
         runCommand(`
@@ -388,7 +496,31 @@ class TelemetryEngine {
           longitude: hubCoord[1],
           altitude: 0,
           speed: 0,
-          message: `Drone ${droneId} arrived at ${ret.hubName}. Commencing charging cycle.`,
+          message: `Drone ${droneId} docked at ${ret.hubName}. Commencing rapid recharge cycle.`,
+        });
+
+        this.broadcastToAdmin('TELEMETRY_UPDATE', {
+          missionId: ret.missionId,
+          orderId: ret.orderId,
+          droneId: ret.droneId,
+          currentLocation: {
+            latitude: hubCoord[0],
+            longitude: hubCoord[1],
+            altitudeMeters: 0,
+            speedKmh: 0,
+            bearing: 0,
+          },
+          battery: queryOne<any>('SELECT battery FROM drones WHERE id = ?', [droneId])?.battery ?? 60,
+          latitude: hubCoord[0],
+          longitude: hubCoord[1],
+          altitude: 0,
+          speed: 0,
+          heading: 0,
+          remainingDistanceKm: 0,
+          remainingKm: 0,
+          progressPercent: 100,
+          status: 'CHARGING',
+          isReturning: false,
         });
 
         // Start simulated charging cycle
@@ -403,15 +535,13 @@ class TelemetryEngine {
       }
 
       // Return flight waypoint calculation
-      const currentCoord = ret.returnRoute[ret.currentIndex];
       const prevCoord = ret.returnRoute[ret.currentIndex - 1] || currentCoord;
       const bearing = this.calculateBearing(prevCoord[0], prevCoord[1], currentCoord[0], currentCoord[1]);
-      const remainingKm = this.calculateDistanceKm(currentCoord[0], currentCoord[1], ret.hubCoords[0], ret.hubCoords[1]);
-      const progress = (ret.currentIndex / ret.totalPoints) * 100;
-      const speed = ret.currentIndex < 3 || ret.currentIndex > ret.totalPoints - 3 ? 35 : 52;
-      const altitude = ret.currentIndex < 3 ? 30 : ret.currentIndex > ret.totalPoints - 3 ? 15 : 65;
+      const progress = (ret.currentIndex / (ret.totalPoints - 1)) * 100;
+      const speed = ret.currentIndex <= 2 ? 30 : ret.currentIndex >= ret.totalPoints - 3 ? 25 : 55;
+      const altitude = ret.currentIndex <= 2 ? 30 : ret.currentIndex >= ret.totalPoints - 3 ? 15 : 65;
 
-      // Update Database - battery continues decreasing on return flight
+      // Update Database
       runCommand(`
         UPDATE drones SET
           latitude = ?,
@@ -439,7 +569,7 @@ class TelemetryEngine {
           speedKmh: speed,
           bearing,
         },
-        battery: currentDrone?.battery ?? 70,
+        battery: currentDrone?.battery ?? 65,
         latitude: currentCoord[0],
         longitude: currentCoord[1],
         altitude,
@@ -497,6 +627,11 @@ class TelemetryEngine {
 
     if (!order) return;
 
+    // Remove from active outbound missions if still present
+    if (order.mission_id && this.activeMissions.has(order.mission_id)) {
+      this.activeMissions.delete(order.mission_id);
+    }
+
     runCommand(`
       UPDATE operational_orders SET
         status = 'delivered',
@@ -517,21 +652,23 @@ class TelemetryEngine {
       const drone = queryOne<any>('SELECT * FROM drones WHERE id = ?', [order.drone_id]);
       const hubLat = order.pickup_lat || 11.1132;
       const hubLng = order.pickup_lng || 77.0277;
-      const startLat = order.destination_lat || 11.1132;
-      const startLng = order.destination_lng || 77.0277;
+      const startLat = order.destination_lat || 11.0725;
+      const startLng = order.destination_lng || 77.0345;
 
       // Generate return flight route from destination back to SkyHub Kurumbapalayam
-      const returnRoute = this.generateFlightRoute(startLat, startLng, hubLat, hubLng, 18);
+      const returnRoute = this.generateFlightRoute(startLat, startLng, hubLat, hubLng, 20);
 
       runCommand(`
         UPDATE drones SET
           status = 'returning',
-          altitude = 60,
-          speed = 45,
+          latitude = ?,
+          longitude = ?,
+          altitude = 25,
+          speed = 30,
           current_mission_id = ?,
           updated_at = datetime('now')
         WHERE id = ?
-      `, [order.mission_id, order.drone_id]);
+      `, [startLat, startLng, order.mission_id, order.drone_id]);
 
       // Register active return flight in engine
       this.activeReturnFlights.set(order.drone_id, {
@@ -550,7 +687,11 @@ class TelemetryEngine {
       this.broadcastToAdmin('DRONE_STATUS_CHANGED', {
         droneId: order.drone_id,
         status: 'returning',
-        message: `Delivery completed via OTP. Drone ${order.drone_id} ascending and returning to SkyHub Kurumbapalayam.`,
+        latitude: startLat,
+        longitude: startLng,
+        altitude: 25,
+        speed: 30,
+        message: `Delivery confirmed via OTP. Drone ${order.drone_id} ascending and initiating return flight to SkyHub Kurumbapalayam.`,
       });
     }
 
@@ -566,7 +707,7 @@ class TelemetryEngine {
       missionId: order.mission_id,
     });
 
-    console.log(`✅ [TelemetryEngine] Order ${order.id} COMPLETED via OTP. Drone ${order.drone_id} returning to base.`);
+    console.log(`✅ [TelemetryEngine] Order ${order.id} COMPLETED via OTP. Drone ${order.drone_id} returning to SkyHub Kurumbapalayam.`);
   }
 }
 

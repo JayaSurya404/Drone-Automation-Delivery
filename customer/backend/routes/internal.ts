@@ -205,6 +205,23 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
       });
     } else if (eventType === 'DELIVERY_TOUCHDOWN') {
       const payload = data as DeliveryTouchdownPayload;
+      const delivery = queryOne<any>('SELECT destination_latitude, destination_longitude FROM deliveries WHERE order_id = ?', [orderId]);
+      const destLat = delivery?.destination_latitude || 11.0725;
+      const destLng = delivery?.destination_longitude || 77.0345;
+
+      runCommand(`
+        UPDATE deliveries SET
+          current_latitude = ?,
+          current_longitude = ?,
+          current_altitude = 0,
+          current_speed = 0,
+          remaining_distance_km = 0,
+          estimated_arrival_mins = 0,
+          status = 'ARRIVED',
+          updated_at = datetime('now')
+        WHERE order_id = ?
+      `, [destLat, destLng, orderId]);
+
       runCommand(`
         UPDATE orders SET
           status = 'Arriving',

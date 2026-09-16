@@ -22,7 +22,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    const cleanToken = typeof token === 'string' ? token.replace(/^"+|"+$/g, '') : token;
+    headers['Authorization'] = `Bearer ${cleanToken}`;
   }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -79,6 +80,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+    },
+
+    getProfile: async (): Promise<CustomerUser> => {
+      return request<CustomerUser>('/auth/me');
     },
 
     register: async (payload: RegisterPayload): Promise<{ user: CustomerUser | null; token?: string; requiresVerification: boolean; email?: string; message: string }> => {

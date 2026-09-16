@@ -277,7 +277,17 @@ class MockDataStore {
                 heading: t.currentLocation.bearing,
               };
               drone.battery = t.battery;
-              drone.status = t.status === 'Delivered' ? 'available' : 'in_flight';
+              if (t.status === 'CHARGING') {
+                drone.status = 'charging';
+              } else if (t.status === 'RETURNING' || t.isReturning) {
+                drone.status = 'returning';
+              } else if (t.status === 'TOUCHDOWN') {
+                drone.status = 'touchdown' as any;
+              } else if (t.status === 'Delivered') {
+                drone.status = 'available';
+              } else {
+                drone.status = 'in_flight';
+              }
               drone.remainingDistanceKm = t.remainingDistanceKm;
             }
 
@@ -289,7 +299,13 @@ class MockDataStore {
               mission.currentBattery = t.battery;
               mission.remainingDistanceKm = t.remainingDistanceKm;
               mission.etaSeconds = Math.round(t.estimatedArrivalMins * 60);
-              mission.currentStatus = t.status === 'Delivered' ? 'delivered' : 'in_flight';
+              if (t.status === 'TOUCHDOWN') {
+                mission.currentStatus = 'touchdown' as any;
+              } else if (t.status === 'RETURNING' || t.isReturning) {
+                mission.currentStatus = 'returning';
+              } else {
+                mission.currentStatus = 'in_flight';
+              }
               if (!mission.actualRoute) mission.actualRoute = [];
               mission.actualRoute.push({
                 lat: t.currentLocation.latitude,
@@ -299,17 +315,76 @@ class MockDataStore {
             }
 
             // Update matching order status
-            const order = this.orders.find((o) => o.id === t.operationalOrderId || o.customerId === t.customerOrderId);
+            const order = this.orders.find((o) => o.id === t.orderId || o.id === t.operationalOrderId || o.customerId === t.customerOrderId);
             if (order) {
               if (t.status === 'Delivered') {
                 order.status = 'delivered';
-              } else if (t.status === 'Arriving') {
+              } else if (t.status === 'TOUCHDOWN' || t.status === 'Arriving') {
                 order.status = 'arriving';
               } else {
                 order.status = 'in_flight';
               }
             }
 
+            this.notify();
+          } else if (payload.type === 'MISSION_TOUCHDOWN') {
+            const data = payload.data;
+            const drone = this.drones.find((d) => d.id === data.droneId);
+            if (drone) {
+              drone.location.lat = data.coords[0];
+              drone.location.lng = data.coords[1];
+              drone.location.altitude = 0;
+              drone.location.speed = 0;
+              drone.status = 'touchdown' as any;
+            }
+            const mission = this.missions.find((m) => m.id === data.missionId);
+            if (mission) {
+              mission.currentStatus = 'touchdown' as any;
+              mission.currentAltitudeM = 0;
+              mission.currentSpeedKmH = 0;
+              mission.remainingDistanceKm = 0;
+            }
+            const order = this.orders.find((o) => o.id === data.orderId);
+            if (order) {
+              order.status = 'arriving';
+            }
+            this.addNotification(`Mission ${data.missionId} touchdown at customer landing zone. Awaiting OTP verification.`, 'info');
+            this.notify();
+          } else if (payload.type === 'DRONE_STATUS_CHANGED') {
+            const data = payload.data;
+            const drone = this.drones.find((d) => d.id === data.droneId);
+            if (drone) {
+              drone.status = data.status;
+              if (data.latitude !== undefined && data.longitude !== undefined) {
+                drone.location.lat = data.latitude;
+                drone.location.lng = data.longitude;
+              }
+              if (data.altitude !== undefined) drone.location.altitude = data.altitude;
+              if (data.speed !== undefined) drone.location.speed = data.speed;
+            }
+            if (data.message) {
+              this.addNotification(data.message, data.status === 'available' ? 'success' : 'info');
+            }
+            this.notify();
+          } else if (payload.type === 'DRONE_BATTERY_UPDATE') {
+            const data = payload.data;
+            const drone = this.drones.find((d) => d.id === data.droneId);
+            if (drone) {
+              drone.battery = data.battery;
+              if (data.status) drone.status = data.status;
+            }
+            this.notify();
+          } else if (payload.type === 'ORDER_DELIVERED') {
+            const data = payload.data;
+            const order = this.orders.find((o) => o.id === data.orderId);
+            if (order) {
+              order.status = 'delivered';
+            }
+            const drone = this.drones.find((d) => d.id === data.droneId);
+            if (drone) {
+              drone.status = 'returning';
+            }
+            this.addNotification(`Order ${data.orderId} verified and delivered. Drone return flight active.`, 'success');
             this.notify();
           } else if (payload.type === 'ORDER_CREATED') {
             this.fetchOperationalData();

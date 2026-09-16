@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { DroneModel3D, DroneAnimationState } from './DroneModel3D';
 import { Environment3D, EnvironmentSettings } from './Environment3D';
 import { StoryScene, MultiDroneSimState, MULTI_DRONE_FLEET } from './simulationStories';
+import { Drone, Mission } from '../../types/skynav';
 
 interface SimulationCanvas3DProps {
   activeScene: StoryScene;
@@ -14,6 +15,8 @@ interface SimulationCanvas3DProps {
   onDroneClick?: (droneId: string) => void;
   playbackProgress: number; // 0.0 to 1.0 within current scene
   isPlaying: boolean;
+  liveDrone?: Drone | null;
+  liveMission?: Mission | null;
 }
 
 export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
@@ -26,6 +29,8 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
   onDroneClick,
   playbackProgress,
   isPlaying,
+  liveDrone,
+  liveMission,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
@@ -37,14 +42,22 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
   const multiDronesRef = useRef<DroneModel3D[]>([]);
   const environmentRef = useRef<Environment3D | null>(null);
 
-  // Mouse orbit interaction state for operations view
+  // Mouse orbit & pan interaction state for operations view
   const isDraggingRef = useRef<boolean>(false);
+  const isPanningRef = useRef<boolean>(false);
   const prevMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const orbitAnglesRef = useRef<{ theta: number; phi: number; radius: number }>({
     theta: Math.PI / 4,
     phi: Math.PI / 3,
-    radius: 45,
+    radius: 50,
   });
+  // Fixed operational center for user-controlled orbit (does NOT track the drone)
+  const orbitCenterRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 4, 0));
+  const cameraModeRef = useRef<string>(cameraMode);
+
+  useEffect(() => {
+    cameraModeRef.current = cameraMode;
+  }, [cameraMode]);
 
   const historyPointsRef = useRef<THREE.Vector3[]>([]);
 
@@ -98,9 +111,10 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
     });
     multiDronesRef.current = multiDrones;
 
-    // Mouse Orbit Listeners for 3D Operations View
+    // Mouse Orbit & Pan Listeners for 3D Operations View
     const handleMouseDown = (e: MouseEvent) => {
       isDraggingRef.current = true;
+      isPanningRef.current = e.button === 2 || e.shiftKey;
       prevMousePosRef.current = { x: e.clientX, y: e.clientY };
     };
 
@@ -110,17 +124,35 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
       const deltaY = e.clientY - prevMousePosRef.current.y;
       prevMousePosRef.current = { x: e.clientX, y: e.clientY };
 
-      orbitAnglesRef.current.theta -= deltaX * 0.008;
-      orbitAnglesRef.current.phi = Math.max(0.1, Math.min(Math.PI / 2.1, orbitAnglesRef.current.phi - deltaY * 0.008));
+      if (isPanningRef.current) {
+        // Pan the orbit center across the Kurumbapalayam world
+        const panFactor = 0.08 * (orbitAnglesRef.current.radius / 45);
+        const theta = orbitAnglesRef.current.theta;
+        const forwardX = Math.sin(theta);
+        const forwardZ = Math.cos(theta);
+        const rightX = Math.cos(theta);
+        const rightZ = -Math.sin(theta);
+
+        orbitCenterRef.current.x -= (rightX * deltaX - forwardX * deltaY) * panFactor;
+        orbitCenterRef.current.z -= (rightZ * deltaX - forwardZ * deltaY) * panFactor;
+      } else {
+        orbitAnglesRef.current.theta -= deltaX * 0.008;
+        orbitAnglesRef.current.phi = Math.max(0.1, Math.min(Math.PI / 2.1, orbitAnglesRef.current.phi - deltaY * 0.008));
+      }
     };
 
     const handleMouseUp = () => {
       isDraggingRef.current = false;
+      isPanningRef.current = false;
     };
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      orbitAnglesRef.current.radius = Math.max(10, Math.min(100, orbitAnglesRef.current.radius + e.deltaY * 0.05));
+      orbitAnglesRef.current.radius = Math.max(10, Math.min(140, orbitAnglesRef.current.radius + e.deltaY * 0.05));
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
     };
 
     const domEl = renderer.domElement;
@@ -128,6 +160,7 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     domEl.addEventListener('wheel', handleWheel, { passive: false });
+    domEl.addEventListener('contextmenu', handleContextMenu);
 
     // Handle Resize
     const handleResize = () => {
@@ -154,6 +187,18 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
       // Update Environment
       if (environmentRef.current) {
         environmentRef.current.updateEnvironment(delta, environmentSettings, isRerouted);
+      }
+
+      // In External / Operations mode: keep camera anchored around user-controlled orbitCenter
+      // NEVER chase or track the drone! The drone moves freely across the world!
+      if (cameraModeRef.current === 'operations' && cameraRef.current) {
+        const { theta, phi, radius } = orbitAnglesRef.current;
+        const center = orbitCenterRef.current;
+        const cx = center.x + radius * Math.sin(phi) * Math.sin(theta);
+        const cy = Math.max(2, center.y + radius * Math.cos(phi));
+        const cz = center.z + radius * Math.sin(phi) * Math.cos(theta);
+        cameraRef.current.position.set(cx, cy, cz);
+        cameraRef.current.lookAt(center);
       }
 
       // Update Auxiliary Multi-Drones
@@ -192,6 +237,7 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       domEl.removeEventListener('wheel', handleWheel);
+      domEl.removeEventListener('contextmenu', handleContextMenu);
 
       if (mountRef.current) {
         mountRef.current.innerHTML = '';
@@ -209,47 +255,129 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
     );
   }, [environmentSettings.timeOfDay]);
 
-  // Update Drone & Camera on Scene and Progress Updates
+  // Update Drone & Camera on Scene, Live Telemetry and Progress Updates
   useEffect(() => {
     const drone = droneModelRef.current;
     const camera = cameraRef.current;
     const env = environmentRef.current;
     if (!drone || !camera || !env) return;
 
-    // 1. Calculate Target Position based on Scene and Reroute
-    const basePos = activeScene.dronePos.clone();
-    const baseRot = activeScene.droneRot.clone();
-
-    // Adjust for Reroute West deviation
-    if (isRerouted && (activeScene.id === 8 || activeScene.id === 9 || activeScene.id === 10)) {
-      basePos.x = -7.5;
-    }
-
-    // Determine Propeller RPM based on flight state
+    let basePos = activeScene.dronePos.clone();
+    let baseRot = activeScene.droneRot.clone();
     let targetRpm = 0;
-    if (activeScene.flightPhase === 'preflight') targetRpm = 1200;
-    else if (activeScene.flightPhase === 'takeoff' || activeScene.flightPhase === 'climb') targetRpm = 6800;
-    else if (activeScene.flightPhase === 'cruise' || activeScene.flightPhase === 'return') targetRpm = 7600;
-    else if (activeScene.flightPhase === 'hover') targetRpm = 6000;
-    else if (activeScene.flightPhase === 'descent') targetRpm = 4500;
-    else if (activeScene.flightPhase === 'delivered') targetRpm = 5200;
-    else if (activeScene.flightPhase === 'completed') targetRpm = 0;
+    let headingDeg = activeScene.heading;
+    let flightPhase: DroneAnimationState['flightPhase'] = activeScene.flightPhase;
+    let droneHighlightStatus: DroneAnimationState['status'] = activeScene.status;
+    let payloadAttached = activeScene.payloadAttached;
+
+    if (liveDrone) {
+      const hubLat = 11.1132;
+      const hubLng = 77.0277;
+      headingDeg = liveDrone.location.heading || 0;
+      baseRot = new THREE.Euler(0, -(headingDeg * Math.PI) / 180, 0);
+
+      const isAtHub = Math.abs(liveDrone.location.lat - hubLat) < 0.0008 &&
+                      Math.abs(liveDrone.location.lng - hubLng) < 0.0008 &&
+                      (liveDrone.location.altitude === 0 || !liveDrone.location.altitude);
+
+      const totalDistM = (liveMission?.distanceKm ? liveMission.distanceKm * 1000 : 4500);
+      const scale = 73 / Math.max(1000, totalDistM);
+
+      const latMeters = -(liveDrone.location.lat - hubLat) * 110540;
+      const lngMeters = (liveDrone.location.lng - hubLng) * (111320 * Math.cos((hubLat * Math.PI) / 180));
+
+      const calcX = lngMeters * scale;
+      const calcZ = -35 + latMeters * scale;
+      const altM = liveDrone.location.altitude || 0;
+      const groundY = env.getGroundElevationAt(calcX, calcZ);
+      const calcY = groundY + (altM > 0 ? Math.max(0.6, (altM / 75) * 16) : 0.2);
+
+      const isTouchdown = liveDrone.status === 'touchdown' ||
+        (liveDrone.status === 'in_flight' && altM === 0 && (!liveDrone.remainingDistanceKm || liveDrone.remainingDistanceKm <= 0.05));
+
+      if (isTouchdown) {
+        basePos = new THREE.Vector3(env.customerPadPosition.x, env.customerPadPosition.y + 0.15, env.customerPadPosition.z);
+        flightPhase = 'delivered';
+        droneHighlightStatus = 'delivery';
+        targetRpm = 0;
+        payloadAttached = true;
+      } else if (liveDrone.status === 'charging' || liveDrone.status === 'available' || isAtHub) {
+        basePos = new THREE.Vector3(0, env.warehousePadPosition.y + 0.15, -35);
+        flightPhase = liveDrone.status === 'charging' ? 'completed' : 'idle';
+        droneHighlightStatus = liveDrone.status === 'charging' ? 'warning' : 'normal';
+        targetRpm = 0;
+        payloadAttached = false;
+      } else if (liveDrone.status === 'returning') {
+        basePos = new THREE.Vector3(calcX, calcY, calcZ);
+        flightPhase = 'return';
+        droneHighlightStatus = 'return';
+        targetRpm = altM > 20 ? 7600 : 4800;
+        payloadAttached = false;
+      } else {
+        // in_flight
+        basePos = new THREE.Vector3(calcX, calcY, calcZ);
+        flightPhase = altM < 15 ? 'takeoff' : 'cruise';
+        droneHighlightStatus = 'normal';
+        targetRpm = altM > 20 ? 7600 : 4800;
+        payloadAttached = true;
+      }
+    } else {
+      // Adjust for Reroute West deviation
+      if (isRerouted && (activeScene.id === 8 || activeScene.id === 9 || activeScene.id === 10)) {
+        basePos.x = -7.5;
+      }
+      if (activeScene.flightPhase === 'preflight') targetRpm = 1200;
+      else if (activeScene.flightPhase === 'takeoff' || activeScene.flightPhase === 'climb') targetRpm = 6800;
+      else if (activeScene.flightPhase === 'cruise' || activeScene.flightPhase === 'return') targetRpm = 7600;
+      else if (activeScene.flightPhase === 'hover') targetRpm = 6000;
+      else if (activeScene.flightPhase === 'descent') targetRpm = 4500;
+      else if (activeScene.flightPhase === 'delivered') targetRpm = 5200;
+      else if (activeScene.flightPhase === 'completed') targetRpm = 0;
+    }
 
     const droneState: DroneAnimationState = {
       position: basePos,
       rotation: baseRot,
       rotorSpeed: targetRpm,
-      flightPhase: activeScene.flightPhase,
-      status: activeScene.status,
-      payloadAttached: activeScene.payloadAttached,
+      flightPhase,
+      status: droneHighlightStatus,
+      payloadAttached,
       obstacleScanning: activeScene.obstacleScanning || isObstacleInjected,
     };
 
     drone.update(0.016, droneState);
-    drone.setHighlightStatus(activeScene.status);
+    drone.setHighlightStatus(droneHighlightStatus);
+
+    if (typeof window !== 'undefined') {
+      (window as any).__skynav3DDrone = {
+        droneId: liveDrone?.id || 'D-001',
+        lat: liveDrone?.location.lat || 11.1132,
+        lng: liveDrone?.location.lng || 77.0277,
+        alt: liveDrone?.location.altitude || 0,
+        speed: liveDrone?.location.speed || 0,
+        heading: headingDeg,
+        status: liveDrone?.status || 'available',
+        scenePos: { x: parseFloat(basePos.x.toFixed(3)), y: parseFloat(basePos.y.toFixed(3)), z: parseFloat(basePos.z.toFixed(3)) },
+        flightPhase,
+        cameraMode,
+        realDemActive: env.isRealDemLoaded,
+        terrainMslMeters: env.baseElevationMsl,
+        osmBuildingsCount: env.totalOsmBuildings,
+        osmRoadsCount: env.totalOsmRoads,
+        visualClearance: env.checkBuildingClearance(basePos),
+      };
+      (window as any).__skynav3DCamera = {
+        position: cameraRef.current ? {
+          x: parseFloat(cameraRef.current.position.x.toFixed(2)),
+          y: parseFloat(cameraRef.current.position.y.toFixed(2)),
+          z: parseFloat(cameraRef.current.position.z.toFixed(2)),
+        } : null,
+        mode: cameraMode,
+      };
+    }
 
     // Record Traversed Path Point
-    if (activeScene.flightPhase !== 'idle') {
+    if (flightPhase !== 'idle' && flightPhase !== 'completed') {
       historyPointsRef.current.push(basePos.clone());
       if (historyPointsRef.current.length > 200) {
         historyPointsRef.current.shift();
@@ -258,54 +386,52 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
     }
 
     // 2. Camera Positioning Modes
-    const targetCameraPos = new THREE.Vector3();
-    const targetLookAt = new THREE.Vector3();
-
     if (cameraMode === 'fpv') {
-      // Drone Cockpit FPV (Gimbal nose camera)
-      targetCameraPos.set(basePos.x, basePos.y + 0.1, basePos.z + 0.6);
-      if (activeScene.heading === 180) {
-        targetLookAt.set(basePos.x, basePos.y - 0.2, basePos.z - 15);
-      } else {
-        targetLookAt.set(basePos.x, basePos.y - 0.2, basePos.z + 15);
-      }
+      // Drone POV: First-person cockpit/nose camera attached to drone because user explicitly selected POV
+      const rad = -(headingDeg * Math.PI) / 180;
+      const forwardX = Math.sin(rad);
+      const forwardZ = -Math.cos(rad);
+      const targetCameraPos = new THREE.Vector3(basePos.x + forwardX * 0.45, basePos.y + 0.25, basePos.z + forwardZ * 0.45);
+      const targetLookAt = new THREE.Vector3(basePos.x + forwardX * 25, basePos.y - 0.1, basePos.z + forwardZ * 25);
+      camera.position.lerp(targetCameraPos, 0.4);
+      camera.lookAt(targetLookAt);
     } else if (cameraMode === 'follow') {
-      // Smooth 3rd-person chase camera trailing drone
-      if (activeScene.heading === 180) {
-        targetCameraPos.set(basePos.x, basePos.y + 4.5, basePos.z + 10);
-        targetLookAt.set(basePos.x, basePos.y + 1, basePos.z - 8);
-      } else {
-        targetCameraPos.set(basePos.x, basePos.y + 4.5, basePos.z - 10);
-        targetLookAt.set(basePos.x, basePos.y + 1, basePos.z + 8);
-      }
+      // Smooth 3rd-person chase camera (only when explicitly selected by user)
+      const rad = -(headingDeg * Math.PI) / 180;
+      const forwardX = Math.sin(rad);
+      const forwardZ = -Math.cos(rad);
+      const targetCameraPos = new THREE.Vector3(basePos.x - forwardX * 8, basePos.y + 4.5, basePos.z - forwardZ * 8);
+      const targetLookAt = new THREE.Vector3(basePos.x + forwardX * 5, basePos.y + 1, basePos.z + forwardZ * 5);
+      camera.position.lerp(targetCameraPos, 0.2);
+      camera.lookAt(targetLookAt);
     } else if (cameraMode === 'top') {
-      // Nadir Top-Down View
-      targetCameraPos.set(basePos.x, 70, basePos.z + 0.1);
-      targetLookAt.set(basePos.x, 0, basePos.z);
+      // Fixed Nadir Top-Down View of Kurumbapalayam corridor
+      const targetCameraPos = new THREE.Vector3(0, 85, 0.1);
+      const targetLookAt = new THREE.Vector3(0, 0, 0);
+      camera.position.lerp(targetCameraPos, 0.2);
+      camera.lookAt(targetLookAt);
     } else if (cameraMode === 'customer') {
-      // Customer Destination View
-      targetCameraPos.set(12, 10, 48);
-      targetLookAt.set(env.customerPadPosition.x, 1, env.customerPadPosition.z);
+      // Fixed Customer Destination View
+      const targetCameraPos = new THREE.Vector3(env.customerPadPosition.x + 12, 10, env.customerPadPosition.z + 10);
+      const targetLookAt = new THREE.Vector3(env.customerPadPosition.x, 1, env.customerPadPosition.z);
+      camera.position.lerp(targetCameraPos, 0.2);
+      camera.lookAt(targetLookAt);
     } else if (cameraMode === 'obstacle') {
       // Close up on obstacle conflict zone
-      targetCameraPos.set(15, 20, 10);
-      targetLookAt.set(env.obstaclePosition.x, 14, env.obstaclePosition.z);
+      const targetCameraPos = new THREE.Vector3(15, 20, 10);
+      const targetLookAt = new THREE.Vector3(env.obstaclePosition.x, 14, env.obstaclePosition.z);
+      camera.position.lerp(targetCameraPos, 0.2);
+      camera.lookAt(targetLookAt);
     } else if (cameraMode === 'hub') {
-      // Logistics Hub View
-      targetCameraPos.set(14, 8, -48);
-      targetLookAt.set(env.warehousePadPosition.x, 1, env.warehousePadPosition.z);
-    } else {
-      // Default: 3D Operations Orbital View
-      const { theta, phi, radius } = orbitAnglesRef.current;
-      targetCameraPos.x = basePos.x + radius * Math.sin(phi) * Math.sin(theta);
-      targetCameraPos.y = Math.max(5, basePos.y + radius * Math.cos(phi));
-      targetCameraPos.z = basePos.z + radius * Math.sin(phi) * Math.cos(theta);
-      targetLookAt.copy(basePos);
+      // Logistics Hub View: SkyHub Kurumbapalayam
+      const targetCameraPos = new THREE.Vector3(16, 8, -48);
+      const targetLookAt = new THREE.Vector3(env.warehousePadPosition.x, 1, env.warehousePadPosition.z);
+      camera.position.lerp(targetCameraPos, 0.2);
+      camera.lookAt(targetLookAt);
     }
-
-    camera.position.lerp(targetCameraPos, 0.2);
-    camera.lookAt(targetLookAt);
-  }, [activeScene, cameraMode, isRerouted, isObstacleInjected, playbackProgress]);
+    // When cameraMode === 'operations', camera position and orientation are driven 100% by the user
+    // in the 60 FPS animation loop around orbitCenterRef.current. Telemetry updates never touch the camera!
+  }, [activeScene, cameraMode, isRerouted, isObstacleInjected, playbackProgress, liveDrone, liveDrone?.location?.lat, liveDrone?.location?.lng, liveDrone?.location?.altitude, liveMission]);
 
   return (
     <div className="relative w-full h-full min-h-[440px] rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl bg-slate-950">
@@ -315,7 +441,7 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
       {/* Interactive 3D Watermark & Instructions Overlay */}
       <div className="absolute top-3 left-3 pointer-events-none flex items-center gap-2">
         <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/80 text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-widest shadow-lg">
-          3D WebGL Digital Twin • 60 FPS
+          3D WebGL Digital Twin • Real DEM (AWS SRTM) • Real OSM Buildings (2,066) • ESRI Satellite
         </span>
         {cameraMode === 'operations' && (
           <span className="hidden sm:inline-block px-2 py-0.5 rounded-lg bg-slate-900/60 backdrop-blur-sm text-[10px] text-slate-400 font-mono">

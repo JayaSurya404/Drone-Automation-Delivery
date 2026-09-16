@@ -13,6 +13,7 @@ import { SimulationScoreModal } from '../../components/simulation/SimulationScor
 import { InteractiveOpsMap } from '../../components/maps/InteractiveOpsMap';
 import { useOperationsModals } from '../../context/OperationsModalContext';
 import { mockStore } from '../../services/mockDataStore';
+import { Drone, Mission } from '../../types/skynav';
 import {
   Play,
   Pause,
@@ -48,18 +49,50 @@ import {
 export const SimulationCenter: React.FC = () => {
   const { openDigitalTwin } = useOperationsModals();
 
+  // Active Authoritative Live Mission Drone State
+  const [activeLiveDrone, setActiveLiveDrone] = useState<Drone | null>(null);
+  const [activeLiveMission, setActiveLiveMission] = useState<Mission | null>(null);
+
+  useEffect(() => {
+    const handleStoreUpdate = () => {
+      const allDrones = mockStore.getDrones();
+      const allMissions = mockStore.getMissions();
+      const active = allDrones.find(
+        (d) => d.status === 'in_flight' || d.status === 'returning' || d.status === 'charging' || (d.status as any) === 'touchdown'
+      ) || allDrones.find((d) => d.id === 'D-001') || allDrones[0] || null;
+      setActiveLiveDrone(active ? { ...active, location: { ...active.location } } : null);
+      if (active) {
+        const mis = allMissions.find((m) => m.droneId === active.id || m.id === active.currentMissionId) || null;
+        setActiveLiveMission(mis ? { ...mis } : null);
+      } else {
+        setActiveLiveMission(null);
+      }
+    };
+
+    handleStoreUpdate();
+    return mockStore.subscribe(handleStoreUpdate);
+  }, []);
+
   // Scenario & Playback State
-  const [scenarioType, setScenarioType] = useState<string>('story'); // 'story' | 'how_it_works' | 'multi_drone' | 'battery' | 'gps' | 'motor'
+  const [scenarioType, setScenarioType] = useState<string>('story');
   const [currentSceneIndex, setCurrentSceneIndex] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [simSpeed, setSimSpeed] = useState<number>(1); // 0.5, 1, 2, 4
-  const [sceneProgress, setSceneProgress] = useState<number>(0); // 0.0 to 1.0 within scene
+  const [sceneProgress, setSceneProgress] = useState<number>(0);
 
   // Camera & View Mode
   const [cameraMode, setCameraMode] = useState<
     'operations' | 'follow' | 'fpv' | 'top' | 'customer' | 'obstacle' | 'hub'
   >('operations');
   const [viewLayout, setViewLayout] = useState<'3d' | 'map' | 'split'>('3d');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__skynavSetCameraMode = (mode: string) => {
+        setCameraMode(mode as any);
+      };
+    }
+  }, []);
 
   // Environment Settings
   const [environmentSettings, setEnvironmentSettings] = useState({
@@ -310,6 +343,8 @@ export const SimulationCenter: React.FC = () => {
                   onDroneClick={(dId) => openDigitalTwin(dId)}
                   playbackProgress={sceneProgress}
                   isPlaying={isPlaying}
+                  liveDrone={activeLiveDrone}
+                  liveMission={activeLiveMission}
                 />
 
                 {/* Drone Cockpit FPV HUD Overlay (when cameraMode is FPV) */}
@@ -329,7 +364,7 @@ export const SimulationCenter: React.FC = () => {
                   missions={missions}
                   orders={orders}
                   geofences={geofences}
-                  selectedDroneId="D-024"
+                  selectedDroneId={activeLiveDrone?.id || 'D-024'}
                   heightClass="h-full"
                 />
               </div>
@@ -348,6 +383,8 @@ export const SimulationCenter: React.FC = () => {
                     onDroneClick={(dId) => openDigitalTwin(dId)}
                     playbackProgress={sceneProgress}
                     isPlaying={isPlaying}
+                    liveDrone={activeLiveDrone}
+                    liveMission={activeLiveMission}
                   />
                 </div>
                 <div className="h-full">
@@ -356,7 +393,7 @@ export const SimulationCenter: React.FC = () => {
                     missions={missions}
                     orders={orders}
                     geofences={geofences}
-                    selectedDroneId="D-024"
+                    selectedDroneId={activeLiveDrone?.id || 'D-024'}
                     heightClass="h-full"
                   />
                 </div>
@@ -366,9 +403,9 @@ export const SimulationCenter: React.FC = () => {
             {/* Bottom-Left Camera Mode Switcher Pill */}
             <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-2xl text-xs">
               {[
-                { id: 'operations', label: '3D Operations', icon: Eye },
-                { id: 'follow', label: 'Drone Follow', icon: Bot },
-                { id: 'fpv', label: 'Drone FPV HUD', icon: Crosshair },
+                { id: 'operations', label: 'External View', icon: Eye },
+                { id: 'follow', label: 'Follow Drone', icon: Bot },
+                { id: 'fpv', label: 'Drone POV', icon: Crosshair },
                 { id: 'top', label: 'Top View', icon: Compass },
               ].map((cam) => {
                 const Icon = cam.icon;
@@ -376,6 +413,7 @@ export const SimulationCenter: React.FC = () => {
                 return (
                   <button
                     key={cam.id}
+                    data-camera-mode={cam.id}
                     onClick={() => setCameraMode(cam.id as any)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
                       isCurrent
@@ -535,40 +573,54 @@ export const SimulationCenter: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
               <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                 <span className="text-slate-400 text-[10px] block">ALTITUDE</span>
-                <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">{currentScene.altitude} m</span>
+                <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                  {activeLiveDrone ? `${activeLiveDrone.location.altitude || 0} m` : `${currentScene.altitude} m`}
+                </span>
               </div>
               <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                 <span className="text-slate-400 text-[10px] block">AIRSPEED</span>
-                <span className="font-black text-sm text-cyan-600 dark:text-cyan-400">{currentScene.speed} km/h</span>
+                <span className="font-black text-sm text-cyan-600 dark:text-cyan-400">
+                  {activeLiveDrone ? `${activeLiveDrone.location.speed || 0} km/h` : `${currentScene.speed} km/h`}
+                </span>
               </div>
               <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                 <span className="text-slate-400 text-[10px] block">BATTERY (SoC)</span>
-                <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">{currentScene.battery}%</span>
+                <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                  {activeLiveDrone ? `${activeLiveDrone.battery}%` : `${currentScene.battery}%`}
+                </span>
               </div>
               <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-400 text-[10px] block">ESC TEMP</span>
-                <span className="font-black text-sm text-amber-600 dark:text-amber-400">{currentScene.temperature}°C</span>
+                <span className="text-slate-400 text-[10px] block">MISSION STATE</span>
+                <span className="font-black text-sm text-amber-600 dark:text-amber-400 uppercase">
+                  {activeLiveDrone ? activeLiveDrone.status : `${currentScene.temperature}°C`}
+                </span>
               </div>
               <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-400 text-[10px] block">DISTANCE</span>
-                <span className="font-black text-sm text-slate-900 dark:text-slate-100">{currentScene.distanceTraveledKm} km</span>
+                <span className="text-slate-400 text-[10px] block">DISTANCE REM</span>
+                <span className="font-black text-sm text-slate-900 dark:text-slate-100">
+                  {activeLiveDrone ? `${activeLiveDrone.remainingDistanceKm ?? 0} km` : `${currentScene.distanceTraveledKm} km`}
+                </span>
               </div>
               <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-400 text-[10px] block">EST. ETA</span>
-                <span className="font-black text-sm text-blue-600 dark:text-blue-400">{currentScene.etaMinutes} min</span>
+                <span className="text-slate-400 text-[10px] block">HEADING</span>
+                <span className="font-black text-sm text-blue-600 dark:text-blue-400">
+                  {activeLiveDrone ? `${activeLiveDrone.location.heading || 0}°` : `${currentScene.etaMinutes} min`}
+                </span>
               </div>
             </div>
 
             {/* Battery Progress Bar */}
             <div className="space-y-1 pt-1">
               <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                <span>Power Drain: 4.8%/km</span>
-                <span className="font-bold text-emerald-500">4.18V/cell</span>
+                <span>Power Source: Autonomous LiPo</span>
+                <span className="font-bold text-emerald-500">
+                  {activeLiveDrone ? `${activeLiveDrone.battery}%` : '4.18V/cell'}
+                </span>
               </div>
               <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${currentScene.battery}%` }}
+                  style={{ width: `${activeLiveDrone ? activeLiveDrone.battery : currentScene.battery}%` }}
                 />
               </div>
             </div>

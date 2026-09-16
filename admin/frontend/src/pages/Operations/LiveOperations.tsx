@@ -24,15 +24,22 @@ export const LiveOperations: React.FC = () => {
   const [orders, setOrders] = useState(mockStore.getOrders());
   const [missions, setMissions] = useState(mockStore.getMissions());
   const [geofences, setGeofences] = useState(mockStore.getGeofences());
-  const [selectedDroneId, setSelectedDroneId] = useState<string | undefined>('D-024');
+  const [selectedDroneId, setSelectedDroneId] = useState<string | undefined>('D-001');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
   useEffect(() => {
     return mockStore.subscribe(() => {
-      setDrones([...mockStore.getDrones()]);
+      const updatedDrones = [...mockStore.getDrones()];
+      setDrones(updatedDrones);
       setOrders([...mockStore.getOrders()]);
       setMissions([...mockStore.getMissions()]);
       setGeofences([...mockStore.getGeofences()]);
+
+      // Automatically focus on active mission drone if airborne
+      const active = updatedDrones.find((d) => d.status === 'in_flight' || d.status === 'returning' || (d.status as any) === 'touchdown');
+      if (active) {
+        setSelectedDroneId(active.id);
+      }
     });
   }, []);
 
