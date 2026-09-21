@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   phone TEXT NOT NULL,
   password_hash TEXT NOT NULL,
+  delivery_pin_hash TEXT,
   avatar TEXT,
   is_verified INTEGER NOT NULL DEFAULT 0,
   account_status TEXT NOT NULL DEFAULT 'active' CHECK (account_status IN ('active', 'pending_verification', 'disabled')),

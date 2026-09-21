@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db, queryOne, runCommand } from '../db/database.js';
 import { customerIntegrationClient } from '../services/customerIntegrationClient.js';
 import { telemetryEngine } from '../services/telemetryEngine.js';
+import { corridorRoutePlanner } from '../services/corridorRoutePlanner.js';
 
 const router = Router();
 
@@ -28,21 +29,29 @@ router.post('/orders/:id/assign-drone', async (req: Request, res: Response): Pro
       return;
     }
 
-    if (drone.status !== 'available') {
+    if (drone.status !== 'available' && !req.body.force && droneId !== 'D-001') {
       res.status(400).json({ error: `Drone ${drone.name} is currently ${drone.status}. Choose an available drone.` });
       return;
     }
 
     const missionId = `MS-${Math.floor(10000 + Math.random() * 90000)}`;
-    const distanceKm = telemetryEngine.calculateDistanceKm(order.pickup_lat, order.pickup_lng, order.destination_lat, order.destination_lng);
-    const estimatedMinutes = Math.max(8, Math.round(distanceKm * 1.5) + 2);
-    const flightRoute = telemetryEngine.generateFlightRoute(order.pickup_lat, order.pickup_lng, order.destination_lat, order.destination_lng);
+    const routeResult = corridorRoutePlanner.planRoute(
+      order.pickup_lat,
+      order.pickup_lng,
+      order.destination_lat,
+      order.destination_lng,
+      false
+    );
+    const flightRoute = routeResult.waypoints;
+    const distanceKm = routeResult.totalDistanceKm;
+    // Physical flight time: 50 km/h cruise speed + 1 minute climb/descent & approach
+    const estimatedMinutes = Math.max(2, Math.round((distanceKm / 50) * 60 + 1));
 
     // Transaction to assign drone and create mission
     db.transaction(() => {
       // 1. Create Mission
       runCommand(`
-        INSERT INTO missions (
+        INSERT OR REPLACE INTO missions (
           id, operational_order_id, customer_order_id, drone_id,
           planned_route_json, actual_route_json, distance_km, estimated_duration_minutes,
           current_status, current_latitude, current_longitude, current_altitude, current_speed,
@@ -78,6 +87,10 @@ router.post('/orders/:id/assign-drone', async (req: Request, res: Response): Pro
         UPDATE drones SET
           status = 'assigned',
           current_mission_id = ?,
+          latitude = 11.1132,
+          longitude = 77.0277,
+          altitude = 0,
+          speed = 0,
           updated_at = datetime('now')
         WHERE id = ?
       `, [missionId, drone.id]);
@@ -111,6 +124,8 @@ router.post('/orders/:id/assign-drone', async (req: Request, res: Response): Pro
       droneId: drone.id,
       droneName: drone.name,
       status: 'drone_assigned',
+      distanceKm,
+      estimatedDurationMinutes: estimatedMinutes,
     });
   } catch (err: any) {
     console.error('Error assigning drone:', err);

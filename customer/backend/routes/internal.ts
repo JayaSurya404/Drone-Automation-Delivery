@@ -206,8 +206,8 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
     } else if (eventType === 'DELIVERY_TOUCHDOWN') {
       const payload = data as DeliveryTouchdownPayload;
       const delivery = queryOne<any>('SELECT destination_latitude, destination_longitude FROM deliveries WHERE order_id = ?', [orderId]);
-      const destLat = delivery?.destination_latitude || 11.0725;
-      const destLng = delivery?.destination_longitude || 77.0345;
+      const destLat = payload.latitude ?? delivery?.destination_latitude ?? 11.0725;
+      const destLng = payload.longitude ?? delivery?.destination_longitude ?? 77.0345;
 
       runCommand(`
         UPDATE deliveries SET

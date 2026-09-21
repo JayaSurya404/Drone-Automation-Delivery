@@ -39,19 +39,21 @@ export const seedDatabase = async () => {
     DELETE FROM faqs;
   `);
 
-  // 1. SEED SINGLE DEVELOPMENT CUSTOMER (customer@skynav / skynav@123)
+  // 1. SEED SINGLE DEVELOPMENT CUSTOMER (Jaya / customer@skynav / skynav@123 / PIN: 4827)
   const passwordHash = await bcrypt.hash('skynav@123', 10);
+  const deliveryPinHash = await bcrypt.hash('4827', 10);
   const userId = 'cust_skynav_dev';
 
   db.prepare(`
-    INSERT INTO users (id, name, email, phone, password_hash, avatar, is_verified, account_status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 1, 'active', datetime('now', '-30 days'), datetime('now'))
+    INSERT INTO users (id, name, email, phone, password_hash, delivery_pin_hash, avatar, is_verified, account_status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'active', datetime('now', '-30 days'), datetime('now'))
   `).run(
     userId,
-    'SkyNav Customer',
+    'Jaya (SkyNav Customer)',
     'customer@skynav',
     '+91 98422 10002',
     passwordHash,
+    deliveryPinHash,
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
   );
 

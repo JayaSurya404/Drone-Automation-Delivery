@@ -77,6 +77,36 @@ export const TrackingPage: React.FC = () => {
 
   const isSimulatingRef = useRef<boolean>(false);
 
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // Online / Offline network detection & PWA shell handling
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('Network connection restored. Telemetry stream reconnected.', 'info');
+      if (order && order.status !== 'Delivered' && order.status !== 'Cancelled') {
+        realtimeDeliveryService.connectToOrderStream(order.id, order.deliveryAddress?.latitude, order.deliveryAddress?.longitude);
+        api.tracking.getSnapshot(order.id)
+          .then((snapshot: LiveTrackingState) => setTrackingState(snapshot))
+          .catch(() => {});
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('Network offline. Offline application shell active.', 'warning');
+      realtimeDeliveryService.disconnect();
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [order, showToast]);
+
   // Load order and start simulation
   useEffect(() => {
     if (!orderId) return;
@@ -130,6 +160,11 @@ export const TrackingPage: React.FC = () => {
   useEffect(() => {
     if (!orderId) return;
     const unsubscribe = realtimeDeliveryService.subscribe(event => {
+      // Do NOT update or animate fake drone movement while offline
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return;
+      }
+
       if (event.orderId === orderId) {
         setLastUpdatedSeconds(0);
         setOrder(prev => {
@@ -249,6 +284,31 @@ export const TrackingPage: React.FC = () => {
   return (
     <div className="main-content tracking-page">
 
+      {/* ── Offline PWA Notice Banner ── */}
+      {!isOnline && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.12)',
+          border: '1px solid rgba(239, 68, 68, 0.35)',
+          borderRadius: '12px',
+          padding: '0.85rem 1.25rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.85rem',
+          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)',
+        }}>
+          <WifiOff size={22} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <div>
+            <strong style={{ color: '#b91c1c', display: 'block', fontSize: '0.9rem' }}>
+              Network Disconnected (PWA Offline Shell Active)
+            </strong>
+            <span style={{ fontSize: '0.82rem', color: '#dc2626', lineHeight: 1.4 }}>
+              Live drone telemetry is paused until network connectivity is restored. Cached order information and route remain accessible.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── Top nav bar ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <Link
@@ -307,7 +367,7 @@ export const TrackingPage: React.FC = () => {
             <CheckCircle2 size={46} />
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.8rem', background: '#dcfce7', borderRadius: 'var(--radius-full)', color: '#15803d', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-            ✓ OTP Verified & Handover Complete
+            ✓ Delivery PIN Verified & Handover Complete
           </div>
           <h2 style={{ fontSize: 'clamp(1.6rem, 3.2vw, 2.25rem)', fontWeight: 900, marginBottom: '0.5rem', color: '#065f46', letterSpacing: '-0.03em' }}>
             Package Delivered Successfully! 🎉

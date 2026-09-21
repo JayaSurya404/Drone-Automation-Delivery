@@ -1,0 +1,834 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <world name="skynav_kurumbapalayam">
+    <physics name="1ms" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>50</iters>
+          <sor>1.3</sor>
+        </solver>
+        <constraints>
+          <cfm>0.0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>100.0</contact_max_correcting_vel>
+          <contact_surface_layer>0.001</contact_surface_layer>
+        </constraints>
+      </ode>
+    </physics>
+
+    <!-- Standard Gazebo System Plugins -->
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-navsat-system" name="gz::sim::systems::NavSat"/>
+    <plugin filename="gz-sim-altimeter-system" name="gz::sim::systems::Altimeter"/>
+
+    <!-- Geographic Origin: SkyHub Kurumbapalayam, Coimbatore, India -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>11.113200</latitude_deg>
+      <longitude_deg>77.027700</longitude_deg>
+      <elevation>374.0</elevation>
+      <heading_deg>0.0</heading_deg>
+    </spherical_coordinates>
+
+    <!-- Sun Lighting -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 500 0.3 0.6 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.4 0.2 -1.0</direction>
+    </light>
+
+    <!-- Ground Plane (Coimbatore Kurumbapalayam Base Elevation) -->
+    <model name="kurumbapalayam_ground">
+      <static>true</static>
+      <link name="ground_link">
+        <collision name="ground_collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>10000 10000</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="ground_visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>10000 10000</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.25 0.35 0.22 1.0</ambient>
+            <diffuse>0.3 0.4 0.25 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- SkyHub Kurumbapalayam Launch & Docking Base -->
+    <model name="skyhub_launch_docking_pad">
+      <static>true</static>
+      <pose>0 0 0.1 0 0 0</pose>
+      <link name="pad_link">
+        <collision name="pad_col">
+          <geometry>
+            <cylinder>
+              <radius>4.0</radius>
+              <length>0.2</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="pad_vis">
+          <geometry>
+            <cylinder>
+              <radius>4.0</radius>
+              <length>0.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.1 0.15 0.25 1.0</ambient>
+            <diffuse>0.2 0.3 0.5 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Autonomous SkyNav Delivery UAV (Spawned on SkyHub Kurumbapalayam Launch Pad) -->
+    <include>
+      <uri>model://skynav_quad</uri>
+      <name>skynav_quad</name>
+      <pose>0 0 0.25 0 0 0</pose>
+    </include>
+
+    <!-- OSM Building: osm_building_kurumbapalayam_logistics (Footprint: 75m x 45m, Height: 18m) -->
+    <model name="osm_building_kurumbapalayam_logistics">
+      <static>true</static>
+      <pose>-180 80 9 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>75 45 18</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>75 45 18</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.42 0.45 1</ambient>
+            <diffuse>0.4 0.42 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kvimis_campus (Footprint: 73m x 22m, Height: 22m) -->
+    <model name="osm_building_kvimis_campus">
+      <static>true</static>
+      <pose>-19 -939 11 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>73 22 22</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>73 22 22</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.45 0.35 1</ambient>
+            <diffuse>0.55 0.45 0.35 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kvimis_hostel_east (Footprint: 29m x 12m, Height: 10m) -->
+    <model name="osm_building_kvimis_hostel_east">
+      <static>true</static>
+      <pose>48 -941 5 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>29 12 10</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>29 12 10</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.5 0.5 0.5 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kvimis_cafeteria (Footprint: 14m x 22m, Height: 10m) -->
+    <model name="osm_building_kvimis_cafeteria">
+      <static>true</static>
+      <pose>28 -935 5 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>14 22 10</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>14 22 10</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.52 0.48 0.4 1</ambient>
+            <diffuse>0.52 0.48 0.4 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kvimis_hostel_west (Footprint: 22m x 18m, Height: 10m) -->
+    <model name="osm_building_kvimis_hostel_west">
+      <static>true</static>
+      <pose>-66 -950 5 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>22 18 10</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>22 18 10</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.5 0.5 0.5 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_sh165_transit_hub (Footprint: 45m x 35m, Height: 15m) -->
+    <model name="osm_building_sh165_transit_hub">
+      <static>true</static>
+      <pose>85 -1450 7.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>45 35 15</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>45 35 15</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.35 0.4 0.45 1</ambient>
+            <diffuse>0.35 0.4 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_annur_road_logistics (Footprint: 55m x 30m, Height: 12m) -->
+    <model name="osm_building_annur_road_logistics">
+      <static>true</static>
+      <pose>-110 -1650 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>55 30 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>55 30 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.38 0.35 1</ambient>
+            <diffuse>0.4 0.38 0.35 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_suburban_depot (Footprint: 40m x 40m, Height: 14m) -->
+    <model name="osm_building_suburban_depot">
+      <static>true</static>
+      <pose>95 -1820 7 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>40 40 14</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>40 40 14</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.42 0.42 0.42 1</ambient>
+            <diffuse>0.42 0.42 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_svb_tech_park_tower (Footprint: 110m x 80m, Height: 38m) -->
+    <model name="osm_building_svb_tech_park_tower">
+      <static>true</static>
+      <pose>380 -2350 19 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>110 80 38</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>110 80 38</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.2 0.3 0.4 1</ambient>
+            <diffuse>0.2 0.3 0.4 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_tech_zone_block_a (Footprint: 50m x 35m, Height: 20m) -->
+    <model name="osm_building_tech_zone_block_a">
+      <static>true</static>
+      <pose>210 -2650 10 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>50 35 20</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>50 35 20</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.3 0.35 0.45 1</ambient>
+            <diffuse>0.3 0.35 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_tech_zone_block_b (Footprint: 45m x 40m, Height: 20m) -->
+    <model name="osm_building_tech_zone_block_b">
+      <static>true</static>
+      <pose>260 -2780 10 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>45 40 20</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>45 40 20</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.3 0.35 0.45 1</ambient>
+            <diffuse>0.3 0.35 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_sh165_commercial_center (Footprint: 60m x 30m, Height: 16m) -->
+    <model name="osm_building_sh165_commercial_center">
+      <static>true</static>
+      <pose>-80 -2950 8 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>60 30 16</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>60 30 16</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.45 0.45 0.48 1</ambient>
+            <diffuse>0.45 0.45 0.48 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_coimbatore_north_substation (Footprint: 35m x 25m, Height: 12m) -->
+    <model name="osm_building_coimbatore_north_substation">
+      <static>true</static>
+      <pose>180 -3150 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>35 25 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>35 25 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.35 0.35 0.35 1</ambient>
+            <diffuse>0.35 0.35 0.35 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_tech_park_annex (Footprint: 40m x 40m, Height: 18m) -->
+    <model name="osm_building_tech_park_annex">
+      <static>true</static>
+      <pose>320 -3350 9 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>40 40 18</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>40 40 18</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.28 0.32 0.4 1</ambient>
+            <diffuse>0.28 0.32 0.4 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_north_apartments (Footprint: 55m x 30m, Height: 22m) -->
+    <model name="osm_building_kalapatti_north_apartments">
+      <static>true</static>
+      <pose>150 -3650 11 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>55 30 22</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>55 30 22</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.48 0.45 0.42 1</ambient>
+            <diffuse>0.48 0.45 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_school_campus (Footprint: 65m x 35m, Height: 15m) -->
+    <model name="osm_building_kalapatti_school_campus">
+      <static>true</static>
+      <pose>-120 -3800 7.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>65 35 15</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>65 35 15</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.52 0.48 0.44 1</ambient>
+            <diffuse>0.52 0.48 0.44 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_retail_cluster (Footprint: 35m x 35m, Height: 12m) -->
+    <model name="osm_building_kalapatti_retail_cluster">
+      <static>true</static>
+      <pose>515 -3963 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>35 35 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>35 35 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.45 0.45 0.45 1</ambient>
+            <diffuse>0.45 0.45 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_west_residential (Footprint: 40m x 30m, Height: 12m) -->
+    <model name="osm_building_kalapatti_west_residential">
+      <static>true</static>
+      <pose>-635 -3939 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>40 30 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>40 30 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.45 0.45 0.45 1</ambient>
+            <diffuse>0.45 0.45 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_lemon_tree_hotel (Footprint: 60m x 50m, Height: 26m) -->
+    <model name="osm_building_lemon_tree_hotel">
+      <static>true</static>
+      <pose>73 -4397 13 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>60 50 26</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>60 50 26</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.25 0.35 0.5 1</ambient>
+            <diffuse>0.25 0.35 0.5 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_east_block_1 (Footprint: 30m x 25m, Height: 12m) -->
+    <model name="osm_building_kalapatti_east_block_1">
+      <static>true</static>
+      <pose>265 -4065 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>30 25 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>30 25 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.42 0.42 0.42 1</ambient>
+            <diffuse>0.42 0.42 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_east_block_2 (Footprint: 32m x 24m, Height: 12m) -->
+    <model name="osm_building_kalapatti_east_block_2">
+      <static>true</static>
+      <pose>281 -4072 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>32 24 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>32 24 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.42 0.42 0.42 1</ambient>
+            <diffuse>0.42 0.42 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_east_block_3 (Footprint: 34m x 26m, Height: 12m) -->
+    <model name="osm_building_kalapatti_east_block_3">
+      <static>true</static>
+      <pose>359 -4153 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>34 26 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>34 26 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.42 0.42 0.42 1</ambient>
+            <diffuse>0.42 0.42 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_south_west_res (Footprint: 30m x 25m, Height: 12m) -->
+    <model name="osm_building_kalapatti_south_west_res">
+      <static>true</static>
+      <pose>-351 -4365 6 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>30 25 12</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>30 25 12</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.45 0.42 0.4 1</ambient>
+            <diffuse>0.45 0.42 0.4 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- OSM Building: osm_building_kalapatti_terminal_commercial (Footprint: 45m x 35m, Height: 15m) -->
+    <model name="osm_building_kalapatti_terminal_commercial">
+      <static>true</static>
+      <pose>19 -4344 7.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry>
+            <box>
+              <size>45 35 15</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <box>
+              <size>45 35 15</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.42 0.46 1</ambient>
+            <diffuse>0.4 0.42 0.46 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Customer Destination Drop Pad (1 km Destination: Kurumbapalayam South / KVIMIS Drop Zone) -->
+    <!-- WGS84: 11.104200 N, 77.028112 E (Local ENU Pose: x=45.0m East, y=-995.0m South, z=0.08m) -->
+    <model name="customer_1km_drop_pad">
+      <static>true</static>
+      <pose>45.0 -995.0 0.08 0 0 0</pose>
+      <link name="pad_link">
+        <collision name="col">
+          <geometry>
+            <cylinder>
+              <radius>3.5</radius>
+              <length>0.1</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <cylinder>
+              <radius>3.5</radius>
+              <length>0.1</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.1 0.6 0.3 1</ambient>
+            <diffuse>0.15 0.8 0.4 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Secondary Customer Destination Drop Pad (Kalapatti South Drop Zone: 4.71 km) -->
+    <model name="customer_kalapatti_drop_pad">
+      <static>true</static>
+      <pose>680 -4520 0.05 0 0 0</pose>
+      <link name="pad_link">
+        <collision name="col">
+          <geometry>
+            <cylinder>
+              <radius>3.5</radius>
+              <length>0.1</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <cylinder>
+              <radius>3.5</radius>
+              <length>0.1</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.1 0.5 0.2 1</ambient>
+            <diffuse>0.15 0.7 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Physical Controlled Test Obstacle: Tower Construction Crane (OBS-CRANE-01) -->
+    <!-- Positioned along the 1 km delivery airway at y=-550m to trigger real LaserScan detection & detour -->
+    <!-- WGS84: 11.1082 N, 77.0279 E (Local ENU Pose: x=22.0m East, y=-550.0m South, z=27.5m, Height=55m) -->
+    <model name="controlled_test_obstacle_crane">
+      <static>true</static>
+      <pose>22.0 -550.0 27.5 0 0 0</pose>
+      <link name="crane_mast_link">
+        <collision name="crane_mast_col">
+          <geometry>
+            <cylinder>
+              <radius>4.5</radius>
+              <length>55.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="crane_mast_vis">
+          <geometry>
+            <cylinder>
+              <radius>4.5</radius>
+              <length>55.0</length>
+            </cylinder>
+          </geometry>
+        </visual>
+        <!-- Crane Jib Arm (Horizontal Boom spanning 36m diameter / 18m radius) -->
+        <collision name="crane_jib_col">
+          <pose>0 0 26.5 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>36.0 3.0 2.5</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="crane_jib_vis">
+          <pose>0 0 26.5 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>36.0 3.0 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.9 0.1 0.1 1.0</ambient>
+            <diffuse>1.0 0.15 0.15 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { queryAll, queryOne } from '../db/database.js';
+import { queryAll, queryOne, runCommand } from '../db/database.js';
 
 const router = Router();
 
@@ -46,6 +46,29 @@ router.get('/:id', (req: Request, res: Response): void => {
       return;
     }
     res.json(drone);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// RESET single drone to available on SkyHub Launch Pad
+router.post('/:id/reset', (req: Request, res: Response): void => {
+  try {
+    const { id } = req.params;
+    runCommand(`
+      UPDATE drones SET
+        status = 'available',
+        current_mission_id = NULL,
+        latitude = 11.1132,
+        longitude = 77.0277,
+        altitude = 0,
+        speed = 0,
+        heading = 0,
+        battery = 100,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `, [id]);
+    res.json({ success: true, droneId: id, status: 'available' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

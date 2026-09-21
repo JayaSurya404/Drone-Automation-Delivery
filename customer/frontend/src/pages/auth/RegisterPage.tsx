@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Navigation, User, Mail, Phone, Lock, Eye, EyeOff, ArrowRight, CheckCircle2, Send } from 'lucide-react';
+import { Navigation, User, Mail, Phone, Lock, Eye, EyeOff, ArrowRight, CheckCircle2, Send, ShieldCheck } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
@@ -17,6 +17,7 @@ export const RegisterPage: React.FC = () => {
     phone: '',
     password: '',
     confirmPassword: '',
+    deliveryPin: '',
     acceptTerms: true,
     acceptPrivacy: true,
   });
@@ -243,6 +244,19 @@ export const RegisterPage: React.FC = () => {
               error={errors.confirmPassword}
               required
               autoComplete="new-password"
+            />
+          </div>
+
+          <div style={{ marginTop: '0.25rem' }}>
+            <Input
+              label="Permanent Delivery PIN (4-6 digits, optional)"
+              type="password"
+              placeholder="e.g. 4827 (used for drone package handover)"
+              maxLength={6}
+              value={formData.deliveryPin}
+              onChange={(e) => setFormData({ ...formData, deliveryPin: e.target.value.replace(/\D/g, '') })}
+              leftIcon={<ShieldCheck size={18} />}
+              hint="Your permanent secure PIN to release arriving packages at your drop zone. You can also configure this later."
             />
           </div>
 

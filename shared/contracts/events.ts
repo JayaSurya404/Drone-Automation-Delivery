@@ -123,6 +123,8 @@ export interface DeliveryTouchdownPayload {
   arrivedAt: string;
   requiresOtp: boolean;
   message: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface DeliveryCompletedPayload {

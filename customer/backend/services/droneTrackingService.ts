@@ -376,14 +376,17 @@ class DroneTrackingService {
       orderId,
     ]);
 
-    // Update order status if changed
+    // Update order status if changed (and not already Delivered)
     if (telemetry.status) {
-      runCommand(`
-        UPDATE orders SET
-          status = ?,
-          updated_at = datetime('now')
-        WHERE id = ?
-      `, [telemetry.status, orderId]);
+      const order = queryOne<any>('SELECT status FROM orders WHERE id = ?', [orderId]);
+      if (order && order.status !== 'Delivered') {
+        runCommand(`
+          UPDATE orders SET
+            status = ?,
+            updated_at = datetime('now')
+          WHERE id = ?
+        `, [telemetry.status, orderId]);
+      }
     }
 
     // Broadcast to customer WebSocket subscribers
@@ -461,6 +464,15 @@ class DroneTrackingService {
         longitude: delivery.current_longitude,
         altitudeMeters: delivery.current_altitude,
         speedKmh: delivery.current_speed,
+        bearing: delivery.current_bearing,
+      },
+      droneLocation: {
+        lat: delivery.current_latitude,
+        lng: delivery.current_longitude,
+        latitude: delivery.current_latitude,
+        longitude: delivery.current_longitude,
+        altitude: delivery.current_altitude,
+        speed: delivery.current_speed,
         bearing: delivery.current_bearing,
       },
       flightRoute: route,

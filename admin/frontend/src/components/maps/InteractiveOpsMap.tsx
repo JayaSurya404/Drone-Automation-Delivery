@@ -104,6 +104,19 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
     };
   }, []);
 
+  // Handle window/container resize
+  useEffect(() => {
+    const handleResize = () => {
+      mapInstanceRef.current?.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+    const timer = setTimeout(handleResize, 150);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Update Tile Layers when mapType changes
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -296,10 +309,11 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
     group.addLayer(hubMarker);
 
     // Authoritative 2D Live Telemetry Synchronization Hook
+    // Strictly track the physical Gazebo drone D-001 across all flight and ground phases
     const activeAirborneDrone =
-      drones.find((d) => d.status === 'in_flight' || d.status === 'returning' || (d.status as any) === 'touchdown') ||
       drones.find((d) => d.id === 'D-001') ||
       selectedDrone ||
+      drones.find((d) => d.status === 'in_flight' || d.status === 'returning' || (d.status as any) === 'touchdown' || d.status === 'charging') ||
       drones[0];
 
     if (typeof window !== 'undefined' && activeAirborneDrone) {

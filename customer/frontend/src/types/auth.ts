@@ -5,6 +5,7 @@ export interface CustomerUser {
   phone: string;
   avatar?: string;
   isVerified: boolean;
+  hasDeliveryPin?: boolean;
   accountStatus: 'active' | 'pending_verification' | 'disabled';
   createdAt: string;
   updatedAt: string;
@@ -28,6 +29,7 @@ export interface RegisterPayload {
   phone: string;
   password: string;
   confirmPassword: string;
+  deliveryPin?: string;
   acceptTerms: boolean;
   acceptPrivacy: boolean;
 }

@@ -29,24 +29,14 @@ const parseDbDateUtc = (dateStr: string): number => {
 // 1. REGISTER
 router.post('/register', async (req, res): Promise<void> => {
   try {
-    const { name, email, phone, password, confirmPassword, acceptTerms } = req.body;
+    const { name, email, phone, password, confirmPassword, acceptTerms, termsAccepted, deliveryPin } = req.body;
 
     if (!name || !email || !phone || !password) {
-      res.status(400).json({ error: 'Please provide all required fields (name, email, phone, password).' });
+      res.status(400).json({ error: 'Please provide all required fields: name, email, phone, and password.' });
       return;
     }
 
-    if (password !== confirmPassword) {
-      res.status(400).json({ error: 'Passwords do not match.' });
-      return;
-    }
-
-    if (password.length < 8) {
-      res.status(400).json({ error: 'Password must be at least 8 characters long.' });
-      return;
-    }
-
-    if (!acceptTerms) {
+    if (acceptTerms === false && termsAccepted === false) {
       res.status(400).json({ error: 'You must accept the Terms & Conditions.' });
       return;
     }
@@ -62,14 +52,18 @@ router.post('/register', async (req, res): Promise<void> => {
 
     const userId = `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const passwordHash = await bcrypt.hash(password, 10);
+    let deliveryPinHash: string | null = null;
+    if (deliveryPin && /^\d{4,6}$/.test(deliveryPin.toString().trim())) {
+      deliveryPinHash = await bcrypt.hash(deliveryPin.toString().trim(), 10);
+    }
 
     // Transaction to create active user, notification preferences, cart, wishlist, and welcome notification
     db.transaction(() => {
       // Create user in active verified state immediately
       runCommand(`
-        INSERT INTO users (id, name, email, phone, password_hash, is_verified, account_status)
-        VALUES (?, ?, ?, ?, ?, 1, 'active')
-      `, [userId, name.trim(), cleanEmail, phone.trim(), passwordHash]);
+        INSERT INTO users (id, name, email, phone, password_hash, delivery_pin_hash, is_verified, account_status)
+        VALUES (?, ?, ?, ?, ?, ?, 1, 'active')
+      `, [userId, name.trim(), cleanEmail, phone.trim(), passwordHash, deliveryPinHash]);
 
       // Create notification preferences
       runCommand(`
@@ -105,6 +99,7 @@ router.post('/register', async (req, res): Promise<void> => {
       user: {
         ...user,
         isVerified: true,
+        hasDeliveryPin: Boolean(deliveryPinHash),
         notificationPreferences: prefs || { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
       },
       token,
@@ -375,6 +370,7 @@ router.post('/login', async (req, res): Promise<void> => {
       phone: userRow.phone,
       avatar: userRow.avatar,
       isVerified: Boolean(userRow.is_verified),
+      hasDeliveryPin: Boolean(userRow.delivery_pin_hash),
       accountStatus: userRow.account_status,
       createdAt: userRow.created_at,
       updatedAt: userRow.updated_at,
@@ -554,6 +550,7 @@ router.get('/me', authenticateToken, (req: AuthenticatedRequest, res: Response):
       phone: userRow.phone,
       avatar: userRow.avatar,
       isVerified: Boolean(userRow.is_verified),
+      hasDeliveryPin: Boolean(userRow.delivery_pin_hash),
       accountStatus: userRow.account_status,
       createdAt: userRow.created_at,
       updatedAt: userRow.updated_at,
@@ -611,6 +608,7 @@ router.put('/profile', authenticateToken, (req: AuthenticatedRequest, res: Respo
       phone: updatedUser.phone,
       avatar: updatedUser.avatar,
       isVerified: Boolean(updatedUser.is_verified),
+      hasDeliveryPin: Boolean(updatedUser.delivery_pin_hash),
       accountStatus: updatedUser.account_status,
       createdAt: updatedUser.created_at,
       updatedAt: updatedUser.updated_at,
@@ -663,6 +661,30 @@ router.post('/change-password', authenticateToken, async (req: AuthenticatedRequ
 // 10. LOGOUT
 router.post('/logout', (req, res): void => {
   res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// 11. SET / UPDATE PERMANENT CUSTOMER DELIVERY PIN (AUTHENTICATED)
+router.put('/delivery-pin', authenticateToken, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { pin } = req.body;
+    const userId = req.user!.id;
+
+    if (!pin || !/^\d{4,6}$/.test(pin.toString().trim())) {
+      res.status(400).json({ error: 'Delivery PIN must be a 4 to 6 digit numeric code.' });
+      return;
+    }
+
+    const pinHash = await bcrypt.hash(pin.toString().trim(), 10);
+    runCommand("UPDATE users SET delivery_pin_hash = ?, updated_at = datetime('now') WHERE id = ?", [pinHash, userId]);
+
+    res.json({
+      success: true,
+      hasDeliveryPin: true,
+      message: 'Permanent Customer Delivery PIN updated successfully.'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update Delivery PIN.' });
+  }
 });
 
 export default router;

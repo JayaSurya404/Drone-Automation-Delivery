@@ -30,6 +30,16 @@ export const initDb = () => {
   db.exec(schemaSql);
 };
 
+// Safe migration for permanent customer delivery PIN
+try {
+  const tableInfo = db.prepare("PRAGMA table_info(users)").all() as any[];
+  if (tableInfo.length > 0 && !tableInfo.some((col: any) => col.name === 'delivery_pin_hash')) {
+    db.prepare("ALTER TABLE users ADD COLUMN delivery_pin_hash TEXT").run();
+  }
+} catch {
+  // Ignore if table does not exist yet
+}
+
 // Database helper functions
 export const queryOne = <T = any>(sql: string, params: any[] = []): T | undefined => {
   const stmt = db.prepare(sql);

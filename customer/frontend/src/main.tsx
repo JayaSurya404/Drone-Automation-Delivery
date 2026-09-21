@@ -4,6 +4,19 @@ import 'leaflet/dist/leaflet.css'
 import './index.css'
 import App from './App.tsx'
 
+// Register PWA Service Worker
+if ('serviceWorker' in navigator && process.env.NODE_ENV !== 'test') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        console.log('[SkyNav PWA] Service Worker registered successfully, scope:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('[SkyNav PWA] Service Worker registration failed:', err);
+      });
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

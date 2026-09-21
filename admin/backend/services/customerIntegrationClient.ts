@@ -84,6 +84,16 @@ export const customerIntegrationClient = {
     });
   },
 
+  sendTelemetryUpdate: async (payload: TelemetryUpdatePayload): Promise<boolean> => {
+    return sendEvent('/api/internal/telemetry', {
+      eventType: 'TELEMETRY_UPDATE',
+      eventId: `evt_telem_${payload.customerOrderId}_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      data: payload,
+    });
+  },
+
+
   notifyDeliveryTouchdown: async (payload: DeliveryTouchdownPayload): Promise<boolean> => {
     return sendEvent('/api/internal/delivery-update', {
       eventType: 'DELIVERY_TOUCHDOWN',

@@ -223,6 +223,13 @@ export const api = {
       });
     },
 
+    updateDeliveryPin: async (deliveryPin: string): Promise<{ success: boolean; message: string }> => {
+      return request<{ success: boolean; message: string }>('/auth/delivery-pin', {
+        method: 'PUT',
+        body: JSON.stringify({ deliveryPin }),
+      });
+    },
+
     getAddresses: async (): Promise<CustomerAddress[]> => {
       const uid = await getSupabaseUserId();
       if (uid) {
@@ -489,10 +496,17 @@ export const api = {
       });
     },
 
-    verifyOtp: async (orderId: string, otp: string): Promise<{ success: boolean; message: string; status: string }> => {
-      return request<{ success: boolean; message: string; status: string }>(`/orders/${orderId}/verify-otp`, {
+    verifyPin: async (orderId: string, deliveryPin: string): Promise<{ success: boolean; message: string; status: string }> => {
+      return request<{ success: boolean; message: string; status: string }>(`/orders/${orderId}/verify-pin`, {
         method: 'POST',
-        body: JSON.stringify({ otp }),
+        body: JSON.stringify({ deliveryPin }),
+      });
+    },
+
+    verifyOtp: async (orderId: string, otp: string): Promise<{ success: boolean; message: string; status: string }> => {
+      return request<{ success: boolean; message: string; status: string }>(`/orders/${orderId}/verify-pin`, {
+        method: 'POST',
+        body: JSON.stringify({ deliveryPin: otp }),
       });
     },
   },

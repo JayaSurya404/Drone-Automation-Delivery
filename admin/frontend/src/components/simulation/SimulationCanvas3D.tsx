@@ -280,14 +280,14 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
                       Math.abs(liveDrone.location.lng - hubLng) < 0.0008 &&
                       (liveDrone.location.altitude === 0 || !liveDrone.location.altitude);
 
-      const totalDistM = (liveMission?.distanceKm ? liveMission.distanceKm * 1000 : 4500);
-      const scale = 73 / Math.max(1000, totalDistM);
+      // Geographic World Scale: 73 scene units corresponds to the 4,711 meter Kurumbapalayam corridor
+      const scale = 73.0 / 4711.0;
 
       const latMeters = -(liveDrone.location.lat - hubLat) * 110540;
       const lngMeters = (liveDrone.location.lng - hubLng) * (111320 * Math.cos((hubLat * Math.PI) / 180));
 
       const calcX = lngMeters * scale;
-      const calcZ = -35 + latMeters * scale;
+      const calcZ = -35.0 + latMeters * scale;
       const altM = liveDrone.location.altitude || 0;
       const groundY = env.getGroundElevationAt(calcX, calcZ);
       const calcY = groundY + (altM > 0 ? Math.max(0.6, (altM / 75) * 16) : 0.2);
@@ -296,7 +296,7 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
         (liveDrone.status === 'in_flight' && altM === 0 && (!liveDrone.remainingDistanceKm || liveDrone.remainingDistanceKm <= 0.05));
 
       if (isTouchdown) {
-        basePos = new THREE.Vector3(env.customerPadPosition.x, env.customerPadPosition.y + 0.15, env.customerPadPosition.z);
+        basePos = new THREE.Vector3(calcX, calcY, calcZ);
         flightPhase = 'delivered';
         droneHighlightStatus = 'delivery';
         targetRpm = 0;
@@ -320,6 +320,19 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
         droneHighlightStatus = 'normal';
         targetRpm = altM > 20 ? 7600 : 4800;
         payloadAttached = true;
+      }
+
+      if (typeof window !== 'undefined') {
+        (window as any).__skynav3DDrone = {
+          droneId: liveDrone.id,
+          lat: liveDrone.location.lat,
+          lng: liveDrone.location.lng,
+          alt: liveDrone.location.altitude || 0,
+          speed: liveDrone.location.speed || 0,
+          heading: headingDeg,
+          status: liveDrone.status,
+          scenePos: [basePos.x, basePos.y, basePos.z],
+        };
       }
     } else {
       // Adjust for Reroute West deviation

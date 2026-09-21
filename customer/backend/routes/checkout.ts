@@ -143,7 +143,6 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
     const total = parseFloat((taxableAmount + deliveryFee + tax).toFixed(2));
 
     const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit handover OTP
     const estimatedMinutes = deliverySpeed === 'express' ? 10 : 15;
     const estFormatted = `${estimatedMinutes} mins`;
     const arrivalTimestamp = new Date(Date.now() + estimatedMinutes * 60000).toISOString();
@@ -184,7 +183,7 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
           payment_method, payment_status, status, delivery_speed, scheduled_time,
           delivery_address_json, delivery_instructions, drop_zone_type, delivery_otp,
           is_cancellable, estimated_delivery_time, estimated_arrival_timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Paid', 'Pending Dispatch', ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Paid', 'Pending Dispatch', ?, ?, ?, ?, ?, 'PIN_PROTECTED', 1, ?, ?)
       `, [
         orderId,
         userId,
@@ -199,7 +198,6 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
         JSON.stringify(deliveryAddress),
         deliveryInstructions || deliveryAddress.instructions || '',
         deliveryAddress.dropZoneType || 'Lawn',
-        deliveryOtp,
         estFormatted,
         arrivalTimestamp,
       ]);
@@ -238,7 +236,7 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
           destination_latitude, destination_longitude, flight_route_json,
           current_latitude, current_longitude, current_altitude, current_speed,
           current_bearing, remaining_distance_km, estimated_arrival_mins, handover_otp, started_at
-        ) VALUES (?, ?, NULL, 'PREPARING', ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, datetime('now'))
+        ) VALUES (?, ?, NULL, 'PREPARING', ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, 'PIN_PROTECTED', datetime('now'))
       `, [
         `del_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         orderId,
@@ -251,7 +249,6 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
         hub.hub_longitude,
         initialDistanceKm,
         estimatedMinutes,
-        deliveryOtp,
       ]);
 
       // 5. Clear Cart
@@ -291,7 +288,7 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
       total,
       paymentMethod,
       paymentStatus: 'Paid',
-      deliveryOtp,
+      deliveryOtp: '',
       pickup: {
         hubId: hub.id,
         hubName: hub.hub_name,
@@ -318,7 +315,7 @@ router.post('/orders', authenticateToken, (req: AuthenticatedRequest, res: Respo
 
     res.status(201).json({
       ...createdOrder,
-      deliveryOtp: createdOrder.delivery_otp,
+      deliveryPinRequired: true,
       items: items.map((i) => ({
         product: {
           id: i.product_id,

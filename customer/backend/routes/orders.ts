@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { queryAll, queryOne, runCommand } from '../db/database.js';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.js';
 import { adminIntegrationClient } from '../services/adminIntegrationClient.js';
@@ -21,7 +22,7 @@ const formatOrder = (order: any, items: any[] = [], timeline: any[] = []) => ({
   deliveryAddress: typeof order.delivery_address_json === 'string' ? JSON.parse(order.delivery_address_json) : order.delivery_address_json,
   deliveryInstructions: order.delivery_instructions,
   dropZoneType: order.drop_zone_type,
-  deliveryOtp: order.delivery_otp,
+  deliveryPinRequired: true,
   isCancellable: Boolean(order.is_cancellable && ['Order Placed', 'Order Confirmed', 'Preparing'].includes(order.status)),
   estimatedDeliveryTime: order.estimated_delivery_time,
   estimatedArrivalTimestamp: order.estimated_arrival_timestamp,
@@ -188,11 +189,11 @@ router.post('/:id/rate', authenticateToken, (req: AuthenticatedRequest, res: Res
   }
 });
 
-// 5. VERIFY HANDOVER OTP & COMPLETE DELIVERY
-router.post('/:id/verify-otp', authenticateToken, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// 5. VERIFY CUSTOMER DELIVERY PIN & COMPLETE HANDOVER
+const verifyDeliveryPin = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { otp } = req.body;
+    const { pin, deliveryPin, otp } = req.body;
     const userId = req.user!.id;
 
     const order = queryOne<any>('SELECT * FROM orders WHERE id = ?', [id]);
@@ -202,12 +203,25 @@ router.post('/:id/verify-otp', authenticateToken, async (req: AuthenticatedReque
     }
 
     if (order.customer_id !== userId) {
-      res.status(403).json({ error: 'Unauthorized.' });
+      res.status(403).json({ error: 'Unauthorized: You do not have permission to verify this delivery.' });
       return;
     }
 
-    if (order.delivery_otp !== otp?.toString().trim()) {
-      res.status(400).json({ error: 'Invalid 4-digit OTP code. Please check your delivery code.' });
+    const customer = queryOne<any>('SELECT delivery_pin_hash FROM users WHERE id = ?', [userId]);
+    if (!customer || !customer.delivery_pin_hash) {
+      res.status(400).json({ error: 'No Customer Delivery PIN configured. Please set a Delivery PIN in your account profile.' });
+      return;
+    }
+
+    const inputPin = (deliveryPin || pin || otp)?.toString().trim();
+    if (!inputPin) {
+      res.status(400).json({ error: 'Customer Delivery PIN is required for handover verification.' });
+      return;
+    }
+
+    const isValid = await bcrypt.compare(inputPin, customer.delivery_pin_hash);
+    if (!isValid) {
+      res.status(400).json({ error: 'Invalid Customer Delivery PIN. Please enter your account Delivery PIN.' });
       return;
     }
 
@@ -230,7 +244,7 @@ router.post('/:id/verify-otp', authenticateToken, async (req: AuthenticatedReque
 
     runCommand(`
       INSERT INTO order_status_history (id, order_id, previous_status, new_status, description, completed)
-      VALUES (?, ?, ?, 'Delivered', 'Package safely handed over onto designated landing zone. Verified via OTP.', 1)
+      VALUES (?, ?, ?, 'Delivered', 'Package safely handed over onto designated landing zone. Verified via Customer Delivery PIN.', 1)
     `, [`hist_${Date.now()}_del`, id, order.status]);
 
     // Notify Admin Backend of delivery completion
@@ -239,20 +253,23 @@ router.post('/:id/verify-otp', authenticateToken, async (req: AuthenticatedReque
       customerOrderId: id,
       missionId: 'MS-COMPLETED',
       droneId: delivery?.drone_id,
-      verifiedOtp: otp,
+      verifiedOtp: 'PIN_VERIFIED',
       completedAt: new Date().toISOString(),
-      notes: 'Customer successfully verified 4-digit OTP at touchdown.',
+      notes: 'Customer successfully verified permanent Delivery PIN at touchdown.',
     });
 
     res.json({
       success: true,
-      message: 'Delivery verified and completed successfully!',
+      message: 'Delivery PIN verified! Package released and delivery completed successfully.',
       status: 'Delivered',
     });
   } catch (err: any) {
-    console.error('Error verifying delivery OTP:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Error verifying Delivery PIN:', err);
+    res.status(500).json({ error: err.message || 'Delivery PIN verification failed.' });
   }
-});
+};
+
+router.post('/:id/verify-pin', authenticateToken, verifyDeliveryPin);
+router.post('/:id/verify-otp', authenticateToken, verifyDeliveryPin);
 
 export default router;

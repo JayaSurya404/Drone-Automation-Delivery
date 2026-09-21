@@ -27,7 +27,7 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapProviderRef = useRef<LeafletMapProvider | null>(null);
   const [isAirspaceVisible, setIsAirspaceVisible] = useState<boolean>(true);
-  const [isAutoFollow, setIsAutoFollow] = useState<boolean>(true);
+  const [isAutoFollow, setIsAutoFollow] = useState<boolean>(false);
   const [isUserInteracted, setIsUserInteracted] = useState<boolean>(false);
 
   const hasInitialFitRef = useRef<boolean>(false);

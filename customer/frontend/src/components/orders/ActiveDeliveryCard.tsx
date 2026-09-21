@@ -123,7 +123,7 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({ activeOr
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
               <ShieldCheck size={16} color="#10b981" />
-              <span>Handover OTP: <strong style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>{activeOrder.deliveryOtp}</strong></span>
+              <span>Handover Security: <strong style={{ color: '#10b981', fontFamily: 'var(--font-mono)' }}>Delivery PIN Protected</strong></span>
             </div>
 
             <Button

@@ -15,7 +15,7 @@ import { DeliveryOptionStep } from '../../components/checkout/DeliveryOptionStep
 import { PaymentStep } from '../../components/checkout/PaymentStep';
 import { ReviewStep } from '../../components/checkout/ReviewStep';
 import { Button } from '../../components/common/Button';
-import { CheckCircle2, Navigation, Package, ArrowRight, ShoppingBag, Sparkles, KeyRound } from 'lucide-react';
+import { CheckCircle2, Navigation, Package, ArrowRight, ShoppingBag, Sparkles, KeyRound, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export const CheckoutPage: React.FC = () => {
@@ -164,11 +164,11 @@ export const CheckoutPage: React.FC = () => {
             </div>
 
             <div>
-              <span style={{ color: 'var(--text-tertiary)', display: 'block' }}>Handover OTP</span>
+              <span style={{ color: 'var(--text-tertiary)', display: 'block' }}>Handover Security</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <KeyRound size={16} color="var(--accent-cyan)" />
-                <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '1.25rem', color: 'var(--accent-cyan)' }}>
-                  {confirmedOrder.deliveryOtp}
+                <ShieldCheck size={16} color="#059669" />
+                <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                  Delivery PIN Protected
                 </strong>
               </div>
             </div>
