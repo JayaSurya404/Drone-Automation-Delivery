@@ -34,6 +34,7 @@ const PORT = process.env.PORT || 5001;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use('/images', express.static(path.resolve(__dirname, 'public/images')));
 
 // Request logger
 app.use((req, res, next) => {

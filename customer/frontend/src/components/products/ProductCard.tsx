@@ -129,6 +129,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, layout = 'gri
               className="product-main-image"
               style={{ transform: isHovered ? 'scale(1.06)' : 'scale(1)' }}
               loading="lazy"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (product.images && product.images.length > 1 && target.src !== product.images[1]) {
+                  target.src = product.images[1];
+                }
+              }}
             />
           </Link>
 

@@ -20,6 +20,10 @@ const formatProduct = (p: any, reviews: any[] = []) => {
     if (p.specifications_json) specifications = JSON.parse(p.specifications_json);
   } catch {}
 
+  const primaryImage = (p.image && p.image.trim().length > 0)
+    ? p.image.trim()
+    : (images && images.length > 0 ? images[0] : '/images/products/masala_dosa.jpg');
+
   return {
     id: p.id,
     name: p.name,
@@ -32,8 +36,8 @@ const formatProduct = (p: any, reviews: any[] = []) => {
     discountPercent: p.discount_percent,
     rating: p.rating,
     reviewCount: p.review_count,
-    image: p.image,
-    images,
+    image: primaryImage,
+    images: images && images.length > 0 ? images : [primaryImage],
     isDroneEligible: Boolean(p.is_drone_eligible),
     maxPayloadKg: p.max_payload_kg,
     estimatedDeliveryMins: p.estimated_delivery_mins,

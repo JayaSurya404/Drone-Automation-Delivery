@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, initDb } from './database.js';
+import { MASTER_CATEGORIES, MASTER_PRODUCTS } from '../../../shared/contracts/catalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,17 +57,8 @@ export const seedAdminDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const categories = [
-    { id: 'cat_food', name: 'Hot Meals & Food', slug: 'Food', desc: 'Fresh chef-crafted meals, authentic South Indian breakfast & delicacies delivered hot.', img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', icon: 'Pizza', order: 1 },
-    { id: 'cat_med', name: 'Medicine & Health', slug: 'Medicine', desc: 'Emergency trauma packs, test kits, inhalers, analgesics & prescription refills.', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80', icon: 'Pill', order: 2 },
-    { id: 'cat_groc', name: 'Fresh Groceries', slug: 'Groceries', desc: 'Aavin fresh dairy, Nilgiris tea, organic farm produce & pantry staples.', img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80', icon: 'ShoppingBag', order: 3 },
-    { id: 'cat_elec', name: 'Tech & Electronics', slug: 'Electronics', desc: 'High-speed GaN chargers, heavy-duty power banks & durable USB-C cables.', img: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', icon: 'Zap', order: 4 },
-    { id: 'cat_doc', name: 'Instant Documents', slug: 'Documents', desc: 'Secure biometric sealed pouches, legal contracts, notary briefs & deeds.', img: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80', icon: 'FileText', order: 5 },
-    { id: 'cat_other', name: 'Daily Essentials', slug: 'Other', desc: 'Heritage cold-pressed oils, air care, emergency pods & home lifestyle.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80', icon: 'Sparkles', order: 6 },
-  ];
-
-  for (const c of categories) {
-    catStmt.run(c.id, c.name, c.slug, c.desc, c.img, c.icon, c.order);
+  for (const c of MASTER_CATEGORIES) {
+    catStmt.run(c.id, c.name, c.slug, c.description, c.image, c.icon, c.displayOrder);
   }
 
   // 3. PRODUCTS (Admin Source of Truth - INR Prices)
@@ -77,171 +69,11 @@ export const seedAdminDatabase = async () => {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const products = [
-    {
-      id: 'prod_elec_1',
-      name: 'BoAt Storm GaN 65W Rapid Dual-Port Fast Charger',
-      slug: 'boat-storm-gan-65w-rapid-fast-charger',
-      brand: 'boAt',
-      category_id: 'cat_elec',
-      sub_category: 'Charging & Power',
-      description: 'Ultra-compact Gallium Nitride 65W fast charger with dual Type-C and USB-A power delivery for Indian smartphones and laptops.',
-      price: 1299.00,
-      stock_count: 50,
-      weight_grams: 180,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80',
-      badge: 'Best Seller'
-    },
-    {
-      id: 'prod_elec_2',
-      name: 'Syska 20000mAh Heavy Duty Power Bank',
-      slug: 'syska-20000mah-power-bank',
-      brand: 'Syska',
-      category_id: 'cat_elec',
-      sub_category: 'Power Accessories',
-      description: 'High-density 20000mAh external battery pack with 22.5W two-way fast charging and LED digital battery level display.',
-      price: 1499.00,
-      stock_count: 35,
-      weight_grams: 420,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1609592424368-45097df6db82?w=600&auto=format&fit=crop&q=80',
-      badge: 'High Capacity'
-    },
-    {
-      id: 'prod_med_1',
-      name: 'Apollo Rapid Emergency First-Aid Trauma Kit',
-      slug: 'apollo-rapid-emergency-first-aid-trauma-kit',
-      brand: 'Apollo Pharmacy',
-      category_id: 'cat_med',
-      sub_category: 'Emergency Care',
-      description: 'Sterile hospital-grade emergency trauma pack with tourniquet, antiseptics, sterile gauze dressings, and burn shield.',
-      price: 499.00,
-      stock_count: 75,
-      weight_grams: 450,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80',
-      badge: 'Urgent Dispatch'
-    },
-    {
-      id: 'prod_med_2',
-      name: 'Amrutanjan Rapid Pain Relief & Vaporub Duo Pack',
-      slug: 'amrutanjan-rapid-pain-relief-duo',
-      brand: 'Amrutanjan Health',
-      category_id: 'cat_med',
-      sub_category: 'Pain Care',
-      description: 'Trusted ayurvedic pain balm and eucalyptus chest rub for headache, congestion, and muscular fatigue.',
-      price: 199.00,
-      stock_count: 90,
-      weight_grams: 150,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1550572017-ed200f5e5a43?w=600&auto=format&fit=crop&q=80',
-      badge: 'Essential'
-    },
-    {
-      id: 'prod_groc_1',
-      name: 'Coimbatore Authentic Filter Coffee Blend (500g)',
-      slug: 'coimbatore-authentic-filter-coffee-blend-500g',
-      brand: 'Kovai Coffee Works',
-      category_id: 'cat_groc',
-      sub_category: 'Beverages',
-      description: 'Traditional 80:20 plantation peaberry and chicory roast freshly grounded for a rich aromatic South Indian morning cup.',
-      price: 340.00,
-      stock_count: 65,
-      weight_grams: 520,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80',
-      badge: 'Local Favorite'
-    },
-    {
-      id: 'prod_groc_2',
-      name: 'Aavin Fresh Farm Pasteurized Pure Milk (1L x 2)',
-      slug: 'aavin-fresh-farm-pure-milk-2l',
-      brand: 'Aavin Tamil Nadu',
-      category_id: 'cat_groc',
-      sub_category: 'Dairy',
-      description: 'Chilled pasteurized homogenized cow milk delivered in insulated flight thermal pods direct from local dairy union.',
-      price: 120.00,
-      stock_count: 120,
-      weight_grams: 1050,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?w=600&auto=format&fit=crop&q=80',
-      badge: 'Fresh Daily'
-    },
-    {
-      id: 'prod_food_1',
-      name: 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)',
-      slug: 'anand-bhavan-ghee-mysore-pak-400g',
-      brand: 'Sri Anand Bhavan',
-      category_id: 'cat_food',
-      sub_category: 'Traditional Sweets',
-      description: 'Melt-in-mouth traditional Coimbatore sweet crafted with pure desi ghee, gram flour, and cardamom.',
-      price: 420.00,
-      stock_count: 40,
-      weight_grams: 450,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
-      badge: 'Popular'
-    },
-    {
-      id: 'prod_food_2',
-      name: 'Kovai Crispy Masala Dosa & Sambar Breakfast Box',
-      slug: 'kovai-crispy-masala-dosa-breakfast-box',
-      brand: 'Kovai Kitchen Direct',
-      category_id: 'cat_food',
-      sub_category: 'Breakfast Combos',
-      description: 'Crisp golden dosa filled with spiced potato masala, served steaming hot at 65°C with coconut chutney and piping hot sambar.',
-      price: 180.00,
-      stock_count: 30,
-      weight_grams: 550,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&auto=format&fit=crop&q=80',
-      badge: 'Hot Pod'
-    },
-    {
-      id: 'prod_doc_1',
-      name: 'Biometric Sealed Legal Document Security Pouch',
-      slug: 'biometric-sealed-legal-document-pouch',
-      brand: 'SkyNav Secure',
-      category_id: 'cat_doc',
-      sub_category: 'Legal Courier',
-      description: 'Tamper-evident waterproof polymer envelope with dynamic QR seal, tracked end-to-end for contracts, property deeds, and certificates.',
-      price: 250.00,
-      stock_count: 100,
-      weight_grams: 120,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80',
-      badge: 'Secure Seal'
-    },
-    {
-      id: 'prod_oth_1',
-      name: 'Kovai Heritage Cold-Pressed Sesame Gingelly Oil (500ml)',
-      slug: 'kovai-heritage-sesame-gingelly-oil-500ml',
-      brand: 'Heritage Kovai Organics',
-      category_id: 'cat_other',
-      sub_category: 'Cooking Essentials',
-      description: 'Wood-pressed authentic unrefined gingelly oil extracted with palm jaggery, ideal for South Indian traditional cooking.',
-      price: 260.00,
-      stock_count: 55,
-      weight_grams: 520,
-      is_drone_eligible: 1,
-      is_active: 1,
-      image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
-      badge: 'Organic'
-    }
-  ];
-
-  for (const p of products) {
-    prodStmt.run(p.id, p.name, p.slug, p.brand, p.category_id, p.sub_category, p.description, p.price, p.stock_count, p.weight_grams, p.is_drone_eligible, p.is_active, p.image, p.badge);
+  for (const p of MASTER_PRODUCTS) {
+    prodStmt.run(
+      p.id, p.name, p.slug, p.brand, p.categoryId, p.subCategory, p.description, p.price,
+      p.stockCount, p.weightGrams, p.isDroneEligible ? 1 : 0, 1, p.image, p.badge || null
+    );
   }
 
   // 4. 40 FLEET DRONES AT SKYHUB KURUMBAPALAYAM

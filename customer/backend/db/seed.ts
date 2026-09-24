@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, initDb } from './database.js';
+import { MASTER_CATEGORIES, MASTER_PRODUCTS } from '../../../shared/contracts/catalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,17 +107,8 @@ export const seedDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const categories = [
-    { id: 'cat_food', name: 'Hot Meals & Food', slug: 'Food', desc: 'Fresh chef-crafted meals, authentic South Indian breakfast & delicacies delivered hot.', img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', icon: 'Pizza', order: 1 },
-    { id: 'cat_med', name: 'Medicine & Health', slug: 'Medicine', desc: 'Emergency trauma packs, test kits, inhalers, analgesics & prescription refills.', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80', icon: 'Pill', order: 2 },
-    { id: 'cat_groc', name: 'Fresh Groceries', slug: 'Groceries', desc: 'Aavin fresh dairy, Nilgiris tea, organic farm produce & pantry staples.', img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80', icon: 'ShoppingBag', order: 3 },
-    { id: 'cat_elec', name: 'Tech & Electronics', slug: 'Electronics', desc: 'High-speed GaN chargers, heavy-duty power banks & durable USB-C cables.', img: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80', icon: 'Zap', order: 4 },
-    { id: 'cat_doc', name: 'Instant Documents', slug: 'Documents', desc: 'Secure biometric sealed pouches, legal contracts, notary briefs & deeds.', img: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80', icon: 'FileText', order: 5 },
-    { id: 'cat_other', name: 'Daily Essentials', slug: 'Other', desc: 'Heritage cold-pressed oils, air care, emergency pods & home lifestyle.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80', icon: 'Sparkles', order: 6 },
-  ];
-
-  for (const c of categories) {
-    categoryStmt.run(c.id, c.name, c.slug, c.desc, c.img, c.icon, c.order);
+  for (const c of MASTER_CATEGORIES) {
+    categoryStmt.run(c.id, c.name, c.slug, c.description, c.image, c.icon, c.displayOrder);
   }
 
   // 5. SEED PRODUCTS (INR Prices)
@@ -134,285 +126,12 @@ export const seedDatabase = async () => {
     )
   `);
 
-  const products = [
-    {
-      id: 'prod_elec_1',
-      name: 'BoAt Storm GaN 65W Rapid Dual-Port Fast Charger',
-      slug: 'boat-storm-gan-65w-rapid-fast-charger',
-      brand: 'boAt',
-      categoryId: 'cat_elec',
-      category: 'Electronics',
-      subCategory: 'Charging & Power',
-      description: 'Ultra-compact Gallium Nitride 65W fast charger with dual Type-C and USB-A power delivery for Indian smartphones and laptops.',
-      price: 1299.00,
-      originalPrice: 1999.00,
-      discountPercent: 35,
-      rating: 4.9,
-      reviewCount: 342,
-      inStock: 1,
-      stockCount: 50,
-      isDroneEligible: 1,
-      weightGrams: 180,
-      dimensions: '5.2 x 4.8 x 3.1 cm',
-      deliveryMins: 11,
-      badge: 'Best Seller',
-      featured: 1,
-      tags: JSON.stringify(['gan', 'fast-charger', 'boat', 'electronics', 'type-c']),
-      image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Wattage': '65W GaN', 'Ports': '2x USB-C, 1x USB-A', 'Protocol': 'PD 3.0 / QC 4+', 'Weight': '180g' })
-    },
-    {
-      id: 'prod_elec_2',
-      name: 'Syska 20000mAh Heavy Duty Power Bank',
-      slug: 'syska-20000mah-power-bank',
-      brand: 'Syska',
-      categoryId: 'cat_elec',
-      category: 'Electronics',
-      subCategory: 'Power Accessories',
-      description: 'High-density 20000mAh external battery pack with 22.5W two-way fast charging and LED digital battery level display.',
-      price: 1499.00,
-      originalPrice: 2499.00,
-      discountPercent: 40,
-      rating: 4.8,
-      reviewCount: 218,
-      inStock: 1,
-      stockCount: 35,
-      isDroneEligible: 1,
-      weightGrams: 420,
-      dimensions: '14.2 x 6.8 x 2.8 cm',
-      deliveryMins: 12,
-      badge: 'High Capacity',
-      featured: 1,
-      tags: JSON.stringify(['powerbank', 'syska', 'battery', 'fast-charge']),
-      image: 'https://images.unsplash.com/photo-1609592424368-45097df6db82?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1609592424368-45097df6db82?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Capacity': '20000mAh', 'Output': '22.5W Fast Charge', 'Ports': 'Micro-USB, Type-C, USB-A', 'Weight': '420g' })
-    },
-    {
-      id: 'prod_med_1',
-      name: 'Apollo Rapid Emergency First-Aid Trauma Kit',
-      slug: 'apollo-rapid-emergency-first-aid-trauma-kit',
-      brand: 'Apollo Pharmacy',
-      categoryId: 'cat_med',
-      category: 'Medicine',
-      subCategory: 'Emergency Care',
-      description: 'Sterile hospital-grade emergency trauma pack with tourniquet, antiseptics, sterile gauze dressings, and burn shield.',
-      price: 499.00,
-      originalPrice: 699.00,
-      discountPercent: 28,
-      rating: 5.0,
-      reviewCount: 512,
-      inStock: 1,
-      stockCount: 75,
-      isDroneEligible: 1,
-      weightGrams: 450,
-      dimensions: '18 x 12 x 8 cm',
-      deliveryMins: 8,
-      badge: 'Urgent Dispatch',
-      featured: 1,
-      tags: JSON.stringify(['trauma', 'first-aid', 'apollo', 'sterile', 'emergency']),
-      image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Certification': 'ISO 13485 / Apollo Healthcare', 'Contents': '38 Sterile Items', 'Drop Method': 'Shock-Absorbing Pod', 'Weight': '450g' })
-    },
-    {
-      id: 'prod_med_2',
-      name: 'Amrutanjan Rapid Pain Relief & Vaporub Duo Pack',
-      slug: 'amrutanjan-rapid-pain-relief-duo',
-      brand: 'Amrutanjan Health',
-      categoryId: 'cat_med',
-      category: 'Medicine',
-      subCategory: 'Pain Care',
-      description: 'Trusted ayurvedic pain balm and eucalyptus chest rub for headache, congestion, and muscular fatigue.',
-      price: 199.00,
-      originalPrice: 260.00,
-      discountPercent: 23,
-      rating: 4.8,
-      reviewCount: 420,
-      inStock: 1,
-      stockCount: 90,
-      isDroneEligible: 1,
-      weightGrams: 150,
-      dimensions: '10 x 6 x 5 cm',
-      deliveryMins: 9,
-      badge: 'Essential',
-      featured: 0,
-      tags: JSON.stringify(['pain-relief', 'balm', 'ayurvedic', 'amrutanjan']),
-      image: 'https://images.unsplash.com/photo-1550572017-ed200f5e5a43?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1550572017-ed200f5e5a43?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Form': 'Herbal Balm & Rub', 'Net Volume': '50g + 30g', 'Active Herbs': 'Pudina, Gandhapura, Eucalyptus' })
-    },
-    {
-      id: 'prod_groc_1',
-      name: 'Coimbatore Authentic Filter Coffee Blend (500g)',
-      slug: 'coimbatore-authentic-filter-coffee-blend-500g',
-      brand: 'Kovai Coffee Works',
-      categoryId: 'cat_groc',
-      category: 'Groceries',
-      subCategory: 'Beverages',
-      description: 'Traditional 80:20 plantation peaberry and chicory roast freshly grounded for a rich aromatic South Indian morning cup.',
-      price: 340.00,
-      originalPrice: 420.00,
-      discountPercent: 19,
-      rating: 4.9,
-      reviewCount: 680,
-      inStock: 1,
-      stockCount: 65,
-      isDroneEligible: 1,
-      weightGrams: 520,
-      dimensions: '16 x 10 x 6 cm',
-      deliveryMins: 11,
-      badge: 'Local Favorite',
-      featured: 1,
-      tags: JSON.stringify(['coffee', 'filter-coffee', 'coimbatore', 'south-indian']),
-      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Roast': 'Medium-Dark', 'Blend Ratio': '80% Coffee : 20% Chicory', 'Origin': 'Western Ghats / Anamalai Hills' })
-    },
-    {
-      id: 'prod_groc_2',
-      name: 'Aavin Fresh Farm Pasteurized Pure Milk (1L x 2)',
-      slug: 'aavin-fresh-farm-pure-milk-2l',
-      brand: 'Aavin Tamil Nadu',
-      categoryId: 'cat_groc',
-      category: 'Groceries',
-      subCategory: 'Dairy',
-      description: 'Chilled pasteurized homogenized cow milk delivered in insulated flight thermal pods direct from local dairy union.',
-      price: 120.00,
-      originalPrice: 130.00,
-      discountPercent: 8,
-      rating: 4.9,
-      reviewCount: 1100,
-      inStock: 1,
-      stockCount: 120,
-      isDroneEligible: 1,
-      weightGrams: 1050,
-      dimensions: '20 x 14 x 10 cm',
-      deliveryMins: 10,
-      badge: 'Fresh Daily',
-      featured: 1,
-      tags: JSON.stringify(['milk', 'aavin', 'fresh', 'dairy', 'coimbatore']),
-      image: 'https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Volume': '2 Litres (1L x 2)', 'Fat Content': '4.5% Standardized', 'Temperature': 'Chilled 4°C Pod' })
-    },
-    {
-      id: 'prod_food_1',
-      name: 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)',
-      slug: 'anand-bhavan-ghee-mysore-pak-400g',
-      brand: 'Sri Anand Bhavan',
-      categoryId: 'cat_food',
-      category: 'Food',
-      subCategory: 'Traditional Sweets',
-      description: 'Melt-in-mouth traditional Coimbatore sweet crafted with pure desi ghee, gram flour, and cardamom.',
-      price: 420.00,
-      originalPrice: 480.00,
-      discountPercent: 12,
-      rating: 5.0,
-      reviewCount: 390,
-      inStock: 1,
-      stockCount: 40,
-      isDroneEligible: 1,
-      weightGrams: 450,
-      dimensions: '18 x 14 x 5 cm',
-      deliveryMins: 13,
-      badge: 'Popular',
-      featured: 1,
-      tags: JSON.stringify(['sweets', 'mysore-pak', 'ghee', 'coimbatore', 'anand-bhavan']),
-      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Weight': '400g Net', 'Ingredients': 'Pure Desi Ghee, Gram Flour, Sugar, Cardamom', 'Shelf Life': '15 Days' })
-    },
-    {
-      id: 'prod_food_2',
-      name: 'Kovai Crispy Masala Dosa & Sambar Breakfast Box',
-      slug: 'kovai-crispy-masala-dosa-breakfast-box',
-      brand: 'Kovai Kitchen Direct',
-      categoryId: 'cat_food',
-      category: 'Food',
-      subCategory: 'Breakfast Combos',
-      description: 'Crisp golden dosa filled with spiced potato masala, served steaming hot at 65°C with coconut chutney and piping hot sambar.',
-      price: 180.00,
-      originalPrice: 220.00,
-      discountPercent: 18,
-      rating: 4.8,
-      reviewCount: 520,
-      inStock: 1,
-      stockCount: 30,
-      isDroneEligible: 1,
-      weightGrams: 550,
-      dimensions: '22 x 18 x 8 cm',
-      deliveryMins: 12,
-      badge: 'Hot Pod',
-      featured: 1,
-      tags: JSON.stringify(['dosa', 'breakfast', 'south-indian', 'hot-meal']),
-      image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Packaging': 'Thermal Lock 65°C Pod', 'Includes': '2x Dosa, Sambar (200ml), Chutney', 'Weight': '550g' })
-    },
-    {
-      id: 'prod_doc_1',
-      name: 'Biometric Sealed Legal Document Security Pouch',
-      slug: 'biometric-sealed-legal-document-pouch',
-      brand: 'SkyNav Secure',
-      categoryId: 'cat_doc',
-      category: 'Documents',
-      subCategory: 'Legal Courier',
-      description: 'Tamper-evident waterproof polymer envelope with dynamic QR seal, tracked end-to-end for contracts, property deeds, and certificates.',
-      price: 250.00,
-      originalPrice: 350.00,
-      discountPercent: 28,
-      rating: 4.9,
-      reviewCount: 160,
-      inStock: 1,
-      stockCount: 100,
-      isDroneEligible: 1,
-      weightGrams: 120,
-      dimensions: '32 x 24 x 1 cm',
-      deliveryMins: 8,
-      badge: 'Secure Seal',
-      featured: 0,
-      tags: JSON.stringify(['document', 'legal', 'secure', 'confidential']),
-      image: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Security': 'Dynamic Handover OTP', 'Capacity': 'Up to 50 A4 Sheets', 'Waterproofing': 'IP68 Enclosure' })
-    },
-    {
-      id: 'prod_oth_1',
-      name: 'Kovai Heritage Cold-Pressed Sesame Gingelly Oil (500ml)',
-      slug: 'kovai-heritage-sesame-gingelly-oil-500ml',
-      brand: 'Heritage Kovai Organics',
-      categoryId: 'cat_other',
-      category: 'Other',
-      subCategory: 'Cooking Essentials',
-      description: 'Wood-pressed authentic unrefined gingelly oil extracted with palm jaggery, ideal for South Indian traditional cooking.',
-      price: 260.00,
-      originalPrice: 320.00,
-      discountPercent: 19,
-      rating: 4.8,
-      reviewCount: 290,
-      inStock: 1,
-      stockCount: 55,
-      isDroneEligible: 1,
-      weightGrams: 520,
-      dimensions: '18 x 7 x 7 cm',
-      deliveryMins: 11,
-      badge: 'Organic',
-      featured: 0,
-      tags: JSON.stringify(['oil', 'gingelly', 'sesame', 'cold-pressed', 'organic']),
-      image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
-      images: JSON.stringify(['https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80']),
-      specs: JSON.stringify({ 'Extraction': 'Traditional Wood Vaagai Chekku', 'Net Volume': '500ml', 'Purity': '100% Raw Unfiltered' })
-    }
-  ];
-
-  for (const p of products) {
+  for (const p of MASTER_PRODUCTS) {
     productStmt.run(
       p.id, p.name, p.slug, p.brand, p.categoryId, p.subCategory, p.description, p.price,
-      p.originalPrice, p.discountPercent, p.rating, p.reviewCount, p.inStock, p.stockCount,
-      p.isDroneEligible, p.weightGrams, p.dimensions, p.deliveryMins,
-      p.badge, p.tags, p.specs, p.image, p.images
+      p.originalPrice, p.discountPercent, p.rating, p.reviewCount, p.inStock ? 1 : 0, p.stockCount,
+      p.isDroneEligible ? 1 : 0, p.weightGrams, p.dimensions, p.deliveryMins,
+      p.badge || null, JSON.stringify(p.features), JSON.stringify(p.specs), p.image, JSON.stringify(p.images)
     );
   }
 
@@ -516,8 +235,8 @@ export const seedDatabase = async () => {
     new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
   );
 
-  orderItemStmt.run('item_1001_1', 'ORD-1001', 'prod_food_1', 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)', 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80', 420.00, 1, 420.00, 450);
-  orderItemStmt.run('item_1001_2', 'ORD-1001', 'prod_med_1', 'Apollo Rapid Emergency First-Aid Trauma Kit', 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80', 499.00, 1, 499.00, 450);
+  orderItemStmt.run('item_1001_1', 'ORD-1001', 'prod_food_1', 'Anand Bhavan Ghee Mysore Pak Special Gift Box (400g)', '/images/products/ghee_mysore_pak.jpg', 420.00, 1, 420.00, 450);
+  orderItemStmt.run('item_1001_2', 'ORD-1001', 'prod_med_1', 'Apollo Rapid Emergency First-Aid Trauma Kit', '/images/products/first_aid_kit.jpg', 499.00, 1, 499.00, 450);
 
   statusHistoryStmt.run('hist_1001_1', 'ORD-1001', null, 'Order Placed', 'Order placed successfully.', 1, '-2 days');
   statusHistoryStmt.run('hist_1001_2', 'ORD-1001', 'Order Placed', 'Order Confirmed', 'Payment confirmed via Razorpay.', 1, '-2 days');
