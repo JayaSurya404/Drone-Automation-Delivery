@@ -80,6 +80,36 @@ router.post('/orders', (req: Request, res: Response): void => {
 
     console.log(`📥 [AdminInternal] Received order #${payload.customerOrderId} -> Created operational order #${operationalOrderId}`);
 
+    // Query inserted order and broadcast ORDER_CREATED event to connected admin clients
+    const orderRow = queryOne<any>('SELECT * FROM operational_orders WHERE id = ?', [operationalOrderId]);
+    if (orderRow) {
+      const orderPayload = {
+        id: orderRow.id,
+        customerOrderId: orderRow.customer_order_id,
+        customerName: orderRow.customer_name,
+        customerPhone: orderRow.customer_phone,
+        merchantName: 'SkyHub Kurumbapalayam',
+        packageName: orderRow.package_name,
+        packageWeightKg: orderRow.package_weight_kg,
+        pickupAddress: orderRow.pickup_address,
+        pickupCoords: { lat: orderRow.pickup_lat, lng: orderRow.pickup_lng },
+        destinationAddress: orderRow.destination_address,
+        destinationCoords: { lat: orderRow.destination_lat, lng: orderRow.destination_lng },
+        status: orderRow.status,
+        deliverySpeed: orderRow.delivery_speed,
+        handoverOtp: orderRow.handover_otp,
+        totalAmount: orderRow.total_amount,
+        createdAt: orderRow.created_at,
+        updatedAt: orderRow.updated_at,
+      };
+
+      telemetryEngine.broadcastToAdmin('ORDER_CREATED', {
+        operationalOrderId,
+        customerOrderId: payload.customerOrderId,
+        order: orderPayload,
+      });
+    }
+
     res.status(201).json({
       success: true,
       operationalOrderId,

@@ -14,8 +14,10 @@ const DEFAULT_HUB: HubLocation = {
 class RealtimeDeliveryService {
   private listeners: Set<EventListener> = new Set();
   private activeWs: WebSocket | null = null;
+  private activeSse: EventSource | null = null;
   private activePollInterval: ReturnType<typeof setInterval> | null = null;
   private currentOrderId: string | null = null;
+  private lastTelemetryReceivedTime: number = 0;
 
   public getHubLocation(): HubLocation {
     return DEFAULT_HUB;
@@ -38,119 +40,116 @@ class RealtimeDeliveryService {
     });
   }
 
-  // Connect to authoritative WebSocket telemetry stream from Customer Backend
+  private processTelemetryPacket(t: any, orderId: string) {
+    if (!t) return;
+    this.lastTelemetryReceivedTime = Date.now();
+
+    const isDone = t.isCompleted || t.status === 'Delivered';
+    const loc = t.currentLocation || t.currentDroneLocation || (t.latitude !== undefined ? {
+      latitude: t.latitude,
+      longitude: t.longitude,
+      altitudeMeters: t.altitudeMeters ?? 0,
+      speedKmh: t.speedKmh ?? 0,
+      bearing: t.bearing ?? 0,
+    } : undefined);
+
+    if (loc && loc.latitude && loc.longitude) {
+      this.emit({
+        type: isDone ? 'DELIVERY_COMPLETED' : 'DRONE_LOCATION_UPDATED',
+        orderId: t.orderId || orderId,
+        timestamp: t.timestamp || new Date().toISOString(),
+        status: (t.status || t.orderStatus || 'in_flight') as CustomerOrderStatus,
+        location: {
+          latitude: Number(loc.latitude),
+          longitude: Number(loc.longitude),
+          altitudeMeters: Number(loc.altitudeMeters || 0),
+          speedKmh: Number(loc.speedKmh || 0),
+          bearing: Number(loc.bearing || 0),
+        },
+        remainingDistanceKm: t.remainingDistanceKm,
+        estimatedArrivalMins: t.estimatedArrivalMins,
+        message: `Drone status: ${t.status || t.orderStatus || 'in_flight'}. Alt: ${loc.altitudeMeters || 0}m, Speed: ${loc.speedKmh || 0} km/h`,
+      });
+    }
+  }
+
+  // Connect to authoritative telemetry stream (SSE + WebSocket + Fast Fallback)
   public connectToOrderStream(orderId: string, _destLat?: number, _destLng?: number): () => void {
-    // Clean up any existing connection
     this.disconnect();
     this.currentOrderId = orderId;
+    this.lastTelemetryReceivedTime = Date.now();
 
+    // 1. PRIMARY TRANSPORT: Server-Sent Events (SSE) via standard HTTP proxy (/api)
+    if (typeof EventSource !== 'undefined') {
+      try {
+        const sseUrl = `/api/tracking/${orderId}/events`;
+        const es = new EventSource(sseUrl);
+        this.activeSse = es;
+
+        es.onmessage = (event) => {
+          try {
+            if (event.data && event.data.trim()) {
+              const data = JSON.parse(event.data);
+              this.processTelemetryPacket(data, orderId);
+            }
+          } catch (e) {
+            console.error('[Realtime SSE] Error parsing:', e);
+          }
+        };
+
+        es.onerror = () => {
+          // SSE natively auto-reconnects
+        };
+      } catch (e) {
+        console.warn('[Realtime] SSE initialization failed:', e);
+      }
+    }
+
+    // 2. SECONDARY TRANSPORT: WebSocket connection
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use host (proxied by Vite in dev to :5000) or explicit backend port
     const wsHost = window.location.host;
     const wsUrl = `${protocol}//${wsHost}/ws?orderId=${orderId}`;
 
-    let socket: WebSocket | null = null;
-
     try {
-      socket = new WebSocket(wsUrl);
+      const socket = new WebSocket(wsUrl);
       this.activeWs = socket;
-
-      socket.onopen = () => {
-        console.log(`[Realtime] Connected to telemetry WebSocket for order: ${orderId}`);
-      };
 
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-
           if (message.type === 'TELEMETRY_UPDATE' && message.data) {
-            const t = message.data;
-            const eventType = t.isCompleted || t.status === 'Delivered'
-              ? 'DELIVERY_COMPLETED'
-              : 'DRONE_LOCATION_UPDATED';
-
-            this.emit({
-              type: eventType,
-              orderId: t.orderId || orderId,
-              timestamp: t.timestamp || new Date().toISOString(),
-              status: t.status as CustomerOrderStatus,
-              location: t.currentLocation ? {
-                latitude: t.currentLocation.latitude,
-                longitude: t.currentLocation.longitude,
-                altitudeMeters: t.currentLocation.altitudeMeters,
-                speedKmh: t.currentLocation.speedKmh,
-                bearing: t.currentLocation.bearing,
-              } : undefined,
-              remainingDistanceKm: t.remainingDistanceKm,
-              estimatedArrivalMins: t.estimatedArrivalMins,
-              message: `Drone status: ${t.status}. Alt: ${t.currentLocation?.altitudeMeters || 0}m, Speed: ${t.currentLocation?.speedKmh || 0} km/h`,
-            });
+            this.processTelemetryPacket(message.data, orderId);
           } else if (message.type === 'SNAPSHOT' && message.data) {
-            const s = message.data;
-            if (s.currentDroneLocation) {
-              this.emit({
-                type: 'DRONE_LOCATION_UPDATED',
-                orderId: s.orderId || orderId,
-                timestamp: s.lastUpdated || new Date().toISOString(),
-                status: s.orderStatus as CustomerOrderStatus,
-                location: s.currentDroneLocation,
-                remainingDistanceKm: s.remainingDistanceKm,
-                estimatedArrivalMins: s.estimatedArrivalMins,
-                message: `Current status: ${s.orderStatus}`,
-              });
-            }
+            this.processTelemetryPacket(message.data, orderId);
           }
         } catch (e) {
-          console.error('[Realtime] Failed to parse WebSocket message:', e);
+          console.error('[Realtime WS] Failed to parse message:', e);
         }
       };
 
-      socket.onerror = (err) => {
-        console.warn('[Realtime] WebSocket error, starting polling fallback:', err);
-        this.startPollingFallback(orderId);
+      socket.onerror = () => {
+        // Will rely on SSE and polling fallback
       };
-
-      socket.onclose = () => {
-        console.log(`[Realtime] WebSocket closed for order: ${orderId}`);
-      };
-    } catch (err) {
-      console.warn('[Realtime] WebSocket initialization error, starting polling fallback:', err);
-      this.startPollingFallback(orderId);
+    } catch (e) {
+      console.warn('[Realtime WS] WebSocket initialization error:', e);
     }
+
+    // 3. FAST RESILIENT POLLING FALLBACK (Checks every 600ms if no stream packets arrived)
+    this.activePollInterval = setInterval(async () => {
+      const idleTime = Date.now() - this.lastTelemetryReceivedTime;
+      if (idleTime > 1200) {
+        try {
+          const snapshot = await api.tracking.getSnapshot(orderId);
+          if (snapshot && (snapshot.currentDroneLocation || (snapshot as any).currentLocation)) {
+            this.processTelemetryPacket(snapshot, orderId);
+          }
+        } catch {}
+      }
+    }, 600);
 
     return () => {
       this.disconnect();
     };
-  }
-
-  private startPollingFallback(orderId: string) {
-    if (this.activePollInterval) return;
-
-    this.activePollInterval = setInterval(async () => {
-      try {
-        const snapshot = await api.tracking.getSnapshot(orderId);
-        if (snapshot && snapshot.currentDroneLocation) {
-          const isDone = snapshot.orderStatus === 'Delivered' || snapshot.isCompleted;
-          this.emit({
-            type: isDone ? 'DELIVERY_COMPLETED' : 'DRONE_LOCATION_UPDATED',
-            orderId,
-            timestamp: snapshot.lastUpdated || new Date().toISOString(),
-            status: snapshot.orderStatus as CustomerOrderStatus,
-            location: snapshot.currentDroneLocation,
-            remainingDistanceKm: snapshot.remainingDistanceKm,
-            estimatedArrivalMins: snapshot.estimatedArrivalMins,
-            message: `Current status: ${snapshot.orderStatus}`,
-          });
-
-          if (isDone && this.activePollInterval) {
-            clearInterval(this.activePollInterval);
-            this.activePollInterval = null;
-          }
-        }
-      } catch (err) {
-        console.warn('[Realtime] Polling fallback error:', err);
-      }
-    }, 2500);
   }
 
   public disconnect() {
@@ -159,6 +158,12 @@ class RealtimeDeliveryService {
         this.activeWs.close();
       } catch {}
       this.activeWs = null;
+    }
+    if (this.activeSse) {
+      try {
+        this.activeSse.close();
+      } catch {}
+      this.activeSse = null;
     }
     if (this.activePollInterval) {
       clearInterval(this.activePollInterval);

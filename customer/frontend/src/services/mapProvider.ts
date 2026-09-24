@@ -40,6 +40,9 @@ export class LeafletMapProvider implements IMapProvider {
   private destMarker: any = null;
   private hubMarker: any = null;
   private flightPolyline: any = null;
+  private traveledPolyline: any = null;
+  private traveledPoints: [number, number][] = [];
+  private pendingDroneLocation: DroneLocation | null = null;
   private geofenceCircle: any = null;
   private nfzLayerGroup: any = null;
   private clearanceCircle: any = null;
@@ -87,6 +90,12 @@ export class LeafletMapProvider implements IMapProvider {
       }
     ).addTo(this.mapInstance);
 
+    // If an update arrived while initializing, flush it now
+    if (this.pendingDroneLocation) {
+      this.updateDronePosition(this.pendingDroneLocation);
+      this.pendingDroneLocation = null;
+    }
+
     // Recalculate dimensions once mounted in DOM
     setTimeout(() => {
       this.invalidateSize();
@@ -107,7 +116,14 @@ export class LeafletMapProvider implements IMapProvider {
   }
 
   public updateDronePosition(location: DroneLocation): void {
-    if (!this.mapInstance || !this.L) return;
+    if (!this.mapInstance || !this.L) {
+      this.pendingDroneLocation = location;
+      return;
+    }
+
+    const lat = Number(location.latitude);
+    const lng = Number(location.longitude);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
 
     const heading = location.bearing || 0;
     const customDroneHtml = `
@@ -132,10 +148,32 @@ export class LeafletMapProvider implements IMapProvider {
     });
 
     if (this.droneMarker) {
-      this.droneMarker.setLatLng([location.latitude, location.longitude]);
+      this.droneMarker.setLatLng([lat, lng]);
       this.droneMarker.setIcon(icon);
     } else {
-      this.droneMarker = this.L.marker([location.latitude, location.longitude], { icon }).addTo(this.mapInstance);
+      this.droneMarker = this.L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(this.mapInstance);
+    }
+
+    // Traveled route maintenance
+    const currentPt: [number, number] = [lat, lng];
+    if (this.traveledPoints.length === 0) {
+      this.traveledPoints.push(currentPt);
+    } else {
+      const last = this.traveledPoints[this.traveledPoints.length - 1];
+      if (Math.abs(last[0] - lat) > 0.00001 || Math.abs(last[1] - lng) > 0.00001) {
+        this.traveledPoints.push(currentPt);
+      }
+    }
+
+    if (this.traveledPolyline) {
+      this.traveledPolyline.setLatLngs(this.traveledPoints);
+    } else if (this.mapInstance && this.traveledPoints.length > 1) {
+      this.traveledPolyline = this.L.polyline(this.traveledPoints, {
+        color: '#06b6d4',
+        weight: 4,
+        opacity: 0.9,
+        lineCap: 'round',
+      }).addTo(this.mapInstance);
     }
   }
 
@@ -409,6 +447,12 @@ export class LeafletMapProvider implements IMapProvider {
       this.destMarker = null;
       this.droneMarker = null;
       this.hubMarker = null;
+      if (this.traveledPolyline) {
+        this.traveledPolyline.remove();
+        this.traveledPolyline = null;
+      }
+      this.traveledPoints = [];
+      this.pendingDroneLocation = null;
       this.flightPolyline = null;
       this.geofenceCircle = null;
       this.mapInstance.remove();

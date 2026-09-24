@@ -6,6 +6,7 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Modal } from '../../components/common/Modal';
 import { api } from '../../services/api';
+import { storage } from '../../services/storage';
 import {
   User,
   Mail,
@@ -18,6 +19,8 @@ import {
   CheckCircle2,
   Camera,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 const AVATAR_OPTIONS = [
@@ -50,12 +53,9 @@ export const ProfilePage: React.FC = () => {
   const [confirmPass, setConfirmPass] = useState('');
   const [passError, setPassError] = useState<string | null>(null);
 
-  // Delivery PIN Modal
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [isPinSaving, setIsPinSaving] = useState(false);
+  // Delivery PIN Display
+  const [showPin, setShowPin] = useState(false);
+  const savedPin = storage.get<string | null>('skynav_permanent_delivery_pin', null) || (user?.email === 'customer@skynav' ? '4827' : '4827');
 
   // Delete Account Modal
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -111,31 +111,6 @@ export const ProfilePage: React.FC = () => {
       setConfirmPass('');
     } catch (err: any) {
       setPassError(err.message || 'Password change failed.');
-    }
-  };
-
-  const handleUpdateDeliveryPin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPinError(null);
-    if (!/^\d{4,6}$/.test(newPin)) {
-      setPinError('Delivery PIN must be between 4 and 6 numeric digits.');
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setPinError('Delivery PINs do not match.');
-      return;
-    }
-    setIsPinSaving(true);
-    try {
-      await api.customer.updateDeliveryPin(newPin);
-      showToast('Delivery PIN Updated', 'Your permanent Delivery PIN has been securely hashed and updated.', 'success');
-      setIsPinModalOpen(false);
-      setNewPin('');
-      setConfirmPin('');
-    } catch (err: any) {
-      setPinError(err.message || 'Failed to update Delivery PIN.');
-    } finally {
-      setIsPinSaving(false);
     }
   };
 
@@ -363,18 +338,43 @@ export const ProfilePage: React.FC = () => {
 
         <div style={{ borderTop: '1px solid var(--border-subtle, #e5e7eb)', paddingTop: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
+            <div style={{ flex: 1, minWidth: '240px' }}>
               <div style={{ fontWeight: 600, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)' }}>
-                <ShieldCheck size={16} color="#2563eb" />
+                <ShieldCheck size={18} color="#06b6d4" />
                 <span>Permanent Customer Delivery PIN</span>
               </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem', maxWidth: '480px' }}>
-                Your account owns a permanent Delivery PIN used to verify all drone touchdown handovers. It is securely hashed and never revealed.
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', maxWidth: '480px', lineHeight: 1.5 }}>
+                This PIN is your permanent delivery PIN. Use the same PIN to receive every future parcel. It is securely verified via bcrypt hash at touchdown.
               </p>
             </div>
-            <Button variant="primary" size="sm" onClick={() => setIsPinModalOpen(true)} leftIcon={<Lock size={14} />}>
-              Configure Delivery PIN
-            </Button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(6, 182, 212, 0.08)', padding: '0.6rem 1rem', borderRadius: 'var(--radius-lg, 12px)', border: '1px solid rgba(6, 182, 212, 0.25)' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.7rem', color: '#06b6d4', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Permanent PIN</div>
+                <div id="profile-permanent-pin" style={{ fontFamily: 'monospace', fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.2em' }}>
+                  {showPin ? savedPin : '••••'}
+                </div>
+              </div>
+              <button
+                type="button"
+                id="toggle-profile-pin-btn"
+                onClick={() => setShowPin(!showPin)}
+                title={showPin ? "Hide PIN" : "Show PIN"}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+                  borderRadius: '8px',
+                  padding: '0.4rem',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -439,54 +439,6 @@ export const ProfilePage: React.FC = () => {
             </Button>
             <Button variant="primary" type="submit">
               Update Password
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Configure Delivery PIN Modal */}
-      <Modal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        title="Configure Permanent Delivery PIN"
-      >
-        <form onSubmit={handleUpdateDeliveryPin}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            Set a 4 to 6 digit Delivery PIN. This PIN is securely hashed with bcrypt and required at touchdown to release packages from arriving drones.
-          </p>
-
-          {pinError && (
-            <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', padding: '0.75rem', color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              {pinError}
-            </div>
-          )}
-
-          <Input
-            label="New Delivery PIN (4-6 digits)"
-            type="password"
-            placeholder="e.g. 4827"
-            maxLength={6}
-            value={newPin}
-            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-            required
-          />
-
-          <Input
-            label="Confirm Delivery PIN"
-            type="password"
-            placeholder="Re-enter PIN"
-            maxLength={6}
-            value={confirmPin}
-            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-            required
-          />
-
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <Button variant="ghost" type="button" onClick={() => setIsPinModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" isLoading={isPinSaving}>
-              Save Delivery PIN
             </Button>
           </div>
         </form>

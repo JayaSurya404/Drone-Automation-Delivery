@@ -52,10 +52,10 @@ router.post('/register', async (req, res): Promise<void> => {
 
     const userId = `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const passwordHash = await bcrypt.hash(password, 10);
-    let deliveryPinHash: string | null = null;
-    if (deliveryPin && /^\d{4,6}$/.test(deliveryPin.toString().trim())) {
-      deliveryPinHash = await bcrypt.hash(deliveryPin.toString().trim(), 10);
-    }
+    
+    // System automatically generates permanent 4-digit numeric delivery PIN
+    const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
+    const deliveryPinHash = await bcrypt.hash(generatedPin, 10);
 
     // Transaction to create active user, notification preferences, cart, wishlist, and welcome notification
     db.transaction(() => {
@@ -99,9 +99,10 @@ router.post('/register', async (req, res): Promise<void> => {
       user: {
         ...user,
         isVerified: true,
-        hasDeliveryPin: Boolean(deliveryPinHash),
+        hasDeliveryPin: true,
         notificationPreferences: prefs || { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
       },
+      deliveryPin: generatedPin,
       token,
       requiresVerification: false,
       email: cleanEmail,
@@ -663,28 +664,11 @@ router.post('/logout', (req, res): void => {
   res.json({ success: true, message: 'Logged out successfully.' });
 });
 
-// 11. SET / UPDATE PERMANENT CUSTOMER DELIVERY PIN (AUTHENTICATED)
+// 11. PERMANENT CUSTOMER DELIVERY PIN (SYSTEM-GENERATED ONLY)
 router.put('/delivery-pin', authenticateToken, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { pin } = req.body;
-    const userId = req.user!.id;
-
-    if (!pin || !/^\d{4,6}$/.test(pin.toString().trim())) {
-      res.status(400).json({ error: 'Delivery PIN must be a 4 to 6 digit numeric code.' });
-      return;
-    }
-
-    const pinHash = await bcrypt.hash(pin.toString().trim(), 10);
-    runCommand("UPDATE users SET delivery_pin_hash = ?, updated_at = datetime('now') WHERE id = ?", [pinHash, userId]);
-
-    res.json({
-      success: true,
-      hasDeliveryPin: true,
-      message: 'Permanent Customer Delivery PIN updated successfully.'
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to update Delivery PIN.' });
-  }
+  res.status(403).json({
+    error: 'Customer Delivery PIN is permanent and system-generated. It cannot be manually modified.',
+  });
 });
 
 export default router;

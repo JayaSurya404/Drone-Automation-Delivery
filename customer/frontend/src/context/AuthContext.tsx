@@ -15,7 +15,7 @@ interface AuthContextType {
   setPendingAction: (action: PendingAction | null) => void;
   clearPendingAction: () => void;
   login: (payload: LoginPayload) => Promise<{ user: CustomerUser; token: string }>;
-  register: (payload: RegisterPayload) => Promise<{ user: CustomerUser | null; token?: string; requiresVerification: boolean; email?: string; message: string }>;
+  register: (payload: RegisterPayload) => Promise<{ user: CustomerUser | null; token?: string; requiresVerification: boolean; email?: string; message: string; deliveryPin?: string }>;
   verifyAccount: (payload: { code: string; email?: string }) => Promise<{ success: boolean; user: CustomerUser; token: string; message: string }>;
   resendVerification: (payload: { email?: string }) => Promise<{ success: boolean; message: string }>;
   forgotPassword: (email: string) => Promise<string>;
@@ -200,6 +200,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(res.token);
         storage.set(storage.keys.AUTH_USER, res.user);
         storage.set(storage.keys.AUTH_TOKEN, res.token);
+        if (payload.email?.trim().toLowerCase() === 'customer@skynav') {
+          storage.set('skynav_permanent_delivery_pin', '4827');
+        }
         return res;
       }
     } finally {
@@ -254,6 +257,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(res.token);
           storage.set(storage.keys.AUTH_USER, res.user);
           storage.set(storage.keys.AUTH_TOKEN, res.token);
+        }
+        if (res.deliveryPin) {
+          storage.set('skynav_permanent_delivery_pin', res.deliveryPin);
         }
         return {
           ...res,

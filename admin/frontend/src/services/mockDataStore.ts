@@ -387,8 +387,48 @@ class MockDataStore {
             this.addNotification(`Order ${data.orderId} verified and delivered. Drone return flight active.`, 'success');
             this.notify();
           } else if (payload.type === 'ORDER_CREATED') {
+            const data = payload.data;
+            const newOrder = data?.order;
+            if (newOrder) {
+              const existingIdx = this.orders.findIndex(
+                (o) => o.id === newOrder.id || (newOrder.customerOrderId && o.customerId === newOrder.customerOrderId)
+              );
+              const mappedOrder: Order = {
+                id: newOrder.id,
+                customerId: newOrder.customerOrderId || 'C-1001',
+                customerName: newOrder.customerName || 'Customer',
+                customerEmail: 'customer@skynav',
+                merchantId: 'M-01',
+                merchantName: newOrder.merchantName || 'SkyHub Kurumbapalayam',
+                packageId: `PKG-${newOrder.id}`,
+                packageName: newOrder.packageName || 'Package Pod',
+                packageWeightKg: newOrder.packageWeightKg || 1.2,
+                packageDimensions: '25x20x15 cm',
+                pickupAddress: newOrder.pickupAddress || 'SkyHub Kurumbapalayam',
+                pickupCoords: newOrder.pickupCoords || { lat: 11.1132, lng: 77.0277 },
+                destinationAddress: newOrder.destinationAddress || 'Customer Destination',
+                destinationCoords: newOrder.destinationCoords || { lat: 11.1132, lng: 77.0277 },
+                droneId: newOrder.droneId,
+                missionId: newOrder.missionId,
+                paymentStatus: 'successful',
+                paymentAmount: newOrder.totalAmount || 49,
+                status: (newOrder.status as any) || 'pending_dispatch',
+                createdAt: newOrder.createdAt || new Date().toISOString(),
+                updatedAt: newOrder.updatedAt || new Date().toISOString(),
+                timestamps: {
+                  created: newOrder.createdAt || new Date().toISOString(),
+                },
+              };
+
+              if (existingIdx >= 0) {
+                this.orders[existingIdx] = { ...this.orders[existingIdx], ...mappedOrder };
+              } else {
+                this.orders.unshift(mappedOrder);
+              }
+              this.addNotification(`New Customer Order Received: ${newOrder.id} (${newOrder.customerName})`, 'info');
+              this.notify();
+            }
             this.fetchOperationalData();
-            this.addNotification(`New Customer Order Received: ${payload.data.customerOrderId}`, 'info');
           }
         } catch (e) {
           console.error('[Admin Store] Error parsing WebSocket message:', e);
@@ -401,7 +441,7 @@ class MockDataStore {
 
       this.ws.onclose = () => {
         console.log('[Admin Store] WebSocket closed. Will attempt reconnect on next cycle.');
-        setTimeout(() => this.connectWebSocket(), 5000);
+        setTimeout(() => this.connectWebSocket(), 3000);
       };
     } catch (e) {
       console.warn('[Admin Store] WebSocket setup error:', e);

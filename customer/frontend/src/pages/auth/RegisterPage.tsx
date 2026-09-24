@@ -17,7 +17,6 @@ export const RegisterPage: React.FC = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    deliveryPin: '',
     acceptTerms: true,
     acceptPrivacy: true,
   });
@@ -27,9 +26,11 @@ export const RegisterPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [generatedDeliveryPin, setGeneratedDeliveryPin] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[DEBUG-AUTH] RegisterPage handleSubmit called with formData:', JSON.stringify(formData));
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) newErrors.name = 'Full name is required.';
@@ -48,15 +49,145 @@ export const RegisterPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await register(formData);
-      showToast('Account Created 🎉', 'Welcome to SkyNav!', 'success');
-      navigate('/dashboard');
+      const res = await register(formData);
+      if (res?.deliveryPin) {
+        setGeneratedDeliveryPin(res.deliveryPin);
+        showToast('Account Created 🎉', 'Your permanent delivery PIN is ready.', 'success');
+      } else {
+        showToast('Account Created 🎉', 'Welcome to SkyNav!', 'success');
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       setErrors({ form: err.message || 'Registration failed. Please check your information.' });
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (generatedDeliveryPin) {
+    return (
+      <div style={{ minHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem 1rem' }}>
+        <div
+          className="card glass-panel"
+          style={{
+            width: '100%',
+            maxWidth: '520px',
+            padding: '3rem 2.5rem',
+            borderRadius: 'var(--radius-xl)',
+            textAlign: 'center',
+            background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.85))',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(6, 182, 212, 0.15)',
+            border: '1px solid rgba(6, 182, 212, 0.3)',
+          }}
+        >
+          <div
+            style={{
+              width: '72px',
+              height: '72px',
+              background: 'rgba(6, 182, 212, 0.12)',
+              border: '2px solid #06b6d4',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#06b6d4',
+              margin: '0 auto 1.5rem',
+              boxShadow: '0 0 30px rgba(6, 182, 212, 0.3)',
+            }}
+          >
+            <ShieldCheck size={38} />
+          </div>
+
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc', marginBottom: '0.5rem' }}>
+            Registration Complete! 🎉
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
+            Welcome to SkyNav Autonomous Aero Delivery.
+          </p>
+
+          <div
+            style={{
+              background: 'rgba(6, 182, 212, 0.08)',
+              border: '1px solid rgba(6, 182, 212, 0.35)',
+              borderRadius: 'var(--radius-lg, 16px)',
+              padding: '1.75rem',
+              margin: '1.5rem 0',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.8rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.12em',
+                fontWeight: 700,
+                color: '#38bdf8',
+                marginBottom: '0.75rem',
+              }}
+            >
+              Your Permanent Delivery PIN
+            </div>
+
+            <div
+              id="permanent-delivery-pin-display"
+              style={{
+                fontSize: '3rem',
+                fontWeight: 900,
+                letterSpacing: '0.35em',
+                color: '#38bdf8',
+                fontFamily: 'monospace',
+                padding: '0.75rem 1.5rem',
+                background: 'rgba(15, 23, 42, 0.85)',
+                borderRadius: '12px',
+                display: 'inline-block',
+                border: '2px solid rgba(56, 189, 248, 0.4)',
+                boxShadow: '0 0 25px rgba(56, 189, 248, 0.25)',
+                margin: '0.5rem 0 1rem',
+              }}
+            >
+              {generatedDeliveryPin}
+            </div>
+
+            <p
+              style={{
+                color: '#e2e8f0',
+                fontSize: '0.95rem',
+                lineHeight: 1.6,
+                fontWeight: 500,
+                margin: '0.5rem auto 0',
+                maxWidth: '420px',
+              }}
+            >
+              This PIN is your permanent delivery PIN.<br />
+              Use the same PIN to receive every future parcel.
+            </p>
+
+            <div
+              style={{
+                marginTop: '1rem',
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.4,
+              }}
+            >
+              🔒 Stored securely via bcrypt salt hash. You can view it anytime in your Profile & Delivery Security.
+            </div>
+          </div>
+
+          <Button
+            variant="primary"
+            fullWidth
+            size="lg"
+            id="continue-to-dashboard-btn"
+            onClick={() => navigate('/dashboard')}
+            rightIcon={<ArrowRight size={18} />}
+          >
+            Continue to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (isRegistered) {
     return (
@@ -184,12 +315,14 @@ export const RegisterPage: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate>
+        <form id="customer-register-form" onSubmit={handleSubmit} noValidate>
           <Input
+            id="register-name"
+            name="name"
             label="Full Name"
             placeholder="John Doe"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             leftIcon={<User size={18} />}
             error={errors.name}
             required
@@ -198,21 +331,25 @@ export const RegisterPage: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <Input
+              id="register-email"
+              name="email"
               label="Email Address"
               type="text"
               placeholder="customer@skynav"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
               leftIcon={<Mail size={18} />}
               error={errors.email}
               required
               autoComplete="email"
             />
             <Input
+              id="register-phone"
+              name="phone"
               label="Mobile Phone"
               placeholder="+91 98422 00000"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
               leftIcon={<Phone size={18} />}
               error={errors.phone}
               required
@@ -222,11 +359,13 @@ export const RegisterPage: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <Input
+              id="register-password"
+              name="password"
               label="Password"
               type={showPassword ? 'text' : 'password'}
               placeholder="Min. 8 characters"
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
               leftIcon={<Lock size={18} />}
               rightIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               onRightIconClick={() => setShowPassword(!showPassword)}
@@ -235,11 +374,13 @@ export const RegisterPage: React.FC = () => {
               autoComplete="new-password"
             />
             <Input
+              id="register-confirm-password"
+              name="confirmPassword"
               label="Confirm Password"
               type={showPassword ? 'text' : 'password'}
               placeholder="Re-enter password"
               value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              onChange={(e) => setFormData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
               leftIcon={<Lock size={18} />}
               error={errors.confirmPassword}
               required
@@ -247,26 +388,14 @@ export const RegisterPage: React.FC = () => {
             />
           </div>
 
-          <div style={{ marginTop: '0.25rem' }}>
-            <Input
-              label="Permanent Delivery PIN (4-6 digits, optional)"
-              type="password"
-              placeholder="e.g. 4827 (used for drone package handover)"
-              maxLength={6}
-              value={formData.deliveryPin}
-              onChange={(e) => setFormData({ ...formData, deliveryPin: e.target.value.replace(/\D/g, '') })}
-              leftIcon={<ShieldCheck size={18} />}
-              hint="Your permanent secure PIN to release arriving packages at your drop zone. You can also configure this later."
-            />
-          </div>
-
           {/* Terms Checkbox */}
           <div style={{ margin: '1rem 0 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.825rem', cursor: 'pointer' }}>
               <input
+                id="register-accept-terms"
                 type="checkbox"
                 checked={formData.acceptTerms}
-                onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, acceptTerms: e.target.checked }))}
                 style={{ marginTop: '0.2rem', accentColor: 'var(--accent-cyan)' }}
               />
               <span style={{ color: 'var(--text-secondary)' }}>
@@ -277,9 +406,10 @@ export const RegisterPage: React.FC = () => {
 
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.825rem', cursor: 'pointer' }}>
               <input
+                id="register-accept-privacy"
                 type="checkbox"
                 checked={formData.acceptPrivacy}
-                onChange={(e) => setFormData({ ...formData, acceptPrivacy: e.target.checked })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, acceptPrivacy: e.target.checked }))}
                 style={{ marginTop: '0.2rem', accentColor: 'var(--accent-cyan)' }}
               />
               <span style={{ color: 'var(--text-secondary)' }}>
@@ -289,6 +419,7 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           <Button
+            id="register-submit-btn"
             type="submit"
             variant="primary"
             size="lg"

@@ -86,7 +86,7 @@ export const api = {
       return request<CustomerUser>('/auth/me');
     },
 
-    register: async (payload: RegisterPayload): Promise<{ user: CustomerUser | null; token?: string; requiresVerification: boolean; email?: string; message: string }> => {
+    register: async (payload: RegisterPayload): Promise<{ user: CustomerUser | null; token?: string; requiresVerification: boolean; email?: string; message: string; deliveryPin?: string }> => {
       if (isSupabaseConfigured()) {
         const { data, error } = await supabase.auth.signUp({
           email: payload.email.trim(),
@@ -109,7 +109,7 @@ export const api = {
         };
       }
 
-      return request<{ user: CustomerUser; token: string; requiresVerification: boolean; email?: string; message: string }>('/auth/register', {
+      return request<{ user: CustomerUser; token: string; requiresVerification: boolean; email?: string; message: string; deliveryPin?: string }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
