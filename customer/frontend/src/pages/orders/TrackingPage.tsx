@@ -174,14 +174,19 @@ export const TrackingPage: React.FC = () => {
 
         if (event.location) {
           if (typeof window !== 'undefined') {
-            (window as any).__skynavCustDrone = {
+            (window as any).__skynavCustomerDrone = {
               lat: event.location.latitude,
               lng: event.location.longitude,
-              alt: event.location.altitudeMeters,
-              speed: event.location.speedKmh,
-              bearing: event.location.bearing,
+              alt: event.location.altitudeMeters || 0,
+              altitudeMeters: event.location.altitudeMeters || 0,
+              speed: event.location.speedKmh || 0,
+              speedKmh: event.location.speedKmh || 0,
+              bearing: event.location.bearing || 0,
+              heading: event.location.bearing || 0,
               status: event.status,
+              updatedAt: Date.now(),
             };
+            (window as any).__skynavCustDrone = (window as any).__skynavCustomerDrone;
           }
 
           setTrackingState(prev => {
@@ -339,7 +344,7 @@ export const TrackingPage: React.FC = () => {
       {/* ═══════════════════════════════════
           PRE-FLIGHT STATE
       ═══════════════════════════════════ */}
-      {isPreFlight ? (
+      {isPreFlight && (
         <div style={{ textAlign: 'center', padding: 'clamp(2.5rem, 5vw, 4rem) 2rem', background: 'linear-gradient(135deg, #ffffff 0%, #f0f9ff 60%, #eef2ff 100%)', borderRadius: 'var(--radius-2xl)', border: '1px solid rgba(14,165,233,0.15)', marginBottom: '1.5rem', boxShadow: 'var(--shadow-card)' }}>
           <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚁</div>
           <h2 style={{ fontSize: 'clamp(1.35rem, 2.5vw, 1.75rem)', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.025em' }}>
@@ -353,26 +358,31 @@ export const TrackingPage: React.FC = () => {
             {statusInfo.sub}
           </div>
         </div>
-      ) : isDelivered ? (
+      )}
+
+      {/* ═══════════════════════════════════
+          DELIVERY COMPLETE HERO
+      ═══════════════════════════════════ */}
+      {isDelivered && (
         <div className="delivery-complete-hero card glass-panel" style={{
           textAlign: 'center',
-          padding: 'clamp(2.5rem, 5vw, 4rem) 2rem',
+          padding: 'clamp(2rem, 4vw, 3rem) 2rem',
           background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 60%, #ecfdf5 100%)',
           borderRadius: 'var(--radius-2xl)',
           border: '1px solid rgba(16,185,129,0.25)',
           marginBottom: '1.5rem',
           boxShadow: 'var(--shadow-card)'
         }}>
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', color: '#059669', boxShadow: '0 0 20px rgba(16,185,129,0.2)' }}>
-            <CheckCircle2 size={46} />
+          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#059669', boxShadow: '0 0 20px rgba(16,185,129,0.2)' }}>
+            <CheckCircle2 size={38} />
           </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.8rem', background: '#dcfce7', borderRadius: 'var(--radius-full)', color: '#15803d', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.8rem', background: '#dcfce7', borderRadius: 'var(--radius-full)', color: '#15803d', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.5rem' }}>
             ✓ Delivery PIN Verified & Handover Complete
           </div>
-          <h2 style={{ fontSize: 'clamp(1.6rem, 3.2vw, 2.25rem)', fontWeight: 900, marginBottom: '0.5rem', color: '#065f46', letterSpacing: '-0.03em' }}>
+          <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 900, marginBottom: '0.5rem', color: '#065f46', letterSpacing: '-0.03em' }}>
             Package Delivered Successfully! 🎉
           </h2>
-          <p style={{ color: 'var(--text-secondary)', maxWidth: '440px', margin: '0 auto 1.5rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: '440px', margin: '0 auto 1.25rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
             Autonomous payload tether lowered gently at your designated landing zone. Safe flight concluded.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -389,10 +399,11 @@ export const TrackingPage: React.FC = () => {
             </Button>
           </div>
         </div>
-      ) : (
-        /* ═══════════════════════════════════
-           CINEMATIC MAP HERO
-        ═══════════════════════════════════ */
+      )}
+
+      {/* ═══════════════════════════════════
+         CINEMATIC MAP HERO (Always Active)
+      ═══════════════════════════════════ */}
         <div className="tracking-map-hero">
           <div className="tracking-map-container">
             <DroneLiveMap
@@ -460,7 +471,6 @@ export const TrackingPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
 
       {/* ═══════════════════════════════════
           STATUS MESSAGE (for active orders)

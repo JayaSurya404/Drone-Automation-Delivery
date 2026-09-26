@@ -245,6 +245,53 @@ export const seedDatabase = async () => {
   statusHistoryStmt.run('hist_1001_5', 'ORD-1001', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via Kurumbapalayam corridor.', 1, '-2 days');
   statusHistoryStmt.run('hist_1001_6', 'ORD-1001', 'Drone Launched', 'Delivered', 'Autonomous payload tether lowered successfully.', 1, '-2 days');
 
+  // ORD-1002 (Active Express Delivery for Live Flight Tracking)
+  const addrSnapshot2 = JSON.stringify({
+    name: 'Jaya (SkyNav Customer)',
+    phone: '+91 98422 10002',
+    building: 'Tech Corridor Block 4',
+    street: 'Kalapatti Main Road',
+    area: 'Kurumbapalayam / Kalapatti',
+    city: 'Coimbatore',
+    state: 'Tamil Nadu',
+    postalCode: '641048',
+    latitude: 11.0725,
+    longitude: 77.0345,
+    dropZoneType: 'Lawn'
+  });
+
+  orderStmt.run(
+    'ORD-1002',
+    userId,
+    1298.00,
+    89.00,
+    0.00,
+    0,
+    1387.00,
+    'Credit Card',
+    'Paid',
+    'Out for Delivery',
+    'express',
+    addrSnapshot2,
+    'Designated lawn drop marker. Clear line of sight.',
+    'Lawn',
+    '4827',
+    0,
+    '12 mins',
+    '-1 hour',
+    '-1 hour',
+    null
+  );
+
+  orderItemStmt.run('item_1002_1', 'ORD-1002', 'prod_tech_1', 'SkyNav Ultra Sensor Beacon Pod', '/images/products/sensor_pod.jpg', 1298.00, 1, 1298.00, 180);
+
+  statusHistoryStmt.run('hist_1002_1', 'ORD-1002', null, 'Order Placed', 'Order placed successfully.', 1, '-1 hour');
+  statusHistoryStmt.run('hist_1002_2', 'ORD-1002', 'Order Placed', 'Order Confirmed', 'Payment confirmed.', 1, '-50 minutes');
+  statusHistoryStmt.run('hist_1002_3', 'ORD-1002', 'Order Confirmed', 'Preparing', 'Items packed at SkyHub Kurumbapalayam.', 1, '-40 minutes');
+  statusHistoryStmt.run('hist_1002_4', 'ORD-1002', 'Preparing', 'Drone Assigned', 'SkyNav Alpha-01 assigned.', 1, '-20 minutes');
+  statusHistoryStmt.run('hist_1002_5', 'ORD-1002', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via Kurumbapalayam corridor.', 1, '-10 minutes');
+  statusHistoryStmt.run('hist_1002_6', 'ORD-1002', 'Drone Launched', 'Out for Delivery', 'Autonomous delivery in-flight.', 1, '-2 minutes');
+
   // 8. SEED INITIAL SAMPLE REVIEWS
   const revStmt = db.prepare(`
     INSERT INTO reviews (id, product_id, customer_id, author_name, author_avatar, rating, title, comment, verified_purchase, helpful_count)

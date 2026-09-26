@@ -21,6 +21,7 @@ export interface NoFlyZone {
   reason: string;
   regulatoryRef: string;
   activeSchedule?: string;
+  polygon?: [number, number][];
 }
 
 export interface DropZoneSafetyEvaluation {

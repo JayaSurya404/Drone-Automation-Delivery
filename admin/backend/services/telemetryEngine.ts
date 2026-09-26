@@ -336,6 +336,23 @@ class TelemetryEngine {
       else if (gzPhase === 'RETURNING') statusStr = 'returning';
       else if (['TAKEOFF', 'CLIMB', 'CRUISE', 'AVOIDANCE', 'DESCENT'].includes(gzPhase)) statusStr = 'in_flight';
 
+      // Stream Gazebo telemetry to Customer backend for active delivery
+      const activeOps = queryAll<any>(`
+        SELECT o.customer_order_id, o.id as operational_order_id, m.id as mission_id, o.destination_lat, o.destination_lng, o.drone_id, o.status as order_status
+        FROM operational_orders o
+        LEFT JOIN missions m ON m.operational_order_id = o.id
+        WHERE o.status NOT IN ('delivered', 'cancelled')
+        ORDER BY o.created_at DESC LIMIT 1
+      `);
+      const targetOps = activeOps.length > 0 ? activeOps : queryAll<any>(`
+        SELECT o.customer_order_id, o.id as operational_order_id, m.id as mission_id, o.destination_lat, o.destination_lng, o.drone_id, o.status as order_status
+        FROM operational_orders o
+        LEFT JOIN missions m ON m.operational_order_id = o.id
+        ORDER BY o.created_at DESC LIMIT 1
+      `);
+
+      const activeDroneId = targetOps.length > 0 && targetOps[0].drone_id ? targetOps[0].drone_id : 'D-001';
+
       runCommand(`
         UPDATE drones SET
           latitude = ?,
@@ -346,27 +363,36 @@ class TelemetryEngine {
           battery = ?,
           status = ?,
           updated_at = datetime('now')
-        WHERE id = 'D-001'
-      `, [gzLat, gzLng, gzAlt, gzBearing, gzSpeed, gzBattery, statusStr]);
+        WHERE id = 'D-001' OR id = ?
+      `, [gzLat, gzLng, gzAlt, gzBearing, gzSpeed, gzBattery, statusStr, activeDroneId]);
 
-      // Stream Gazebo telemetry to Customer backend for active or recent delivery
-      const activeOps = queryAll<any>(`
-        SELECT o.customer_order_id, o.id as operational_order_id, m.id as mission_id, o.destination_lat, o.destination_lng
-        FROM operational_orders o
-        LEFT JOIN missions m ON m.operational_order_id = o.id
-        WHERE (o.drone_id = 'D-001' OR o.drone_id IS NULL)
-        ORDER BY o.created_at DESC LIMIT 1
-      `);
-      for (const op of activeOps) {
-        const destLat = op.destination_lat || 11.1042;
-        const destLng = op.destination_lng || 77.028112;
+      for (const op of targetOps) {
+        if (!op.customer_order_id) continue;
+        const destLat = op.destination_lat || 11.0725;
+        const destLng = op.destination_lng || 77.0345;
         const remKm = this.calculateDistanceKm(gzLat, gzLng, destLat, destLng);
+        
+        let custStatus: CustomerOrderStatus = 'Out for Delivery';
+        if (gzPhase === 'TAKEOFF' || gzPhase === 'CLIMB') {
+          custStatus = 'Drone Launched';
+        } else if (gzPhase === 'TOUCHDOWN') {
+          custStatus = 'Arriving';
+        } else if (['RETURNING', 'CHARGING', 'AVAILABLE', 'DOCKED'].includes(gzPhase)) {
+          custStatus = 'Delivered';
+        } else if (remKm <= 0.25) {
+          custStatus = 'Arriving';
+        } else if (remKm <= 0.8) {
+          custStatus = 'Near Destination';
+        } else {
+          custStatus = 'Out for Delivery';
+        }
+
         customerIntegrationClient.sendTelemetryUpdate({
           customerOrderId: op.customer_order_id,
           missionId: op.mission_id || 'MS-GAZEBO',
-          droneId: 'D-001',
+          droneId: op.drone_id || 'D-001',
           droneName: 'SkyNav X1',
-          status: gzPhase === 'TOUCHDOWN' ? 'Arriving' : (['RETURNING', 'CHARGING', 'AVAILABLE'].includes(gzPhase) ? 'Delivered' : 'Out for Delivery'),
+          status: custStatus,
           currentLocation: {
             latitude: gzLat,
             longitude: gzLng,
@@ -376,7 +402,7 @@ class TelemetryEngine {
           },
           remainingDistanceKm: remKm,
           estimatedArrivalMins: Math.max(1, Math.ceil((remKm * 1000) / Math.max(2.0, gzSpeed / 3.6) / 60)),
-          progressPercent: Math.min(100, Math.max(0, Math.round((1.0 - Math.min(1.0, remKm)) * 100))),
+          progressPercent: Math.min(100, Math.max(0, Math.round((1.0 - Math.min(1.0, remKm / 4.71)) * 100))),
           timestamp: nowIso,
         });
       }

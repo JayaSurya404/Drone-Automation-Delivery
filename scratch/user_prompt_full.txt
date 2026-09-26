@@ -1,0 +1,827 @@
+<USER_REQUEST>
+FINAL FLIGHT SIMULATION + CUSTOMER 2D LIVE MOVEMENT + SHARED 2D/3D PATH + VERIFIED GEOFENCE FIX
+=================================================================================================
+
+Repository:
+JayaSurya404/Drone-Automation-Delivery
+
+WORK ONLY ON:
+`admin+customer`
+
+DO NOT:
+- modify `main`
+- modify `customer`
+- modify `Drone-admin`
+- create PRs
+- merge branches
+- rewrite the whole architecture
+- create a second drone simulator
+- create fake browser movement
+- create random geographic coordinates
+
+This is a focused correction of the remaining flight-visualization problem.
+
+============================================================
+1. CURRENT CRITICAL BUG
+============================================================
+
+The Customer-side 2D simulation is STILL NOT visually showing the drone moving.
+
+CURRENT OBSERVED BEHAVIOR:
+
+- Distance travelled changes.
+- After browser refresh, the updated distance can be seen.
+- But during the live mission, the drone marker remains visually static.
+- This means telemetry/data is changing somewhere, but the Customer 2D map is NOT applying the live latitude/longitude updates to the rendered Leaflet marker in real time.
+
+THIS MUST BE FIXED.
+
+The expected behavior is:
+
+Gazebo physical drone moves
+        ↓
+Gazebo GPS/telemetry changes continuously
+        ↓
+Telemetry bridge publishes live position
+        ↓
+Admin backend receives live position
+        ↓
+Customer backend receives/relays live position
+        ↓
+Customer browser receives each live position update
+        ↓
+Customer Leaflet marker moves continuously
+        ↓
+Customer traveled path also updates continuously
+
+NO REFRESH MUST BE REQUIRED.
+
+============================================================
+2. IMPORTANT ARCHITECTURE RULE
+============================================================
+
+There must be EXACTLY ONE authoritative drone trajectory.
+
+Gazebo is the physical authority.
+
+Do NOT make Customer 2D calculate its own trajectory.
+
+Do NOT make Admin 2D calculate a separate trajectory.
+
+Do NOT make Admin 3D calculate a separate trajectory.
+
+Do NOT use:
+
+- setInterval() fake movement
+- random movement
+- hardcoded coordinate arrays
+- frontend distance interpolation that creates an independent path
+- synthetic browser-only drone motion
+- "move marker from A to B over N seconds" if that creates a second simulation
+
+The browser maps are visualization layers of the SAME physical Gazebo drone.
+
+============================================================
+3. ACTUAL FLIGHT TIMING MUST BE PHYSICALLY CONSISTENT
+============================================================
+
+The mission timing must be based on:
+
+actual distance
++
+actual configured drone speed
++
+actual climb/descent rates
++
+actual obstacle-detour distance
++
+actual simulation elapsed time
+
+Do NOT use arbitrary frontend animation durations.
+
+Basic cruise relationship:
+
+time_seconds = distance_meters / speed_mps
+
+Examples:
+
+40 km/h = 11.111 m/s
+
+1 km ideal cruise:
+1000 / 11.111 ≈ 90 seconds
+
+5 km ideal cruise:
+5000 / 11.111 ≈ 450 seconds
+≈ 7.5 minutes
+
+These are IDEAL CRUISE values only.
+
+Actual mission duration may be longer because of:
+
+- takeoff
+- climb
+- acceleration
+- obstacle avoidance
+- detour path
+- descent
+- landing
+
+The final report must calculate and display the actual measured mission duration.
+
+Do NOT speed up the browser visually just to make the demo finish faster.
+
+Default simulation speed must remain:
+
+1x REAL TIME
+
+If a test acceleration/warp mode exists, it must NEVER be used for the normal demonstration and must be clearly labeled.
+
+============================================================
+4. FIX CUSTOMER 2D LIVE DRONE MOVEMENT
+============================================================
+
+Inspect the entire Customer tracking pipeline.
+
+Find:
+
+- Customer tracking telemetry hook
+- WebSocket/SSE subscription
+- telemetry state
+- DroneLiveMap
+- Leaflet marker creation
+- marker update logic
+- route/polyline update logic
+
+Determine where the live latitude/longitude stops propagating.
+
+The customer map must receive continuous telemetry objects containing at minimum:
+
+- latitude
+- longitude
+- altitude
+- heading
+- speed
+- timestamp
+- flight phase
+- drone ID
+- mission/order ID
+
+Preferred conceptual structure:
+
+{
+  droneId,
+  orderId,
+  latitude,
+  longitude,
+  altitude,
+  heading,
+  speed,
+  flightPhase,
+  timestamp
+}
+
+The exact existing contract may be different, so preserve the project's existing shared contract style.
+
+============================================================
+5. CUSTOMER LEAFLET MARKER MUST MOVE LIVE
+============================================================
+
+Do NOT recreate the entire map every time telemetry arrives.
+
+Create the marker once.
+
+Then update the existing marker on every authoritative telemetry sample.
+
+Equivalent behavior:
+
+droneMarker.setLatLng([latitude, longitude])
+
+The marker must visually change position as telemetry changes.
+
+The React/component state and Leaflet imperative state must remain synchronized.
+
+Prevent this common bug:
+
+state.latitude changes
+BUT
+Leaflet marker remains at the old coordinate.
+
+Verify both:
+
+1. React telemetry state changes.
+2. Actual Leaflet marker position changes.
+
+Expose a debug/test reference if useful, such as:
+
+window.__skynavCustomerDrone
+
+containing the CURRENT marker coordinates.
+
+The test script must read the actual rendered marker position, NOT merely a React variable.
+
+============================================================
+6. DO NOT REQUIRE MAP REFRESH
+============================================================
+
+During a real running mission:
+
+T0 launch
+→ marker moves
+
+T1 climb
+→ marker moves
+
+T2 cruise
+→ marker continues moving
+
+T3 obstacle detection
+→ marker changes direction according to the physical detour
+
+T4 approach
+→ marker continues toward customer
+
+T5 touchdown
+→ marker reaches destination
+
+At NO point should the user need:
+
+F5
+Ctrl+R
+manual refresh
+leaving/re-entering the page
+
+============================================================
+7. CUSTOMER 2D ROUTE MUST MATCH ACTUAL DRONE PATH
+============================================================
+
+The route polyline shown to the customer must be based on the actual telemetry breadcrumbs.
+
+Do NOT draw a simple straight line from:
+
+Hub → Customer
+
+if the physical drone actually takes:
+
+Hub
+→ obstacle encounter
+→ local detour
+→ rejoin route
+→ customer
+
+The customer 2D path must visually reproduce the same path flown by Gazebo.
+
+For example:
+
+Actual Gazebo path:
+A → B → C → D → E
+
+Customer map:
+A → B → C → D → E
+
+NOT:
+
+Customer map:
+A → E
+
+while 3D shows:
+A → B → C → D → E
+
+============================================================
+8. ADMIN 2D, ADMIN 3D, CUSTOMER 2D MUST BE THE SAME DRONE
+============================================================
+
+At the SAME telemetry timestamp:
+
+Gazebo GPS
+=
+Admin 2D position
+=
+Admin 3D position
+=
+Customer 2D position
+
+within a clearly documented small synchronization tolerance.
+
+Do not merely compare distance.
+
+Compare:
+
+latitude
+longitude
+timestamp
+heading
+flight phase
+
+At minimum, the test should record:
+
+T0
+T1
+T2
+T3
+T4
+T5
+
+and preferably several intermediate samples between milestones.
+
+============================================================
+9. OBSTACLE AVOIDANCE MUST APPEAR IDENTICALLY IN 2D AND 3D
+============================================================
+
+This is extremely important.
+
+Suppose Gazebo detects an obstacle using the physical LiDAR.
+
+Gazebo changes physical flight path:
+
+straight route
+       ↓
+obstacle detected
+       ↓
+detour
+       ↓
+rejoin destination route
+
+Then:
+
+Admin 3D:
+must visibly show the drone taking that detour.
+
+Admin 2D:
+must show the drone marker taking the SAME geographic detour.
+
+Customer 2D:
+must show the drone marker taking the SAME geographic detour.
+
+The displayed traveled polyline must also contain that detour.
+
+NO separate 2D avoidance algorithm should generate a different route.
+
+The 2D views should render the actual telemetry trajectory produced by the physical Gazebo drone.
+
+============================================================
+10. SPEED/HEADING/ALTITUDE MUST ALSO MATCH
+============================================================
+
+At matched timestamps:
+
+Admin 2D
+Admin 3D
+Customer 2D
+
+should display the same:
+
+- speed
+- altitude
+- heading
+- flight phase
+
+where those values are shown in the UI.
+
+The 3D attitude/heading and 2D marker rotation must be driven from the same authoritative telemetry.
+
+============================================================
+11. NO AUTOMATIC CAMERA MOVEMENT
+============================================================
+
+Preserve the previous requirement.
+
+Do NOT use:
+
+fitBounds
+flyTo
+easeTo
+setView
+automatic recenter
+automatic zoom
+automatic follow
+
+The map camera remains controlled by the user.
+
+Only the drone marker/path updates.
+
+This applies to:
+
+- Admin 2D
+- Customer 2D
+
+The 3D camera also remains user-controlled.
+
+============================================================
+12. USE ACTUAL DISTANCE, NOT ROUNDED TEST DATA
+============================================================
+
+Do NOT create fake values such as:
+
+1.0 km exactly
+5.0 km exactly
+40 km/h exactly
+
+unless those are intentionally configured mission parameters.
+
+The UI/report should distinguish between:
+
+planned distance
+actual traveled distance
+straight-line distance
+route/corridor distance
+detour distance
+
+For each mission calculate:
+
+- planned route length
+- actual traveled distance
+- obstacle-detour distance
+- total mission distance
+- actual elapsed time
+- average ground speed
+- nominal cruise speed
+
+Do NOT round away important differences.
+
+For example, if actual route is:
+
+1,034.72 m
+
+do not claim:
+
+1,000 m
+
+just because the mission was described as a 1 km mission.
+
+Use the real measured value and explain the planned-vs-actual distinction.
+
+============================================================
+13. REMOVE CURRENT RESTRICTED FLY ZONE
+============================================================
+
+There is currently a restricted/no-fly zone displayed around the current demonstration area.
+
+REMOVE THIS CURRENT DEMONSTRATION-AREA RESTRICTED ZONE.
+
+Do not simply hide it visually while leaving fake logic underneath.
+
+Remove the current arbitrary/restrictive test polygon from:
+
+- map rendering
+- flight planner
+- route planner
+- obstacle logic
+- geofence validation
+
+unless it is an actually authoritative restriction.
+
+============================================================
+14. ADD A REAL VERIFIED FLY/RESTRICTED ZONE ELSEWHERE
+============================================================
+
+After removing the current arbitrary zone, add a geographically meaningful restricted/fly-zone dataset elsewhere.
+
+IMPORTANT:
+
+DO NOT:
+- invent random latitude/longitude
+- use rounded coordinates such as 11.0000, 77.0000
+- create a random circle merely for visual appearance
+- claim a fictional area is legally restricted
+- fabricate aviation restrictions
+
+Use a VERIFIED SOURCE.
+
+Preferred sources, in order:
+
+1. Existing authoritative geofence/restricted-zone dataset already present in the repository.
+2. Official DGCA / Digital Sky geospatial data.
+3. Official AAI / airport geospatial restriction data.
+4. Another clearly documented authoritative aviation/geospatial source.
+
+If an authoritative source is not available in the repository and cannot be legitimately obtained in the current environment:
+
+DO NOT FABRICATE THE DATA.
+
+Instead:
+- clearly identify that the verified data source is unavailable,
+- keep the feature structurally ready for an authoritative GeoJSON/geofence dataset,
+- do not pretend a random polygon is a real legal restriction.
+
+The final report must state the exact source used.
+
+============================================================
+15. RESTRICTED ZONE MUST USE REAL POLYGON GEOMETRY
+============================================================
+
+Do not use simplistic fake circles/rectangles just for appearance if authoritative polygon data exists.
+
+Use the actual geometry:
+
+GeoJSON / polygon / multipolygon as supplied by the authoritative source.
+
+Preserve:
+
+- exact coordinates
+- polygon boundaries
+- metadata
+- source attribution
+- update date if available
+
+The UI should be able to display:
+
+Zone name
+Zone type
+Source
+Coordinates/geometry
+Relevant restriction metadata
+
+without inventing missing values.
+
+============================================================
+16. GEOSPATIAL ACCURACY
+============================================================
+
+For all geographic data:
+
+DO NOT unnecessarily round coordinates.
+
+Prefer the source precision.
+
+For example, preserve:
+
+11.1234567
+
+instead of converting it to:
+
+11.12
+
+when the original source provides higher precision.
+
+This applies to:
+
+- drone positions
+- destination positions
+- obstacle positions
+- building footprints
+- roads
+- geofences
+- route waypoints
+
+============================================================
+17. ACTUAL CUSTOMER 2D BROWSER TEST
+============================================================
+
+Perform a real Chrome/Puppeteer browser test.
+
+Open:
+
+Customer Tracking page
+Admin 2D
+Admin 3D
+
+Start one real Gazebo mission.
+
+DO NOT refresh Customer Tracking during the mission.
+
+Record actual rendered positions every few seconds.
+
+For each sample capture:
+
+timestamp
+Gazebo lat/lng
+Admin 2D rendered lat/lng
+Admin 3D rendered lat/lng
+Customer 2D rendered lat/lng
+speed
+heading
+altitude
+flight phase
+
+IMPORTANT:
+
+For Customer 2D, inspect the ACTUAL Leaflet marker coordinate.
+
+Do not merely read API state.
+
+Do not merely read distance travelled.
+
+============================================================
+18. PROVE THE CUSTOMER MARKER ACTUALLY MOVES
+============================================================
+
+The test MUST explicitly calculate:
+
+initial Customer marker position
+final Customer marker position
+number of unique marker positions observed
+total marker movement
+
+Expected:
+
+number of unique positions > 1
+
+and
+
+initial position != final position
+
+and
+
+the marker coordinates progress over time.
+
+Also capture screenshots at:
+
+T0
+T1
+T2
+T3
+T4
+T5
+
+The screenshots must visibly show the marker at different geographic locations.
+
+============================================================
+19. PROVE THE OBSTACLE DETOUR IS VISIBLE IN 2D
+============================================================
+
+At the obstacle:
+
+Capture:
+
+1. LiDAR detects obstacle.
+2. Gazebo begins detour.
+3. Admin 3D changes route.
+4. Admin 2D changes route.
+5. Customer 2D changes route.
+
+The 2D route must have the same geographic detour as the 3D/Gazebo route.
+
+============================================================
+20. TEST A REAL 1 KM-CLASS MISSION
+============================================================
+
+Use a real mission configured around the existing SkyHub/customer geography.
+
+Do not force exactly rounded coordinates just to make the report look cleaner.
+
+Measure:
+
+actual route distance
+actual elapsed time
+actual cruise speed
+actual detour
+
+At 40 km/h:
+
+1 km ideal cruise ≈ 90 seconds
+
+Then report the actual complete duration including:
+
+takeoff
+climb
+cruise
+detour
+descent
+touchdown
+
+============================================================
+21. OPTIONAL 5 KM VALIDATION
+============================================================
+
+If the current environment and runtime allow a longer mission, also test a 5 km route.
+
+At 40 km/h:
+
+5 km ideal cruise ≈ 450 seconds
+
+Again, report the actual mission timing rather than an artificially shortened demo.
+
+Do NOT use a fake accelerated browser animation.
+
+============================================================
+22. DO NOT MODIFY THE ALREADY-VERIFIED PHYSICAL AUTHORITY
+============================================================
+
+Preserve:
+
+Native Gazebo
+ROS 2
+Gazebo GPS
+IMU
+LiDAR
+physical collision models
+telemetry bridge
+Admin telemetry
+Customer telemetry relay
+
+Do not replace Gazebo with frontend simulation.
+
+Do not reintroduce the old fake Three.js flight engine.
+
+Three.js remains only the geographic visualization layer.
+
+============================================================
+23. BUILD + REGRESSION TEST
+============================================================
+
+After the fix:
+
+- customer frontend build
+- customer backend build
+- admin frontend build
+- admin backend build
+
+must pass.
+
+Also verify:
+
+- customer authentication
+- product catalog
+- ordering
+- permanent delivery PIN
+- realtime Admin Orders
+- Gazebo telemetry
+- Admin 2D
+- Admin 3D
+- Customer 2D
+- return-to-hub
+- charging
+
+Do not break existing features while fixing the marker synchronization.
+
+============================================================
+24. FINAL ACCEPTANCE CRITERIA
+============================================================
+
+The task is COMPLETE only when ALL are true:
+
+[ ] Customer 2D drone marker visibly moves during flight
+[ ] No customer browser refresh required
+[ ] Marker movement is driven by live Gazebo telemetry
+[ ] Customer map does not calculate an independent trajectory
+[ ] Customer breadcrumb/path updates continuously
+[ ] Actual route distance is used
+[ ] Flight timing is consistent with actual configured speed
+[ ] 1 km @ 40 km/h ideal cruise is approximately 90 seconds
+[ ] Actual total mission time is reported separately from ideal cruise time
+[ ] Admin 2D and Admin 3D show the same physical drone
+[ ] Customer 2D shows the same physical drone
+[ ] Same timestamp positions match within documented tolerance
+[ ] Heading matches
+[ ] Altitude matches
+[ ] Speed matches
+[ ] Flight phase matches
+[ ] Obstacle detection changes the physical Gazebo route
+[ ] The same obstacle detour appears in Admin 2D
+[ ] The same obstacle detour appears in Customer 2D
+[ ] The same obstacle detour appears in Admin 3D
+[ ] No automatic 2D camera movement
+[ ] No automatic 3D camera movement
+[ ] Current arbitrary restricted zone removed
+[ ] New restricted/fly zone is based on verified geographic data
+[ ] No random/rounded/fabricated coordinates used
+[ ] Exact source of restricted zone is documented
+[ ] All browser-level tests pass
+[ ] All builds pass
+[ ] Only `admin+customer` changed
+
+============================================================
+25. FINAL REPORT REQUIRED
+============================================================
+
+Return:
+
+1. Root cause of the Customer 2D static-marker bug.
+2. Exact fix.
+3. Telemetry path used by Customer 2D.
+4. Proof that the ACTUAL Leaflet marker moved.
+5. Number of unique marker positions observed.
+6. Initial marker coordinates.
+7. Final marker coordinates.
+8. Actual traveled distance.
+9. Nominal speed.
+10. Actual elapsed flight time.
+11. Obstacle detour distance.
+12. T0–T5 synchronization table.
+13. Proof that Admin 2D and Admin 3D follow identical telemetry.
+14. Proof that Customer 2D follows identical telemetry.
+15. Screenshot evidence of Customer marker movement.
+16. Screenshot evidence of 2D obstacle detour.
+17. Screenshot evidence of 3D obstacle detour.
+18. Restricted-zone source.
+19. Exact geofence dataset used.
+20. Build/test results.
+21. Exact files changed.
+
+DO NOT REPORT SUCCESS JUST BECAUSE:
+- distance text changes
+- API returns new coordinates
+- builds pass
+- backend telemetry changes
+
+The task is successful only when the USER CAN ACTUALLY WATCH THE CUSTOMER 2D DRONE MARKER MOVE ACROSS THE MAP IN REAL TIME WITHOUT REFRESHING, FOLLOWING THE SAME PHYSICAL PATH AS THE GAZEBO/3D DRONE.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-25T10:24:39+05:30.
+
+The user's current state is as follows:
+Active Document: d:\Drone-Automation-Delivery\shared\contracts\events.ts (LANGUAGE_TYPESCRIPT)
+Cursor is on line: 153
+Other open documents:
+- d:\Drone-Automation-Delivery\shared\contracts\events.ts (LANGUAGE_TYPESCRIPT)
+</ADDITIONAL_METADATA>

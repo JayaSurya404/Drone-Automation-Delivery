@@ -184,13 +184,20 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     mapProviderRef.current.updateDronePosition(droneLocation);
 
     if (typeof window !== 'undefined') {
-      (window as any).__skynavCustDrone = {
-        lat: droneLocation.latitude,
-        lng: droneLocation.longitude,
-        alt: droneLocation.altitudeMeters,
-        speed: droneLocation.speedKmh,
-        bearing: droneLocation.bearing,
+      const markerCoords = mapProviderRef.current?.getDroneMarkerLatLng?.();
+      (window as any).__skynavCustomerDrone = {
+        lat: markerCoords ? markerCoords.lat : droneLocation.latitude,
+        lng: markerCoords ? markerCoords.lng : droneLocation.longitude,
+        alt: droneLocation.altitudeMeters || 0,
+        altitudeMeters: droneLocation.altitudeMeters || 0,
+        speed: droneLocation.speedKmh || 0,
+        speedKmh: droneLocation.speedKmh || 0,
+        heading: droneLocation.bearing || 0,
+        bearing: droneLocation.bearing || 0,
+        markerLatLng: markerCoords ? [markerCoords.lat, markerCoords.lng] : [droneLocation.latitude, droneLocation.longitude],
+        updatedAt: Date.now(),
       };
+      (window as any).__skynavCustDrone = (window as any).__skynavCustomerDrone;
       (window as any).__skynavCustMapCamera = {
         center: mapProviderRef.current?.getCenter?.() || null,
         zoom: mapProviderRef.current?.getZoom?.() || null,

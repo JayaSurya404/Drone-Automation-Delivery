@@ -115,6 +115,14 @@ export class LeafletMapProvider implements IMapProvider {
     }
   }
 
+  public getDroneMarkerLatLng(): { lat: number; lng: number } | null {
+    if (this.droneMarker) {
+      const pos = this.droneMarker.getLatLng();
+      return { lat: pos.lat, lng: pos.lng };
+    }
+    return null;
+  }
+
   public updateDronePosition(location: DroneLocation): void {
     if (!this.mapInstance || !this.L) {
       this.pendingDroneLocation = location;
@@ -126,32 +134,63 @@ export class LeafletMapProvider implements IMapProvider {
     if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
 
     const heading = location.bearing || 0;
-    const customDroneHtml = `
-      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-        <div style="position: absolute; inset: -6px; border-radius: 9999px; background-color: rgba(6, 182, 212, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9999px; border: 2px solid #06b6d4; background-color: rgba(15, 23, 42, 0.95); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
-          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; color: white; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
-            <path fill="#06b6d4" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-          </svg>
-        </div>
-        <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; font-family: monospace; color: white; background-color: rgba(15, 23, 42, 0.92); border: 1px solid #06b6d4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">
-          ${location.altitudeMeters ? `${location.altitudeMeters}m • ` : ''}${location.speedKmh ? `${location.speedKmh} km/h` : 'Airborne'}
-        </div>
-      </div>
-    `;
-
-    const icon = this.L.divIcon({
-      className: 'custom-drone-leaflet-icon',
-      html: customDroneHtml,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
-    });
+    const badgeText = `${location.altitudeMeters ? `${location.altitudeMeters}m • ` : ''}${location.speedKmh ? `${location.speedKmh} km/h` : 'Airborne'}`;
 
     if (this.droneMarker) {
+      // Smoothly update marker position without destroying DOM element or icon
       this.droneMarker.setLatLng([lat, lng]);
-      this.droneMarker.setIcon(icon);
+      const el = this.droneMarker.getElement();
+      if (el) {
+        const svg = el.querySelector('svg');
+        if (svg) {
+          svg.style.transform = `rotate(${heading}deg)`;
+        }
+        const badge = el.querySelector('.drone-status-text') as HTMLElement;
+        if (badge) {
+          badge.textContent = badgeText;
+        }
+      }
     } else {
+      const customDroneHtml = `
+        <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <div style="position: absolute; inset: -6px; border-radius: 9999px; background-color: rgba(6, 182, 212, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9999px; border: 2px solid #06b6d4; background-color: rgba(15, 23, 42, 0.95); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
+            <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; color: white; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
+              <path fill="#06b6d4" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+            </svg>
+          </div>
+          <div class="drone-status-text" style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; font-family: monospace; color: white; background-color: rgba(15, 23, 42, 0.92); border: 1px solid #06b6d4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">
+            ${badgeText}
+          </div>
+        </div>
+      `;
+
+      const icon = this.L.divIcon({
+        className: 'custom-drone-leaflet-icon',
+        html: customDroneHtml,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+      });
+
       this.droneMarker = this.L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(this.mapInstance);
+    }
+
+    // Expose actual Leaflet marker position globally for verification and testing
+    if (typeof window !== 'undefined' && this.droneMarker) {
+      const pos = this.droneMarker.getLatLng();
+      (window as any).__skynavCustomerDrone = {
+        lat: pos.lat,
+        lng: pos.lng,
+        alt: location.altitudeMeters || 0,
+        altitudeMeters: location.altitudeMeters || 0,
+        speed: location.speedKmh || 0,
+        speedKmh: location.speedKmh || 0,
+        heading,
+        bearing: heading,
+        markerLatLng: [pos.lat, pos.lng],
+        updatedAt: Date.now(),
+      };
+      (window as any).__skynavCustDrone = (window as any).__skynavCustomerDrone;
     }
 
     // Traveled route maintenance
@@ -160,7 +199,7 @@ export class LeafletMapProvider implements IMapProvider {
       this.traveledPoints.push(currentPt);
     } else {
       const last = this.traveledPoints[this.traveledPoints.length - 1];
-      if (Math.abs(last[0] - lat) > 0.00001 || Math.abs(last[1] - lng) > 0.00001) {
+      if (Math.abs(last[0] - lat) > 0.000005 || Math.abs(last[1] - lng) > 0.000005) {
         this.traveledPoints.push(currentPt);
       }
     }
@@ -351,15 +390,27 @@ export class LeafletMapProvider implements IMapProvider {
       const fillColor = isProhibited ? '#ef4444' : '#f59e0b';
       const fillOpacity = isProhibited ? 0.16 : 0.12;
 
-      const circle = this.L.circle([zone.latitude, zone.longitude], {
-        radius: zone.radiusMeters,
-        color: strokeColor,
-        fillColor,
-        fillOpacity,
-        weight: isProhibited ? 2 : 1.5,
-        dashArray: isProhibited ? '6, 6' : '4, 4',
-        className: `nfz-circle ${isProhibited ? 'prohibited' : 'warning'}`,
-      });
+      let layer: any;
+      if (zone.polygon && zone.polygon.length >= 3) {
+        layer = this.L.polygon(zone.polygon, {
+          color: strokeColor,
+          fillColor,
+          fillOpacity,
+          weight: isProhibited ? 2 : 1.5,
+          dashArray: isProhibited ? '6, 6' : '4, 4',
+          className: `nfz-polygon ${isProhibited ? 'prohibited' : 'warning'}`,
+        });
+      } else {
+        layer = this.L.circle([zone.latitude, zone.longitude], {
+          radius: zone.radiusMeters,
+          color: strokeColor,
+          fillColor,
+          fillOpacity,
+          weight: isProhibited ? 2 : 1.5,
+          dashArray: isProhibited ? '6, 6' : '4, 4',
+          className: `nfz-circle ${isProhibited ? 'prohibited' : 'warning'}`,
+        });
+      }
 
       const popupHtml = `
         <div class="nfz-popup-card">
@@ -377,10 +428,10 @@ export class LeafletMapProvider implements IMapProvider {
         </div>
       `;
 
-      circle.bindPopup(popupHtml, { maxWidth: 300, className: 'custom-nfz-leaflet-popup' });
-      circle.bindTooltip(`⚠️ ${zone.name}`, { direction: 'top', sticky: true });
+      layer.bindPopup(popupHtml, { maxWidth: 300, className: 'custom-nfz-leaflet-popup' });
+      layer.bindTooltip(`⚠️ ${zone.name}`, { direction: 'top', sticky: true });
 
-      circle.addTo(this.nfzLayerGroup);
+      layer.addTo(this.nfzLayerGroup);
     });
   }
 

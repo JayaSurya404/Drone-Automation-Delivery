@@ -274,21 +274,36 @@ export const INITIAL_GEOFENCES: GeofenceZone[] = [
   },
   {
     id: 'GEO-02',
-    name: 'Coimbatore International Airport (CJB) Airspace',
+    name: 'Sulur Air Force Station (AFS Sulur / VO47) Defense Red Zone',
     type: 'nofly',
     coordinates: [
-      [11.040, 77.030],
-      [11.040, 77.070],
-      [11.010, 77.070],
-      [11.010, 77.030],
+      [11.025280, 77.142500],
+      [11.028610, 77.172220],
+      [11.001940, 77.175560],
+      [10.998610, 77.145830],
     ],
-    boundsRadiusMeters: 3000,
+    boundsRadiusMeters: 2800,
     active: true,
     maxAltitudeMeters: 0,
-    description: 'STRICT DGCA NO-FLY AIRSPACE: Commercial aircraft runway approach vectors.',
+    description: 'STRICT MoD & DGCA RED ZONE: Indian Air Force Fighter Jet Base & Military Flight Training Airspace (VO47).',
   },
   {
     id: 'GEO-03',
+    name: 'Coimbatore International Airport (CJB / VOCB) Runway Security Zone',
+    type: 'nofly',
+    coordinates: [
+      [11.038500, 77.030500],
+      [11.042500, 77.056000],
+      [11.024500, 77.059000],
+      [11.020500, 77.033500],
+    ],
+    boundsRadiusMeters: 1600,
+    active: true,
+    maxAltitudeMeters: 0,
+    description: 'STRICT DGCA RED ZONE: Active Commercial Jet Runway 05/23 & Aerodrome Boundary (DGCA UAS Rules 2021).',
+  },
+  {
+    id: 'GEO-04',
     name: 'VOC Park & Stadium Event Airspace',
     type: 'caution',
     coordinates: [
@@ -303,7 +318,7 @@ export const INITIAL_GEOFENCES: GeofenceZone[] = [
     description: 'Caution Zone: High civilian density. Maintain 25 km/h transit velocity.',
   },
   {
-    id: 'GEO-04',
+    id: 'GEO-05',
     name: 'Peelamedu Tech Park Express Zone',
     type: 'delivery',
     coordinates: [

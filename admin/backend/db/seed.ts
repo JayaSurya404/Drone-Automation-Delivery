@@ -120,10 +120,10 @@ export const seedAdminDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  geoStmt.run('GEO-01', 'Coimbatore International Airport (CJB) Exclusion Buffer', 'nofly', JSON.stringify([[11.0298, 77.0434]]), 5000, 1, 3000, 'DGCA UAS Rules 2021 Class D Airspace Corridor');
-  geoStmt.run('GEO-02', 'Sulur Air Force Station (AFS Sulur) Military Zone', 'restricted', JSON.stringify([[11.0136, 77.1611]]), 6000, 1, 4000, 'MoD IAF Defense Flight Training Range & Red Zone');
-  geoStmt.run('GEO-03', 'Kurumbapalayam Operations & Delivery Corridor', 'delivery', JSON.stringify([[11.1132, 77.0277]]), 12000, 1, 120, 'Primary Autonomous Delivery Flight Corridor for Kurumbapalayam & Coimbatore North');
-  geoStmt.run('GEO-04', 'CMCH & PSG Hospitals Medical Heliport Caution Area', 'caution', JSON.stringify([[11.0250, 77.0300]]), 1200, 1, 350, 'Emergency Medevac Helicopter Transit Corridor');
+  geoStmt.run('GEO-01', 'Kurumbapalayam Operations & Delivery Corridor', 'delivery', JSON.stringify([[11.1450, 77.0000], [11.1450, 77.0600], [11.0700, 77.0600], [11.0700, 77.0000]]), 12000, 1, 120, 'Authoritative DGCA Green Zone: Primary Autonomous Delivery Air Corridor for Kurumbapalayam & Coimbatore North');
+  geoStmt.run('GEO-02', 'Sulur Air Force Station (AFS Sulur / VO47) Defense Red Zone', 'nofly', JSON.stringify([[11.025280, 77.142500], [11.028610, 77.172220], [11.001940, 77.175560], [10.998610, 77.145830]]), 2800, 1, 4000, 'MoD Gazette Notification S.O. 425(E) & DGCA Digital Sky Red Zone: IAF Fighter Jet Training Airspace');
+  geoStmt.run('GEO-03', 'Coimbatore International Airport (CJB / VOCB) Statutory Runway Security Zone', 'nofly', JSON.stringify([[11.038500, 77.030500], [11.042500, 77.056000], [11.024500, 77.059000], [11.020500, 77.033500]]), 1600, 1, 3000, 'DGCA Drone Rules 2021 & AAI AIP India VOCB AD 2.1: Prohibited Active Jet Runway 05/23 Security Envelope');
+  geoStmt.run('GEO-04', 'CMCH & PSG Hospitals Medical Heliport Caution Area', 'caution', JSON.stringify([[11.0270, 77.0280], [11.0270, 77.0320], [11.0230, 77.0320], [11.0230, 77.0280]]), 1200, 1, 350, 'Emergency Medevac Helicopter Transit Corridor');
 
   // 6. MAINTENANCE RECORDS
   const maintStmt = db.prepare(`

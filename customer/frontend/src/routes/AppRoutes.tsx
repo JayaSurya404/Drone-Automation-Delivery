@@ -92,6 +92,14 @@ export const AppRoutes: React.FC = () => {
         }
       />
       <Route
+        path="/orders/:orderId/tracking"
+        element={
+          <ProtectedRoute>
+            <TrackingPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/addresses"
         element={
           <ProtectedRoute>

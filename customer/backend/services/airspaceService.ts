@@ -14,6 +14,7 @@ export interface NoFlyZone {
   reason: string;
   regulatoryRef: string;
   activeSchedule?: string;
+  polygon?: [number, number][];
 }
 
 export interface DropZoneSafetyEvaluation {
@@ -32,47 +33,44 @@ export interface DropZoneSafetyEvaluation {
 const COIMBATORE_NO_FLY_ZONES: NoFlyZone[] = [
   {
     id: 'nfz_cjb_airport',
-    name: 'Coimbatore International Airport (CJB / VOCB) Active Runway Security Perimeter',
-    code: 'CJB-CLASS-D-CORE',
+    name: 'Coimbatore International Airport (CJB / VOCB) Statutory Runway Security Zone',
+    code: 'VOCB-RED-RUNWAY',
     type: 'AIRPORT',
     restriction: 'PROHIBITED',
-    latitude: 11.0298,
-    longitude: 77.0434,
-    radiusMeters: 2500,
+    latitude: 11.030000,
+    longitude: 77.043333,
+    radiusMeters: 1600,
+    polygon: [
+      [11.038500, 77.030500],
+      [11.042500, 77.056000],
+      [11.024500, 77.059000],
+      [11.020500, 77.033500],
+    ],
     altitudeFloorMeters: 0,
     altitudeCeilingMeters: 3000,
-    reason: 'Active commercial aircraft runway & terminal security perimeter. UAV operations prohibited inside runway safety boundary.',
-    regulatoryRef: 'DGCA UAS Rules 2021 / Class D Runway Buffer',
+    reason: 'Active commercial jet runway 05/23 and primary terminal boundary. Prohibited Red Zone under DGCA Drone Rules.',
+    regulatoryRef: 'DGCA Drone Rules 2021, Rule 22(1)(a) & AAI AIP India VOCB AD 2.1',
     activeSchedule: '24/7 Continuous',
   },
   {
-    id: 'nfz_cjb_corridor',
-    name: 'Coimbatore Airport Outer Air Corridor Advisory Zone',
-    code: 'CJB-UAV-YELLOW',
-    type: 'AIRPORT',
-    restriction: 'RESTRICTED_WARNING',
-    latitude: 11.0298,
-    longitude: 77.0434,
-    radiusMeters: 5000,
-    altitudeFloorMeters: 0,
-    altitudeCeilingMeters: 60,
-    reason: 'DGCA designated low-altitude commercial delivery air corridor under 60m AGL. Normal drone flight permitted with continuous telemetry.',
-    regulatoryRef: 'DGCA Digital Sky Drone Airspace Map (Yellow Zone Corridor)',
-    activeSchedule: '24/7 Monitored',
-  },
-  {
     id: 'nfz_sulur_iaf',
-    name: 'Sulur Air Force Station (AFS Sulur) Military Airspace Zone',
-    code: 'SULUR-IAF-RED',
+    name: 'Sulur Air Force Station (AFS Sulur / VO47) Military Airspace Red Zone',
+    code: 'VO47-RED-MIL',
     type: 'MILITARY',
     restriction: 'PROHIBITED',
-    latitude: 11.0136,
-    longitude: 77.1611,
-    radiusMeters: 6000,
+    latitude: 11.013611,
+    longitude: 77.160000,
+    radiusMeters: 2800,
+    polygon: [
+      [11.025280, 77.142500],
+      [11.028610, 77.172220],
+      [11.001940, 77.175560],
+      [10.998610, 77.145830],
+    ],
     altitudeFloorMeters: 0,
     altitudeCeilingMeters: 4000,
-    reason: 'Indian Air Force fighter jet training range and defense installation. Classified Red Zone by Ministry of Civil Aviation.',
-    regulatoryRef: 'MoD & DGCA National Drone Airspace Map (Red Zone)',
+    reason: 'Indian Air Force Fighter Base & Military Flight Training Area. Red Zone: Drone operations strictly prohibited without Ministry of Defence (MoD) clearance.',
+    regulatoryRef: 'MoD Gazette Notification S.O. 425(E) & DGCA Digital Sky Airspace Map (Red Zone)',
     activeSchedule: '24/7 Continuous',
   },
   {
