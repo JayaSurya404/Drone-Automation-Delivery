@@ -113,6 +113,8 @@ export interface TelemetryUpdatePayload {
   estimatedArrivalMins: number;
   progressPercent: number;
   timestamp: string;
+  sampleId?: number;
+  simTime?: number;
   handoverOtp?: string;
 }
 

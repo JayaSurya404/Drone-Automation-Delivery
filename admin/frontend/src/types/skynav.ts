@@ -6,6 +6,9 @@ export interface LocationCoordinates {
   altitude?: number;
   heading?: number;
   speed?: number;
+  sampleId?: number;
+  simTime?: number;
+  timestamp?: string;
 }
 
 export interface Drone {
@@ -31,6 +34,9 @@ export interface Drone {
   issuesCount: number;
   imageUrl?: string;
   isRecommended?: boolean;
+  sampleId?: number;
+  simTime?: number;
+  lastTelemetryTimestamp?: string;
 }
 
 export type OrderStatus =
@@ -120,6 +126,8 @@ export interface Mission {
   currentAltitudeM: number;
   etaSeconds: number;
   remainingDistanceKm?: number;
+  sampleId?: number;
+  simTime?: number;
   createdAt: string;
   startTime?: string;
   completionTime?: string;

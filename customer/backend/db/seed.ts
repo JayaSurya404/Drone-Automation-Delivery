@@ -95,6 +95,7 @@ export const seedDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
+  droneStmt.run('D-001', 'SkyNav Alpha-01 (D-001)', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 11.1132, 77.0277, 0, 0, 0, 4.5);
   droneStmt.run('drone_01', 'SkyNav Alpha-01', 'AeroCarrier Hexacopter v4', 'AVAILABLE', 98, 11.1132, 77.0277, 0, 0, 0, 4.5);
   droneStmt.run('drone_02', 'SkyNav Falcon-02', 'AeroCarrier HeavyLift v5', 'AVAILABLE', 100, 11.1132, 77.0277, 0, 0, 0, 5.0);
   droneStmt.run('drone_03', 'SkyNav Osprey-03', 'Osprey Rapid VTOL', 'AVAILABLE', 92, 11.1132, 77.0277, 0, 0, 0, 3.5);
@@ -147,15 +148,15 @@ export const seedDatabase = async () => {
     'Home',
     'SkyNav Customer',
     '+91 98422 10002',
-    'Tech Corridor Block 4',
-    'Kalapatti Main Road',
-    'Kurumbapalayam / Kalapatti',
+    'Kurumbapalayam South Tech Hub',
+    'KVIMIS Campus Road',
+    'Kurumbapalayam South',
     'Coimbatore',
     'Tamil Nadu',
-    '641048',
-    11.0725,
-    77.0345,
-    'Backyard lawn landing pad marked with high-visibility SkyNav drone beacon.',
+    '641107',
+    11.104262,
+    77.028112,
+    'Designated lawn drop marker. Clear line of sight.',
     1,
     'Lawn'
   );
@@ -249,14 +250,14 @@ export const seedDatabase = async () => {
   const addrSnapshot2 = JSON.stringify({
     name: 'Jaya (SkyNav Customer)',
     phone: '+91 98422 10002',
-    building: 'Tech Corridor Block 4',
-    street: 'Kalapatti Main Road',
-    area: 'Kurumbapalayam / Kalapatti',
+    building: 'Kurumbapalayam South Tech Hub',
+    street: 'KVIMIS Campus Road',
+    area: 'Kurumbapalayam South',
     city: 'Coimbatore',
     state: 'Tamil Nadu',
-    postalCode: '641048',
-    latitude: 11.0725,
-    longitude: 77.0345,
+    postalCode: '641107',
+    latitude: 11.104262,
+    longitude: 77.028112,
     dropZoneType: 'Lawn'
   });
 
@@ -291,6 +292,47 @@ export const seedDatabase = async () => {
   statusHistoryStmt.run('hist_1002_4', 'ORD-1002', 'Preparing', 'Drone Assigned', 'SkyNav Alpha-01 assigned.', 1, '-20 minutes');
   statusHistoryStmt.run('hist_1002_5', 'ORD-1002', 'Drone Assigned', 'Drone Launched', 'Autonomous drone dispatched via Kurumbapalayam corridor.', 1, '-10 minutes');
   statusHistoryStmt.run('hist_1002_6', 'ORD-1002', 'Drone Launched', 'Out for Delivery', 'Autonomous delivery in-flight.', 1, '-2 minutes');
+
+  // Seed active delivery record for ORD-1002
+  const delStmt = db.prepare(`
+    INSERT OR REPLACE INTO deliveries (
+      id, order_id, drone_id, status, pickup_latitude, pickup_longitude,
+      destination_latitude, destination_longitude, flight_route_json,
+      current_latitude, current_longitude, current_altitude, current_speed,
+      current_bearing, remaining_distance_km, estimated_arrival_mins, handover_otp, started_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?))
+  `);
+
+  const initial1kmRoute = [
+    [11.113200, 77.027700],
+    [11.111403, 77.027792],
+    [11.109156, 77.027865],
+    [11.108258, 77.028231],
+    [11.106911, 77.028020],
+    [11.105114, 77.028112],
+    [11.104262, 77.028112]
+  ];
+
+  delStmt.run(
+    'del_1002',
+    'ORD-1002',
+    'D-001',
+    'IN_FLIGHT',
+    11.1132,
+    77.0277,
+    11.104262,
+    77.028112,
+    JSON.stringify(initial1kmRoute),
+    11.1132,
+    77.0277,
+    0,
+    0,
+    185,
+    1.0,
+    2,
+    '4827',
+    '-10 minutes'
+  );
 
   // 8. SEED INITIAL SAMPLE REVIEWS
   const revStmt = db.prepare(`

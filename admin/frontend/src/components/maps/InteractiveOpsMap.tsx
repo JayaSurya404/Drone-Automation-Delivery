@@ -324,6 +324,9 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
         alt: activeAirborneDrone.location.altitude || 0,
         speed: activeAirborneDrone.location.speed || 0,
         heading: activeAirborneDrone.location.heading || 0,
+        sampleId: activeAirborneDrone.location.sampleId,
+        simTime: activeAirborneDrone.location.simTime,
+        timestamp: activeAirborneDrone.location.timestamp,
         status: activeAirborneDrone.status,
         battery: activeAirborneDrone.battery,
       };

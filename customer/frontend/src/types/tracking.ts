@@ -6,6 +6,8 @@ export interface DroneLocation {
   altitudeMeters?: number; // Safe consumer display e.g. "Cruising at safe altitude (65m)"
   speedKmh?: number;       // Safe consumer display e.g. "48 km/h"
   bearing?: number;        // Rotation angle in degrees
+  sampleId?: number;
+  simTime?: number;
 }
 
 export interface HubLocation {
@@ -56,5 +58,7 @@ export interface RealtimeCustomerEvent {
   location?: DroneLocation;
   remainingDistanceKm?: number;
   estimatedArrivalMins?: number;
+  sampleId?: number;
+  simTime?: number;
   message: string;
 }

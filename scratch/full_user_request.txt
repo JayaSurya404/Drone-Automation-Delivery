@@ -1,0 +1,633 @@
+<USER_REQUEST>
+FINAL FLIGHT CONSISTENCY + DESTINATION CORRECTION + SYNCHRONIZATION VALIDATION
+=============================================================================
+
+Repository:
+JayaSurya404/Drone-Automation-Delivery
+
+WORK ONLY ON:
+`admin+customer`
+
+DO NOT:
+- modify `main`
+- modify `customer`
+- modify `Drone-admin`
+- create PRs
+- merge branches
+- redesign the architecture
+- replace Gazebo
+- create another flight simulator
+- introduce fake frontend motion
+- change unrelated product/order/PIN functionality unless required for this fix
+
+IMPORTANT:
+The Customer 2D live marker bug has already been fixed and verified:
+- actual Leaflet marker moves without refresh
+- 36 distinct browser marker positions were recorded
+- Gazebo is the physical authority
+- Admin 2D, Admin 3D, and Customer 2D consume the same flight telemetry
+
+DO NOT REGRESS THAT FIX.
+
+The latest verification still has TWO IMPORTANT ISSUES:
+
+1. T3/T4 synchronization is not sufficiently tight.
+2. The configured customer destination does not match the reported touchdown coordinate.
+
+Fix ONLY these remaining inconsistencies and re-run the complete browser/Gazebo validation.
+
+============================================================
+1. EXISTING VERIFIED CUSTOMER 2D MOVEMENT — PRESERVE IT
+============================================================
+
+Do not undo the current Customer 2D marker fix.
+
+The following behavior must remain:
+
+- Customer marker moves continuously without refresh.
+- Existing Leaflet marker is updated with setLatLng().
+- No setIcon() recreation on every telemetry frame.
+- No fake interpolation.
+- No timer-driven browser simulation.
+- No independent Customer trajectory.
+- No automatic camera follow/recenter.
+- Customer breadcrumb path updates from actual telemetry.
+
+The Customer 2D map must continue showing the physical Gazebo drone.
+
+============================================================
+2. SINGLE AUTHORITATIVE POSITION SAMPLE
+============================================================
+
+The current synchronization problem appears around obstacle avoidance/descent.
+
+At each synchronization checkpoint, all systems must derive their position from the SAME telemetry sample.
+
+At timestamp T:
+
+Gazebo GPS(T)
+=
+Admin Backend telemetry(T)
+=
+Admin 2D(T)
+=
+Admin 3D(T)
+=
+Customer 2D(T)
+
+Do NOT compare telemetry from different moments.
+
+IMPORTANT:
+Do NOT solve synchronization merely by increasing tolerance.
+
+The objective is to reduce the actual mismatch.
+
+============================================================
+3. FIX TIMESTAMP ALIGNMENT
+============================================================
+
+Inspect:
+
+- Gazebo GPS timestamps
+- telemetry bridge timestamp
+- Admin backend telemetry timestamp
+- Admin 2D render timestamp
+- Admin 3D render timestamp
+- Customer WebSocket/SSE timestamp
+
+Every telemetry packet must carry an authoritative timestamp.
+
+Use the same sample identity/time reference across:
+
+Gazebo
+→ bridge
+→ Admin backend
+→ Customer backend
+→ Admin 2D
+→ Admin 3D
+→ Customer 2D
+
+The E2E test must compare matched samples, not nearest unrelated samples.
+
+If the frontend receives packet N:
+
+Admin 2D, Admin 3D and Customer 2D should all be evaluated against packet N.
+
+============================================================
+4. FIX T3 OBSTACLE-AVOIDANCE SYNCHRONIZATION
+============================================================
+
+Current report shows approximately:
+
+Gazebo:
+11.10825, 77.02823
+
+Admin 2D:
+11.10833, 77.02821
+
+Admin 3D:
+11.10833, 77.02821
+
+Customer:
+11.10833, 77.02821
+
+Reported discrepancy:
+8.24 m
+
+This is too large for the final synchronized demonstration.
+
+Investigate the actual cause.
+
+Possible causes to inspect:
+
+- stale frontend telemetry frame
+- delayed WebSocket/SSE event
+- interpolation using an older timestamp
+- Admin backend caching stale coordinates
+- Customer relay lag
+- map renderer reading previous state
+- obstacle-detour command and GPS sample occurring at different times
+- separate 2D/3D route interpolation
+- frontend throttling/drop behavior
+
+Do NOT simply alter the tolerance to hide this.
+
+Target:
+Preferably < 1 m.
+If a larger residual is unavoidable, document the exact physical/telemetry cause.
+
+============================================================
+5. FIX T4 APPROACH SYNCHRONIZATION
+============================================================
+
+Current report shows:
+
+Gazebo:
+11.10426, 77.02811
+
+Customer:
+11.10421, 77.02811
+
+Reported discrepancy:
+5.58 m
+
+Again, do not merely increase tolerance.
+
+Trace the actual packet flow and make sure all systems render the same telemetry sample.
+
+Target:
+Preferably < 1 m.
+
+============================================================
+6. CRITICAL DESTINATION COORDINATE MISMATCH
+============================================================
+
+This MUST be resolved.
+
+Current report says the active customer order was seeded with:
+
+11.0725, 77.0345
+
+However, reported touchdown is approximately:
+
+11.104262, 77.028112
+
+These are different locations.
+
+DO NOT leave this ambiguous.
+
+Inspect ALL destination definitions in:
+
+- customer database
+- admin database
+- customer order record
+- admin order record
+- checkout payload
+- dispatch payload
+- mission creation
+- Gazebo mission target
+- telemetry bridge
+- customer tracking page
+- Admin 2D route
+- Admin 3D route
+
+Identify which coordinate is supposed to be the authoritative customer destination.
+
+============================================================
+7. AUTHORITATIVE DESTINATION RULE
+============================================================
+
+There must be ONE authoritative destination for an order.
+
+For an active order, the exact same destination must propagate:
+
+Customer Order
+→ Admin Order
+→ Mission
+→ Gazebo target
+→ Admin 2D route
+→ Admin 3D route
+→ Customer 2D route
+→ Touchdown location
+
+Do not maintain separate destination coordinates in separate layers.
+
+Use the existing shared contract/data structure wherever possible.
+
+============================================================
+8. DO NOT SILENTLY CHOOSE BETWEEN THE TWO COORDINATES
+============================================================
+
+Do NOT simply decide:
+
+"11.104262 is correct"
+
+or:
+
+"11.0725 is correct"
+
+without tracing the real application data.
+
+Determine which coordinate belongs to the actual active customer's intended delivery pad.
+
+Then make the entire system consistent with that authoritative destination.
+
+If the current seed/demo customer destination was intentionally changed, update the stale configuration so there is only ONE source of truth.
+
+============================================================
+9. TOUCHDOWN MUST EQUAL ORDER DESTINATION
+============================================================
+
+At T5:
+
+Actual Gazebo touchdown coordinate
+must equal
+active order destination
+
+within a documented small physical tolerance.
+
+Target:
+< 1 m if the pad/physics allows it.
+
+The final report must show:
+
+Order destination:
+LAT, LNG
+
+Gazebo touchdown:
+LAT, LNG
+
+Difference:
+X meters
+
+Expected:
+small, documented physical landing tolerance.
+
+============================================================
+10. ROUTE DISTANCE MUST BE CALCULATED FROM THE ACTUAL PATH
+============================================================
+
+Do not describe the route simply as "1 km" if the actual flown path differs.
+
+Report all of these separately:
+
+- straight-line Hub → Customer distance
+- planned corridor distance
+- actual flown distance
+- obstacle-detour distance
+- total flight distance
+
+Use actual measured telemetry/breadcrumb data.
+
+Do not round the final result unnecessarily.
+
+For example, if the actual route is 860 m:
+
+say 860 m.
+
+Do not call it 1,000 m unless 1,000 m is specifically the planned corridor length.
+
+============================================================
+11. REAL-TIME FLIGHT PHYSICS
+============================================================
+
+Preserve:
+
+40 km/h = 11.11 m/s
+
+At 1 km ideal cruise:
+~90 seconds
+
+But actual total mission time must include:
+
+- climb
+- acceleration
+- cruise
+- obstacle avoidance
+- descent
+- touchdown
+
+Continue using 1x real-time.
+
+Do not add artificial frontend acceleration.
+
+============================================================
+12. OBSTACLE DETOUR MUST BE IDENTICAL IN 2D AND 3D
+============================================================
+
+When Gazebo LiDAR detects an obstacle:
+
+Gazebo physically changes route.
+
+Then:
+
+Admin 3D
+Admin 2D
+Customer 2D
+
+must all show the same resulting trajectory.
+
+The 2D route must NOT be:
+
+Hub → Customer straight line
+
+while 3D uses:
+
+Hub → obstacle
+→ east/west detour
+→ rejoin route
+→ Customer.
+
+Both visualizations must use the actual telemetry breadcrumb trajectory.
+
+============================================================
+13. CUSTOMER MAP VALIDATION
+============================================================
+
+The Customer 2D map must continue to pass:
+
+- live marker movement
+- no refresh
+- 36+ unique marker positions or equivalent continuous samples
+- real telemetry
+- real breadcrumb movement
+
+Add stronger validation:
+
+Count unique rendered marker positions.
+
+Verify:
+
+initial != intermediate != later != final
+
+Also record timestamp for each sample.
+
+============================================================
+14. ADMIN 2D + ADMIN 3D VALIDATION
+============================================================
+
+At identical timestamps:
+
+- latitude matches
+- longitude matches
+- altitude matches
+- heading matches
+- speed matches
+- flight phase matches
+
+Do not compare values sampled seconds apart.
+
+============================================================
+15. CAMERA BEHAVIOR
+============================================================
+
+Preserve the previous requirement:
+
+NO:
+
+fitBounds
+flyTo
+easeTo
+setView
+automatic recenter
+automatic zoom
+automatic follow
+
+The marker/path moves.
+
+The camera does not automatically chase it.
+
+============================================================
+16. FINAL E2E TEST
+============================================================
+
+Run an actual native Gazebo mission using the real browser applications.
+
+Open simultaneously:
+
+1. Admin 2D
+2. Admin 3D
+3. Customer tracking
+
+Do NOT refresh any of them during flight.
+
+Collect matched telemetry checkpoints:
+
+T0 Launch
+T1 Climb
+T2 Cruise
+T3 Obstacle Avoidance
+T4 Customer Approach
+T5 Touchdown
+T6 Delivery Handover
+
+At each checkpoint record:
+
+timestamp
+Gazebo lat
+Gazebo lng
+Admin 2D lat
+Admin 2D lng
+Admin 3D lat
+Admin 3D lng
+Customer lat
+Customer lng
+speed
+altitude
+heading
+flight phase
+
+============================================================
+17. REQUIRED SYNCHRONIZATION TARGET
+============================================================
+
+Target final result:
+
+T0 < 1 m
+T1 < 1 m
+T2 < 1 m
+T3 < 1 m preferred
+T4 < 1 m preferred
+T5 < 1 m
+
+If any value exceeds 1 m:
+
+DO NOT hide it.
+
+Investigate and report the exact reason.
+
+============================================================
+18. REQUIRED DESTINATION TEST
+============================================================
+
+Before flight:
+
+Print:
+
+ORDER DESTINATION:
+lat, lng
+
+MISSION TARGET:
+lat, lng
+
+GAZEBO TARGET:
+lat, lng
+
+They must all match.
+
+After touchdown:
+
+GAZEBO ACTUAL TOUCHDOWN:
+lat, lng
+
+DISTANCE TO ORDER DESTINATION:
+X meters
+
+Expected:
+small physical landing tolerance.
+
+============================================================
+19. RESTRICTED / FLY ZONE
+============================================================
+
+Preserve the already-requested correction:
+
+Remove the old artificial Kurumbapalayam demonstration restricted circle.
+
+Keep the geographically sourced zone implementation.
+
+Do not create random coordinates.
+
+Do not reintroduce the old fake circular restriction.
+
+Do not change the verified geofence architecture unless required to fix the current mission.
+
+============================================================
+20. BUILD + REGRESSION
+============================================================
+
+Run:
+
+customer/backend build
+customer/frontend build
+admin/backend build
+admin/frontend build
+
+Then run the actual browser/Gazebo E2E mission.
+
+Do not report success from compilation alone.
+
+============================================================
+21. FINAL ACCEPTANCE CRITERIA
+============================================================
+
+COMPLETE ONLY WHEN:
+
+[ ] Customer 2D marker still moves live
+[ ] No browser refresh needed
+[ ] Customer marker uses actual Gazebo telemetry
+[ ] Admin 2D uses same telemetry
+[ ] Admin 3D uses same telemetry
+[ ] All three browser views remain synchronized
+[ ] T3 discrepancy is corrected
+[ ] T4 discrepancy is corrected
+[ ] No stale telemetry frame is being rendered
+[ ] One timestamped telemetry sample is used consistently
+[ ] One authoritative order destination exists
+[ ] Customer destination equals mission destination
+[ ] Mission target equals Gazebo target
+[ ] Gazebo touchdown equals customer destination within documented tolerance
+[ ] Actual flown distance is measured
+[ ] Planned distance and actual distance are clearly distinguished
+[ ] Actual mission duration is measured
+[ ] 40 km/h timing remains physically consistent
+[ ] Obstacle detour is identical in 2D and 3D
+[ ] Customer 2D shows the same detour
+[ ] No automatic map camera movement
+[ ] Restricted demonstration circle remains removed
+[ ] Verified geofence data remains intact
+[ ] All four builds pass
+[ ] Browser E2E test passes
+[ ] No source branches except `admin+customer` were modified
+
+============================================================
+22. FINAL REPORT FORMAT
+============================================================
+
+Return a final report containing:
+
+1. Exact root cause of T3/T4 synchronization discrepancy.
+2. Exact fix implemented.
+3. Exact authoritative destination coordinate.
+4. Previous destination coordinate and why it was stale/incorrect, if applicable.
+5. Final Gazebo touchdown coordinate.
+6. Final touchdown-to-destination error in meters.
+7. Actual route distance.
+8. Planned route distance.
+9. Obstacle-detour distance.
+10. Actual total flight time.
+11. Nominal cruise speed.
+12. T0–T6 synchronization table.
+13. Maximum synchronization error.
+14. Number of Customer 2D rendered marker positions.
+15. Confirmation that browser reload count = 0.
+16. Screenshot evidence for:
+    - Customer T2 cruise
+    - Admin 2D T2
+    - Admin 3D T2
+    - Customer T3 obstacle detour
+    - Admin 2D T3 obstacle detour
+    - Admin 3D T3 obstacle detour
+    - Customer T5 touchdown
+17. Confirmation that touchdown coordinate equals order destination.
+18. Build results.
+19. Exact files changed.
+20. Confirmation that only `admin+customer` was modified.
+
+FINAL RULE:
+
+Do NOT state "fully synchronized" unless the numerical synchronization table actually supports that statement.
+
+Do NOT state "correct destination" until the order destination, mission target, Gazebo target, and actual touchdown have been compared.
+
+Do NOT hide discrepancies by increasing tolerances.
+
+The goal is one physical Gazebo drone, one authoritative mission destination, one authoritative telemetry stream, and three synchronized browser views:
+Admin 2D + Admin 3D + Customer 2D.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-28T10:13:19+05:30.
+
+The user's current state is as follows:
+Active Document: d:\Drone-Automation-Delivery\shared\contracts\events.ts (LANGUAGE_TYPESCRIPT)
+Cursor is on line: 1
+Other open documents:
+- d:\Drone-Automation-Delivery\scratch\test_tab_eval.ts (LANGUAGE_TYPESCRIPT)
+- d:\Drone-Automation-Delivery\customer\frontend\src\services\api.ts (LANGUAGE_TYPESCRIPT)
+- d:\Drone-Automation-Delivery\customer\frontend\src\pages\orders\TrackingPage.tsx (LANGUAGE_TSX)
+- d:\Drone-Automation-Delivery\customer\frontend\src\pages\checkout\CheckoutPage.tsx (LANGUAGE_TSX)
+- d:\Drone-Automation-Delivery\customer\frontend\src\components\map\LocationPickerMap.tsx (LANGUAGE_TSX)
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.8 Flash (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

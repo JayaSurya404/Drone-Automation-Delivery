@@ -16,6 +16,8 @@ export interface TelemetryUpdate {
   estimatedArrivalMins: number;
   progressPercent: number;
   timestamp: string;
+  sampleId?: number;
+  simTime?: number;
   isCompleted: boolean;
   handoverOtp: string;
 }
@@ -347,6 +349,8 @@ class DroneTrackingService {
     estimatedArrivalMins: number;
     progressPercent: number;
     timestamp: string;
+    sampleId?: number;
+    simTime?: number;
     handoverOtp?: string;
   }) {
     const orderId = telemetry.customerOrderId;
@@ -400,6 +404,8 @@ class DroneTrackingService {
       estimatedArrivalMins: telemetry.estimatedArrivalMins,
       progressPercent: telemetry.progressPercent,
       timestamp: telemetry.timestamp,
+      sampleId: telemetry.sampleId,
+      simTime: telemetry.simTime,
       isCompleted: telemetry.status === 'Delivered',
       handoverOtp: telemetry.handoverOtp || '',
     });

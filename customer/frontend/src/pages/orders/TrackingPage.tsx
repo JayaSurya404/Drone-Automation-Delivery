@@ -173,8 +173,14 @@ export const TrackingPage: React.FC = () => {
         });
 
         if (event.location) {
+          const sampleId = event.sampleId ?? (event.location as any)?.sampleId;
+          const simTime = event.simTime ?? (event.location as any)?.simTime;
+
           if (typeof window !== 'undefined') {
             (window as any).__skynavCustomerDrone = {
+              sampleId,
+              simTime,
+              timestamp: event.timestamp,
               lat: event.location.latitude,
               lng: event.location.longitude,
               alt: event.location.altitudeMeters || 0,
@@ -200,6 +206,8 @@ export const TrackingPage: React.FC = () => {
                 altitudeMeters: event.location!.altitudeMeters,
                 speedKmh: event.location!.speedKmh,
                 bearing: event.location!.bearing,
+                sampleId,
+                simTime,
               },
               remainingDistanceKm: event.remainingDistanceKm ?? prev.remainingDistanceKm,
               estimatedArrivalMins: event.estimatedArrivalMins ?? prev.estimatedArrivalMins,

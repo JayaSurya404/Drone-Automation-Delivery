@@ -275,7 +275,13 @@ class MockDataStore {
                 altitude: t.currentLocation.altitudeMeters,
                 speed: t.currentLocation.speedKmh,
                 heading: t.currentLocation.bearing,
+                sampleId: t.sampleId,
+                simTime: t.simTime,
+                timestamp: t.timestamp,
               };
+              drone.sampleId = t.sampleId;
+              drone.simTime = t.simTime;
+              drone.lastTelemetryTimestamp = t.timestamp;
               drone.battery = t.battery;
               if (t.status === 'CHARGING') {
                 drone.status = 'charging';
@@ -299,6 +305,8 @@ class MockDataStore {
               mission.currentBattery = t.battery;
               mission.remainingDistanceKm = t.remainingDistanceKm;
               mission.etaSeconds = Math.round(t.estimatedArrivalMins * 60);
+              mission.sampleId = t.sampleId;
+              mission.simTime = t.simTime;
               if (t.status === 'TOUCHDOWN') {
                 mission.currentStatus = 'touchdown' as any;
               } else if (t.status === 'RETURNING' || t.isReturning) {
@@ -311,6 +319,9 @@ class MockDataStore {
                 lat: t.currentLocation.latitude,
                 lng: t.currentLocation.longitude,
                 altitude: t.currentLocation.altitudeMeters,
+                sampleId: t.sampleId,
+                simTime: t.simTime,
+                timestamp: t.timestamp,
               });
             }
 

@@ -181,8 +181,8 @@ class TelemetryEngine {
 
     const startLat = this.latestGazeboTelemetry?.latitude || mission.pickup_lat || 11.1132;
     const startLng = this.latestGazeboTelemetry?.longitude || mission.pickup_lng || 77.0277;
-    const destLat = mission.destination_lat || 11.0725;
-    const destLng = mission.destination_lng || 77.0345;
+    const destLat = mission.destination_lat || 11.104262;
+    const destLng = mission.destination_lng || 77.028112;
 
     if (route.length === 0) {
       route = this.generateFlightRoute(startLat, startLng, destLat, destLng, false);
@@ -273,7 +273,13 @@ class TelemetryEngine {
       fetch(`${bridgeUrl}/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start_mission', missionId }),
+        body: JSON.stringify({
+          action: 'start_mission',
+          missionId,
+          destinationLat: destCoords[0],
+          destinationLng: destCoords[1],
+          distanceM: totalDistanceMeters,
+        }),
         signal: AbortSignal.timeout(1000),
       }).catch(() => {});
     } catch {}
@@ -326,7 +332,9 @@ class TelemetryEngine {
       const gzBattery = gazeboTelemetry.sensors?.battery ?? 100;
       const gzPhase = gazeboTelemetry.flightPhase;
       const gzObstacle = gazeboTelemetry.obstacleAvoidance;
-      const gzSimTime = gazeboTelemetry.simTime;
+      const gzSimTime = gazeboTelemetry.simTime ?? 0;
+      const gzSampleId = gazeboTelemetry.sampleId ?? 0;
+      const gzTimestamp = gazeboTelemetry.timestampIso || nowIso;
 
       // ── Unconditionally update physical Gazebo drone D-001 in SQLite database ──
       let statusStr = 'available';
@@ -336,7 +344,7 @@ class TelemetryEngine {
       else if (gzPhase === 'RETURNING') statusStr = 'returning';
       else if (['TAKEOFF', 'CLIMB', 'CRUISE', 'AVOIDANCE', 'DESCENT'].includes(gzPhase)) statusStr = 'in_flight';
 
-      // Stream Gazebo telemetry to Customer backend for active delivery
+      // Stream Gazebo telemetry to Customer backend for active delivery (only if no activeMissions in loop)
       const activeOps = queryAll<any>(`
         SELECT o.customer_order_id, o.id as operational_order_id, m.id as mission_id, o.destination_lat, o.destination_lng, o.drone_id, o.status as order_status
         FROM operational_orders o
@@ -366,45 +374,49 @@ class TelemetryEngine {
         WHERE id = 'D-001' OR id = ?
       `, [gzLat, gzLng, gzAlt, gzBearing, gzSpeed, gzBattery, statusStr, activeDroneId]);
 
-      for (const op of targetOps) {
-        if (!op.customer_order_id) continue;
-        const destLat = op.destination_lat || 11.0725;
-        const destLng = op.destination_lng || 77.0345;
-        const remKm = this.calculateDistanceKm(gzLat, gzLng, destLat, destLng);
-        
-        let custStatus: CustomerOrderStatus = 'Out for Delivery';
-        if (gzPhase === 'TAKEOFF' || gzPhase === 'CLIMB') {
-          custStatus = 'Drone Launched';
-        } else if (gzPhase === 'TOUCHDOWN') {
-          custStatus = 'Arriving';
-        } else if (['RETURNING', 'CHARGING', 'AVAILABLE', 'DOCKED'].includes(gzPhase)) {
-          custStatus = 'Delivered';
-        } else if (remKm <= 0.25) {
-          custStatus = 'Arriving';
-        } else if (remKm <= 0.8) {
-          custStatus = 'Near Destination';
-        } else {
-          custStatus = 'Out for Delivery';
-        }
+      if (this.activeMissions.size === 0) {
+        for (const op of targetOps) {
+          if (!op.customer_order_id) continue;
+          const destLat = op.destination_lat || 11.104262;
+          const destLng = op.destination_lng || 77.028112;
+          const remKm = this.calculateDistanceKm(gzLat, gzLng, destLat, destLng);
+          
+          let custStatus: CustomerOrderStatus = 'Out for Delivery';
+          if (gzPhase === 'TAKEOFF' || gzPhase === 'CLIMB') {
+            custStatus = 'Drone Launched';
+          } else if (gzPhase === 'TOUCHDOWN') {
+            custStatus = 'Arriving';
+          } else if (['RETURNING', 'CHARGING', 'AVAILABLE', 'DOCKED'].includes(gzPhase)) {
+            custStatus = 'Delivered';
+          } else if (remKm <= 0.25) {
+            custStatus = 'Arriving';
+          } else if (remKm <= 0.8) {
+            custStatus = 'Near Destination';
+          } else {
+            custStatus = 'Out for Delivery';
+          }
 
-        customerIntegrationClient.sendTelemetryUpdate({
-          customerOrderId: op.customer_order_id,
-          missionId: op.mission_id || 'MS-GAZEBO',
-          droneId: op.drone_id || 'D-001',
-          droneName: 'SkyNav X1',
-          status: custStatus,
-          currentLocation: {
-            latitude: gzLat,
-            longitude: gzLng,
-            altitudeMeters: gzAlt,
-            speedKmh: gzSpeed,
-            bearing: gzBearing,
-          },
-          remainingDistanceKm: remKm,
-          estimatedArrivalMins: Math.max(1, Math.ceil((remKm * 1000) / Math.max(2.0, gzSpeed / 3.6) / 60)),
-          progressPercent: Math.min(100, Math.max(0, Math.round((1.0 - Math.min(1.0, remKm / 4.71)) * 100))),
-          timestamp: nowIso,
-        });
+          customerIntegrationClient.sendTelemetryUpdate({
+            customerOrderId: op.customer_order_id,
+            missionId: op.mission_id || 'MS-GAZEBO',
+            droneId: op.drone_id || 'D-001',
+            droneName: 'SkyNav X1',
+            status: custStatus,
+            currentLocation: {
+              latitude: gzLat,
+              longitude: gzLng,
+              altitudeMeters: gzAlt,
+              speedKmh: gzSpeed,
+              bearing: gzBearing,
+            },
+            remainingDistanceKm: remKm,
+            estimatedArrivalMins: Math.max(1, Math.ceil((remKm * 1000) / Math.max(2.0, gzSpeed / 3.6) / 60)),
+            progressPercent: Math.min(100, Math.max(0, Math.round((1.0 - Math.min(1.0, remKm / 1.0)) * 100))),
+            timestamp: gzTimestamp,
+            sampleId: gzSampleId,
+            simTime: gzSimTime,
+          });
+        }
       }
 
       // 1. Authoritative Gazebo Outbound Mission Processing
@@ -526,7 +538,9 @@ class TelemetryEngine {
             remainingDistanceKm: remainingKm,
             estimatedArrivalMins: etaMins,
             progressPercent: progress,
-            timestamp: nowIso,
+            timestamp: gzTimestamp,
+            sampleId: gzSampleId,
+            simTime: gzSimTime,
           });
         }
 
@@ -555,6 +569,8 @@ class TelemetryEngine {
           flightPhase: gzPhase,
           obstacleAvoidance: gzObstacle,
           simTime: gzSimTime,
+          sampleId: gzSampleId,
+          timestamp: gzTimestamp,
         });
       }
 
@@ -1227,8 +1243,8 @@ class TelemetryEngine {
     const drone = queryOne<any>('SELECT * FROM drones WHERE id = ?', [targetDroneId]);
     const hubLat = order.pickup_lat || 11.1132;
     const hubLng = order.pickup_lng || 77.0277;
-    const startLat = this.latestGazeboTelemetry?.latitude || order.destination_lat || 11.0725;
-    const startLng = this.latestGazeboTelemetry?.longitude || order.destination_lng || 77.0345;
+    const startLat = this.latestGazeboTelemetry?.latitude || order.destination_lat || 11.104262;
+    const startLng = this.latestGazeboTelemetry?.longitude || order.destination_lng || 77.028112;
 
     // Plan non-straight dedicated Eastbound Return Airway
     const returnRouteResult = corridorRoutePlanner.planRoute(startLat, startLng, hubLat, hubLng, true);

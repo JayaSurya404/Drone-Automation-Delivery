@@ -20,8 +20,8 @@ export class Environment3D {
   // SkyHub Kurumbapalayam [11.1132, 77.0277] mapped to (0, 0.05, -35)
   public warehousePadPosition = new THREE.Vector3(0, 0.05, -35);
 
-  // Customer Destination [11.0725, 77.0345] mapped to (12.05, 0.05, 38)
-  public customerPadPosition = new THREE.Vector3(12.05, 0.05, 38);
+  // Customer Destination [11.104262, 77.028112] mapped to (0.70, 0.05, -19.69)
+  public customerPadPosition = new THREE.Vector3(0.70, 0.05, -19.69);
 
   // Flight corridor obstacle (transmission tower / cell mast along SH-165)
   public obstaclePosition = new THREE.Vector3(3.5, 0, 5);
@@ -264,7 +264,7 @@ export class Environment3D {
   }
 
   /**
-   * Customer Delivery Drop-Off Zone [11.0725, 77.0345] (Kalapatti, Coimbatore)
+   * Customer Delivery Drop-Off Zone [11.104262, 77.028112] (Kurumbapalayam South / KVIMIS Pad)
    */
   private buildCustomerZone() {
     const custPos = this.customerPadPosition;

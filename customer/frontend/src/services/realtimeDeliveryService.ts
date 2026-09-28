@@ -54,6 +54,9 @@ class RealtimeDeliveryService {
     } : undefined);
 
     if (loc && loc.latitude && loc.longitude) {
+      const sampleId = t.sampleId !== undefined ? Number(t.sampleId) : undefined;
+      const simTime = t.simTime !== undefined ? Number(t.simTime) : undefined;
+
       this.emit({
         type: isDone ? 'DELIVERY_COMPLETED' : 'DRONE_LOCATION_UPDATED',
         orderId: t.orderId || orderId,
@@ -65,7 +68,11 @@ class RealtimeDeliveryService {
           altitudeMeters: Number(loc.altitudeMeters || 0),
           speedKmh: Number(loc.speedKmh || 0),
           bearing: Number(loc.bearing || 0),
+          sampleId,
+          simTime,
         },
+        sampleId,
+        simTime,
         remainingDistanceKm: t.remainingDistanceKm,
         estimatedArrivalMins: t.estimatedArrivalMins,
         message: `Drone status: ${t.status || t.orderStatus || 'in_flight'}. Alt: ${loc.altitudeMeters || 0}m, Speed: ${loc.speedKmh || 0} km/h`,

@@ -186,6 +186,9 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
     if (typeof window !== 'undefined') {
       const markerCoords = mapProviderRef.current?.getDroneMarkerLatLng?.();
       (window as any).__skynavCustomerDrone = {
+        sampleId: droneLocation.sampleId,
+        simTime: droneLocation.simTime,
+        timestamp: (droneLocation as any).timestamp,
         lat: markerCoords ? markerCoords.lat : droneLocation.latitude,
         lng: markerCoords ? markerCoords.lng : droneLocation.longitude,
         alt: droneLocation.altitudeMeters || 0,

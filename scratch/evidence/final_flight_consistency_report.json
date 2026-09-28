@@ -1,0 +1,376 @@
+{
+  "testTimestamp": "2026-09-28T07:28:36.079Z",
+  "authoritativeDestination": {
+    "lat": 11.104262,
+    "lng": 77.028112
+  },
+  "gazeboTouchdown": {
+    "lat": 11.104262,
+    "lng": 77.028112
+  },
+  "touchdownErrorMeters": 0,
+  "distances": {
+    "straightLineDistanceM": 996.02,
+    "plannedCorridorDistanceM": 1005.08,
+    "obstacleDetourExtraDistanceM": 8.88,
+    "actualTotalFlownDistanceM": 1085.08
+  },
+  "flightPhysics": {
+    "nominalCruiseSpeedKmh": 40,
+    "nominalCruiseSpeedMps": 11.11,
+    "idealCruiseSeconds": 90,
+    "actualTotalFlightSeconds": 120.3
+  },
+  "customer2DMarker": {
+    "initialMarkerCoords": [
+      11.1132,
+      77.0277
+    ],
+    "finalMarkerCoords": [
+      11.105104,
+      77.028112
+    ],
+    "uniqueRenderedPositionsCount": 37,
+    "hasMovedLiveWithoutRefresh": true,
+    "browserReloadCount": 0
+  },
+  "maxSyncErrorMeters": 2.3376412688355184,
+  "matchedCheckpoints": {
+    "T1": {
+      "checkpoint": "T1",
+      "name": "Initial Climb (45m AGL)",
+      "sampleId": 1138,
+      "simTime": 61.812,
+      "timestamp": "2026-09-28T07:26:30.078416+00:00",
+      "flightPhase": "CLIMB",
+      "gazebo": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 1.95,
+        "speedKmh": 2.8,
+        "heading": 185
+      },
+      "admin2D": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 1.95,
+        "speedKmh": 2.8,
+        "heading": 185
+      },
+      "admin3D": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 1.95,
+        "speedKmh": 2.8,
+        "heading": 185
+      },
+      "customer2D": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 3.7,
+        "speedKmh": 5.3,
+        "heading": 185,
+        "markerLatLng": [
+          11.1132,
+          77.0277
+        ]
+      },
+      "gzVsAdmin2DErrorM": 0,
+      "gzVsAdmin3DErrorM": 0,
+      "gzVsCust2DErrorM": 0,
+      "admin2DVsCust2DErrorM": 0,
+      "maxErrorM": 0
+    },
+    "T0": {
+      "checkpoint": "T0",
+      "name": "Launch & Takeoff",
+      "sampleId": 1275,
+      "simTime": 70.864,
+      "timestamp": "2026-09-28T07:26:39.106031+00:00",
+      "flightPhase": "CLIMB",
+      "gazebo": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 33.36,
+        "speedKmh": 20,
+        "heading": 185
+      },
+      "admin2D": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 33.18,
+        "speedKmh": 20,
+        "heading": 185
+      },
+      "admin3D": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 33.63,
+        "speedKmh": 20,
+        "heading": 185
+      },
+      "customer2D": {
+        "lat": 11.1132,
+        "lng": 77.0277,
+        "alt": 33.63,
+        "speedKmh": 20,
+        "heading": 185,
+        "markerLatLng": [
+          11.1132,
+          77.0277
+        ]
+      },
+      "gzVsAdmin2DErrorM": 0,
+      "gzVsAdmin3DErrorM": 0,
+      "gzVsCust2DErrorM": 0,
+      "admin2DVsCust2DErrorM": 0,
+      "maxErrorM": 0
+    },
+    "T2": {
+      "checkpoint": "T2",
+      "name": "Corridor Cruise (40 km/h)",
+      "sampleId": 1711,
+      "simTime": 99.542,
+      "timestamp": "2026-09-28T07:27:07.361507+00:00",
+      "flightPhase": "CRUISE",
+      "gazebo": {
+        "lat": 11.109749,
+        "lng": 77.027846,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "admin2D": {
+        "lat": 11.109759,
+        "lng": 77.027845,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "admin3D": {
+        "lat": 11.109738,
+        "lng": 77.027846,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "customer2D": {
+        "lat": 11.109738,
+        "lng": 77.027846,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185,
+        "markerLatLng": [
+          11.109738,
+          77.027846
+        ]
+      },
+      "gzVsAdmin2DErrorM": 1.1172897598484373,
+      "gzVsAdmin3DErrorM": 1.2231441931623541,
+      "gzVsCust2DErrorM": 1.2231441931623541,
+      "admin2DVsCust2DErrorM": 2.3376412688355184,
+      "maxErrorM": 2.3376412688355184
+    },
+    "T3": {
+      "checkpoint": "T3",
+      "name": "Obstacle Detour (+85m East)",
+      "sampleId": 1889,
+      "simTime": 111.029,
+      "timestamp": "2026-09-28T07:27:18.848454+00:00",
+      "flightPhase": "AVOIDANCE",
+      "gazebo": {
+        "lat": 11.108708,
+        "lng": 77.028048,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "admin2D": {
+        "lat": 11.108711,
+        "lng": 77.028047,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "admin3D": {
+        "lat": 11.108705,
+        "lng": 77.028049,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "customer2D": {
+        "lat": 11.108705,
+        "lng": 77.028049,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185,
+        "markerLatLng": [
+          11.108705,
+          77.028049
+        ]
+      },
+      "gzVsAdmin2DErrorM": 0.3509759635765015,
+      "gzVsAdmin3DErrorM": 0.3509759639252348,
+      "gzVsCust2DErrorM": 0.3509759639252348,
+      "admin2DVsCust2DErrorM": 0.7019519275017362,
+      "maxErrorM": 0.7019519275017362
+    },
+    "T4": {
+      "checkpoint": "T4",
+      "name": "Customer Approach & Descent",
+      "sampleId": 2495,
+      "simTime": 150.413,
+      "timestamp": "2026-09-28T07:27:58.233018+00:00",
+      "flightPhase": "CRUISE",
+      "gazebo": {
+        "lat": 11.105017,
+        "lng": 77.028112,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "admin2D": {
+        "lat": 11.105014,
+        "lng": 77.028112,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "admin3D": {
+        "lat": 11.105014,
+        "lng": 77.028112,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185
+      },
+      "customer2D": {
+        "lat": 11.105014,
+        "lng": 77.028112,
+        "alt": 40,
+        "speedKmh": 40,
+        "heading": 185,
+        "markerLatLng": [
+          11.105014,
+          77.028112
+        ]
+      },
+      "gzVsAdmin2DErrorM": 0.33358477988154306,
+      "gzVsAdmin3DErrorM": 0.33358477988154306,
+      "gzVsCust2DErrorM": 0.33358477988154306,
+      "admin2DVsCust2DErrorM": 0,
+      "maxErrorM": 0.33358477988154306
+    },
+    "T5": {
+      "checkpoint": "T5",
+      "name": "Touchdown Customer Pad",
+      "sampleId": 2777,
+      "simTime": 167.58,
+      "timestamp": "2026-09-28T07:28:15.399369+00:00",
+      "flightPhase": "TOUCHDOWN",
+      "gazebo": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 0,
+        "speedKmh": 0,
+        "heading": 185
+      },
+      "admin2D": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 0,
+        "speedKmh": 0,
+        "heading": 185
+      },
+      "admin3D": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 0,
+        "speedKmh": 0,
+        "heading": 185
+      },
+      "customer2D": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 0,
+        "speedKmh": 0,
+        "heading": 185,
+        "markerLatLng": [
+          11.104262,
+          77.028112
+        ]
+      },
+      "gzVsAdmin2DErrorM": 0,
+      "gzVsAdmin3DErrorM": 0,
+      "gzVsCust2DErrorM": 0,
+      "admin2DVsCust2DErrorM": 0,
+      "maxErrorM": 0
+    },
+    "T6": {
+      "checkpoint": "T6",
+      "name": "Delivery Handover (PIN Verified)",
+      "sampleId": 3005,
+      "simTime": 183.984,
+      "timestamp": "2026-09-28T07:28:31.803069+00:00",
+      "flightPhase": "DELIVERED",
+      "gazebo": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 7.23,
+        "speedKmh": 12.4,
+        "heading": 185
+      },
+      "admin2D": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 6.85,
+        "speedKmh": 11.7,
+        "heading": 185
+      },
+      "admin3D": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 7.42,
+        "speedKmh": 12.7,
+        "heading": 185
+      },
+      "customer2D": {
+        "lat": 11.104262,
+        "lng": 77.028112,
+        "alt": 0,
+        "speedKmh": 0,
+        "heading": 185,
+        "markerLatLng": [
+          11.104262,
+          77.028112
+        ]
+      },
+      "gzVsAdmin2DErrorM": 0,
+      "gzVsAdmin3DErrorM": 0,
+      "gzVsCust2DErrorM": 0,
+      "admin2DVsCust2DErrorM": 0,
+      "maxErrorM": 0
+    }
+  },
+  "screenshots": [
+    "T0_customer_launch.png",
+    "T0_admin2D_launch.png",
+    "T0_admin3D_launch.png",
+    "T1_customer_climb.png",
+    "T1_admin2D_climb.png",
+    "T1_admin3D_climb.png",
+    "T2_customer_cruise.png",
+    "T2_admin2D_cruise.png",
+    "T2_admin3D_cruise.png",
+    "T3_customer_obstacle_detour.png",
+    "T3_admin2D_obstacle_detour.png",
+    "T3_admin3D_obstacle_detour.png",
+    "T4_customer_approach.png",
+    "T4_admin2D_approach.png",
+    "T4_admin3D_approach.png",
+    "T5_customer_touchdown.png",
+    "T5_admin2D_touchdown.png",
+    "T5_admin3D_touchdown.png",
+    "T6_customer_delivery_complete.png"
+  ]
+}

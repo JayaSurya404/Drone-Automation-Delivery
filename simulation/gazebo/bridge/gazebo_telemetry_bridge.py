@@ -15,13 +15,22 @@ Architecture Rule:
 
 import os
 import sys
+
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 import json
 import time
+import datetime
 import math
 import subprocess
 import threading
 import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer as HTTPServer, BaseHTTPRequestHandler
 
 # Attempt to import rclpy for live ROS 2 telemetry subscriptions
 HAS_RCLPY = False
@@ -87,12 +96,19 @@ def set_gazebo_pose(x, y, z, yaw_deg=185.0, force=False):
             qz = math.sin(yaw_rad / 2.0)
             qw = math.cos(yaw_rad / 2.0)
             req = f'name: "skynav_quad" position {{ x: {x:.2f} y: {y:.2f} z: {z:.2f} }} orientation {{ x: 0.0 y: 0.0 z: {qz:.6f} w: {qw:.6f} }}'
-            subprocess.run(
-                ['gz', 'service', '-s', '/world/skynav_kurumbapalayam/set_pose',
-                 '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean',
-                 '--timeout', '1000', '--req', req],
-                capture_output=True, text=True, timeout=1.5
-            )
+            if sys.platform == 'win32':
+                subprocess.run(
+                    ['wsl.exe', '-d', 'Ubuntu-22.04', '-u', 'root', '-e', 'bash', '-c',
+                     f"source /opt/ros/humble/setup.bash; gz service -s /world/skynav_kurumbapalayam/set_pose --reqtype gz.msgs.Pose --reptype gz.msgs.Boolean --timeout 1000 --req '{req}'"],
+                    capture_output=True, text=True, timeout=2.0
+                )
+            else:
+                subprocess.run(
+                    ['gz', 'service', '-s', '/world/skynav_kurumbapalayam/set_pose',
+                     '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean',
+                     '--timeout', '1000', '--req', req],
+                    capture_output=True, text=True, timeout=1.5
+                )
         except Exception:
             pass
 
@@ -173,6 +189,13 @@ class DroneState:
         self.total_distance_m = 4711.0
         self.last_sensor_update = time.time()
         self.is_paused = False
+
+        # Authoritative Sample Identity, Timestamp, and History Buffer
+        self.sample_id = 0
+        self.sample_timestamp = time.time()
+        self.telemetry_history = []
+        self.destination_lat = 11.104262
+        self.destination_lng = 77.028112
 
         # Simulation Mode
         is_running, pid = check_native_gazebo_process()
@@ -328,13 +351,35 @@ def run_gazebo_flight_guidance_loop():
                 continue
             step_dt = dt * state.real_time_factor
             state.sim_time += step_dt
+            state.sample_id += 1
+            state.sample_timestamp = time.time()
+
+            # Record authoritative sample into ring buffer on every tick (20Hz)
+            sample_record = {
+                "sampleId": state.sample_id,
+                "simTime": round(state.sim_time, 3),
+                "timestamp": state.sample_timestamp,
+                "latitude": round(state.latitude, 6),
+                "longitude": round(state.longitude, 6),
+                "altitudeAgl": round(state.altitude_agl, 2),
+                "altitudeMsl": round(state.altitude_msl, 2),
+                "speedKmh": round(state.speed_kmh, 1),
+                "heading": round(state.yaw, 1),
+                "flightPhase": state.flightPhase,
+                "distanceTraveledM": round(state.distance_traveled_m, 1),
+                "obstacleDetected": state.obstacle_detected,
+                "dynamicAvoidanceActive": state.dynamic_avoidance_active,
+            }
+            state.telemetry_history.append(sample_record)
+            if len(state.telemetry_history) > 2000:
+                state.telemetry_history.pop(0)
 
             if state.flightPhase == 'CHARGING':
                 state.battery_pct = min(100.0, state.battery_pct + 5.0 * step_dt)
                 if state.battery_pct >= 99.9:
                     state.battery_pct = 100.0
                     state.flightPhase = 'AVAILABLE'
-                    print("✅ [GazeboGuidance] Battery 100%. Drone status: AVAILABLE.")
+                    print("[BATTERY] [GazeboGuidance] Battery 100%. Drone status: AVAILABLE.")
                 continue
 
             if not state.armed or state.mission_type is None:
@@ -455,7 +500,7 @@ def run_gazebo_flight_guidance_loop():
                         state.vz = 0.0
                         state.flightPhase = 'TOUCHDOWN'
                         state.mode = 'AWAITING_PIN'
-                        print(f"📍 [GazeboGuidance] TOUCHDOWN at Customer Drop Pad ({dest_x}, {dest_y})! Awaiting Permanent Delivery PIN.")
+                        print(f"[TOUCHDOWN] [GazeboGuidance] TOUCHDOWN at Customer Drop Pad ({dest_x}, {dest_y})! Awaiting Permanent Delivery PIN.")
 
                 # Publish Twist command to Gazebo cmd_vel
                 if ros2_cmd_pub is not None:
@@ -528,7 +573,7 @@ def run_gazebo_flight_guidance_loop():
                             state.mission_type = None
                             state.armed = False
                             set_gazebo_pose(0.0, 0.0, 0.25, 185.0, force=True)
-                            print("🔋 [GazeboGuidance] LANDED on SkyHub Launch & Docking Pad! Initiating fast recharge.")
+                            print("[LANDED] [GazeboGuidance] LANDED on SkyHub Launch & Docking Pad! Initiating fast recharge.")
 
                 if ros2_cmd_pub is not None:
                     try:
@@ -544,6 +589,8 @@ def run_gazebo_flight_guidance_loop():
                         pass
 
                 set_gazebo_pose(state.x, state.y, state.z, 0.0)
+
+
 
 
 
@@ -614,54 +661,100 @@ class GazeboBridgeHandler(BaseHTTPRequestHandler):
                     "note": "REAL_GAZEBO_MODE verified with native gz sim 7.9.0 process in Ubuntu-22.04 WSL2.",
                 })
             elif parsed.path == '/telemetry':
-                # Return authoritative Gazebo drone telemetry
-                self._send_json(200, {
-                    "simulationMode": state.simulation_mode,
-                    "isNativeGazeboRunning": state.native_gazebo_running,
-                    "simTime": round(state.sim_time, 3),
-                    "latitude": round(state.latitude, 6),
-                    "longitude": round(state.longitude, 6),
-                    "altitudeAgl": round(state.altitude_agl, 2),
-                    "altitudeMsl": round(state.altitude_msl, 2),
-                    "speedKmh": round(state.speed_kmh, 1),
-                    "distanceTraveledM": round(state.distance_traveled_m, 1),
-                    "totalDistanceM": state.total_distance_m,
-                    "flightPhase": state.flightPhase,
-                    "isArmed": state.armed,
-                    "velocities": {
-                        "vx": round(state.vx, 2),
-                        "vy": round(state.vy, 2),
-                        "vz": round(state.vz, 2),
-                    },
-                    "accelerations": {
-                        "ax": round(state.ax, 2),
-                        "ay": round(state.ay, 2),
-                        "az": round(state.az, 2),
-                    },
-                    "attitude": {
-                        "rollDeg": round(math.degrees(state.roll), 2),
-                        "pitchDeg": round(math.degrees(state.pitch), 2),
-                        "yawDeg": round(state.yaw, 1),
-                    },
-                    "sensors": {
-                        "battery": round(state.battery_pct, 1),
-                        "gpsFix": state.gps_fix,
-                        "satellites": state.satellites,
-                        "downwardLidarMeters": round(state.lidar_range_m, 2),
-                        "forwardLidarRangeM": round(state.forward_lidar_distance_m, 2),
-                        "obstacleDetected": state.obstacle_detected,
-                        "imuAccel": [round(a, 3) for a in state.imu_accel],
-                        "imuGyro": [round(g, 4) for g in state.imu_gyro],
-                    },
-                    "obstacleAvoidance": {
-                        "active": state.dynamic_avoidance_active,
-                        "detected": state.obstacle_detected,
-                        "obstacleId": state.injected_obstacle["id"] if state.obstacle_detected else None,
-                        "clearanceMeters": round(state.clearance_distance_m, 1),
-                    },
-                    "airway": state.active_airway,
-                    "timestamp": time.time()
-                })
+                # Support querying exact sampleId from history ring buffer for tight synchronization
+                qs = urllib.parse.parse_qs(parsed.query)
+                target_sample = None
+                if 'sampleId' in qs:
+                    try:
+                        target_id = int(qs['sampleId'][0])
+                        for rec in reversed(state.telemetry_history):
+                            if rec.get('sampleId') == target_id:
+                                target_sample = rec
+                                break
+                    except Exception:
+                        pass
+
+                if target_sample:
+                    iso_time = datetime.datetime.fromtimestamp(target_sample["timestamp"], tz=datetime.timezone.utc).isoformat()
+                    self._send_json(200, {
+                        "simulationMode": state.simulation_mode,
+                        "isNativeGazeboRunning": state.native_gazebo_running,
+                        "sampleId": target_sample["sampleId"],
+                        "simTime": target_sample["simTime"],
+                        "timestamp": target_sample["timestamp"],
+                        "timestampIso": iso_time,
+                        "latitude": target_sample["latitude"],
+                        "longitude": target_sample["longitude"],
+                        "altitudeAgl": target_sample["altitudeAgl"],
+                        "altitudeMsl": target_sample["altitudeMsl"],
+                        "speedKmh": target_sample["speedKmh"],
+                        "distanceTraveledM": target_sample["distanceTraveledM"],
+                        "totalDistanceM": state.total_distance_m,
+                        "flightPhase": target_sample["flightPhase"],
+                        "attitude": {
+                            "yawDeg": target_sample["heading"],
+                        },
+                        "sensors": {
+                            "battery": round(state.battery_pct, 1),
+                            "obstacleDetected": target_sample.get("obstacleDetected", False),
+                        },
+                        "obstacleAvoidance": {
+                            "active": target_sample.get("dynamicAvoidanceActive", False),
+                            "detected": target_sample.get("obstacleDetected", False),
+                        },
+                        "airway": state.active_airway,
+                    })
+                else:
+                    iso_time = datetime.datetime.fromtimestamp(state.sample_timestamp, tz=datetime.timezone.utc).isoformat()
+                    self._send_json(200, {
+                        "simulationMode": state.simulation_mode,
+                        "isNativeGazeboRunning": state.native_gazebo_running,
+                        "sampleId": state.sample_id,
+                        "simTime": round(state.sim_time, 3),
+                        "timestamp": state.sample_timestamp,
+                        "timestampIso": iso_time,
+                        "latitude": round(state.latitude, 6),
+                        "longitude": round(state.longitude, 6),
+                        "altitudeAgl": round(state.altitude_agl, 2),
+                        "altitudeMsl": round(state.altitude_msl, 2),
+                        "speedKmh": round(state.speed_kmh, 1),
+                        "distanceTraveledM": round(state.distance_traveled_m, 1),
+                        "totalDistanceM": state.total_distance_m,
+                        "flightPhase": state.flightPhase,
+                        "isArmed": state.armed,
+                        "velocities": {
+                            "vx": round(state.vx, 2),
+                            "vy": round(state.vy, 2),
+                            "vz": round(state.vz, 2),
+                        },
+                        "accelerations": {
+                            "ax": round(state.ax, 2),
+                            "ay": round(state.ay, 2),
+                            "az": round(state.az, 2),
+                        },
+                        "attitude": {
+                            "rollDeg": round(math.degrees(state.roll), 2),
+                            "pitchDeg": round(math.degrees(state.pitch), 2),
+                            "yawDeg": round(state.yaw, 1),
+                        },
+                        "sensors": {
+                            "battery": round(state.battery_pct, 1),
+                            "gpsFix": state.gps_fix,
+                            "satellites": state.satellites,
+                            "downwardLidarMeters": round(state.lidar_range_m, 2),
+                            "forwardLidarRangeM": round(state.forward_lidar_distance_m, 2),
+                            "obstacleDetected": state.obstacle_detected,
+                            "imuAccel": [round(a, 3) for a in state.imu_accel],
+                            "imuGyro": [round(g, 4) for g in state.imu_gyro],
+                        },
+                        "obstacleAvoidance": {
+                            "active": state.dynamic_avoidance_active,
+                            "detected": state.obstacle_detected,
+                            "obstacleId": state.injected_obstacle["id"] if state.obstacle_detected else None,
+                            "clearanceMeters": round(state.clearance_distance_m, 1),
+                        },
+                        "airway": state.active_airway,
+                    })
             elif parsed.path == '/sensors':
                 now = time.time()
                 self._send_json(200, {
@@ -729,6 +822,10 @@ class GazeboBridgeHandler(BaseHTTPRequestHandler):
                         state.total_distance_m = float(payload.get('distanceKm')) * 1000.0
                     else:
                         state.total_distance_m = 1000.0
+                    dest_lat = float(payload.get('destinationLat', 11.104262))
+                    dest_lng = float(payload.get('destinationLng', 77.028112))
+                    state.destination_lat = dest_lat
+                    state.destination_lng = dest_lng
                     state.x = 0.0
                     state.y = 0.0
                     state.z = 0.25
@@ -740,7 +837,10 @@ class GazeboBridgeHandler(BaseHTTPRequestHandler):
                     state.obstacle_detected = False
                     state.dynamic_avoidance_active = False
                     set_gazebo_pose(0.0, 0.0, 0.25, 185.0, force=True)
-                    print(f"🚀 [GazeboBridge] Mission {state.active_mission_id} initiated ({state.total_distance_m:.0f}m). Starting physical Gazebo flight.")
+                    print(f"[LAUNCH] [GazeboBridge] Mission {state.active_mission_id} initiated ({state.total_distance_m:.0f}m). Starting physical Gazebo flight.")
+                    print(f"[TARGET] ORDER DESTINATION: {dest_lat:.6f}, {dest_lng:.6f}")
+                    print(f"[TARGET] MISSION TARGET:    {dest_lat:.6f}, {dest_lng:.6f}")
+                    print(f"[TARGET] GAZEBO TARGET:     {dest_lat:.6f}, {dest_lng:.6f}")
 
                 elif action in ('complete_delivery', 'start_return'):
                     state.mission_type = 'RETURNING'
@@ -748,7 +848,7 @@ class GazeboBridgeHandler(BaseHTTPRequestHandler):
                     state.return_distance_traveled_m = 0.0
                     state.armed = True
                     state.is_paused = False
-                    print(f"🔄 [GazeboBridge] Delivery PIN verified. Initiating return Gazebo flight to SkyHub.")
+                    print(f"[RETURN] [GazeboBridge] Delivery PIN verified. Initiating return Gazebo flight to SkyHub.")
 
                 elif action in ('reset', 'reset_mission'):
                     state.armed = False
@@ -771,7 +871,7 @@ class GazeboBridgeHandler(BaseHTTPRequestHandler):
                     state.obstacle_detected = False
                     state.dynamic_avoidance_active = False
                     set_gazebo_pose(0.0, 0.0, 0.25, 185.0, force=True)
-                    print(f"🔄 [GazeboBridge] Resetting Gazebo drone to launchpad origin.")
+                    print(f"[RESET] [GazeboBridge] Resetting Gazebo drone to launchpad origin.")
 
                 elif action == 'arm':
                     state.armed = True
