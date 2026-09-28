@@ -283,7 +283,7 @@ export const seedDatabase = async () => {
     null
   );
 
-  orderItemStmt.run('item_1002_1', 'ORD-1002', 'prod_tech_1', 'SkyNav Ultra Sensor Beacon Pod', '/images/products/sensor_pod.jpg', 1298.00, 1, 1298.00, 180);
+  orderItemStmt.run('item_1002_1', 'ORD-1002', 'prod_elec_1', 'BoAt Storm GaN 65W Rapid Dual-Port Fast Charger', '/images/products/fast_charger.jpg', 1298.00, 1, 1298.00, 180);
 
   statusHistoryStmt.run('hist_1002_1', 'ORD-1002', null, 'Order Placed', 'Order placed successfully.', 1, '-1 hour');
   statusHistoryStmt.run('hist_1002_2', 'ORD-1002', 'Order Placed', 'Order Confirmed', 'Payment confirmed.', 1, '-50 minutes');

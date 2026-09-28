@@ -74,11 +74,13 @@ async function main() {
     await custPage.goto('http://localhost:5173/', { waitUntil: 'domcontentloaded' });
     // Inject auth token and user state into localStorage
     await custPage.evaluate((token, user) => {
+      localStorage.setItem('drone_customer_token', JSON.stringify(token));
+      localStorage.setItem('drone_customer_user', JSON.stringify(user));
       localStorage.setItem('skynav_customer_token', token);
       localStorage.setItem('skynav_customer_user', JSON.stringify(user));
     }, customerToken, customerUser);
 
-    await custPage.goto('http://localhost:5173/orders/ORD-1002/tracking', { waitUntil: 'networkidle2' });
+    await custPage.goto('http://localhost:5173/tracking/ORD-1002', { waitUntil: 'networkidle2' });
     await sleep(2000);
     console.log('   ✓ Customer Tracking Page loaded.');
 
@@ -88,6 +90,7 @@ async function main() {
     await admin2DPage.goto('http://localhost:5174/', { waitUntil: 'domcontentloaded' });
     await admin2DPage.evaluate((token, user) => {
       localStorage.setItem('skynav_admin_token', token);
+      localStorage.setItem('skynav_auth_user', JSON.stringify(user));
       localStorage.setItem('skynav_admin_user', JSON.stringify(user));
     }, adminToken, adminAuth.user);
     await admin2DPage.goto('http://localhost:5174/operations', { waitUntil: 'networkidle2' });
@@ -97,6 +100,12 @@ async function main() {
     // 5. Setup Admin 3D Simulation Center Page
     console.log('5. Setting up Admin 3D Simulation Center Page...');
     const admin3DPage: Page = await browser.newPage();
+    await admin3DPage.goto('http://localhost:5174/', { waitUntil: 'domcontentloaded' });
+    await admin3DPage.evaluate((token, user) => {
+      localStorage.setItem('skynav_admin_token', token);
+      localStorage.setItem('skynav_auth_user', JSON.stringify(user));
+      localStorage.setItem('skynav_admin_user', JSON.stringify(user));
+    }, adminToken, adminAuth.user);
     await admin3DPage.goto('http://localhost:5174/simulation', { waitUntil: 'networkidle2' });
     await sleep(2000);
     console.log('   ✓ Admin 3D Simulation Center Page loaded.');
@@ -120,7 +129,10 @@ async function main() {
     console.log('\n7. Dispatching ORD-1002 and launching authoritative flight...');
     const assignRes = await fetch('http://localhost:5001/api/admin/dispatch/orders/ORD-1002/assign-drone', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`,
+      },
       body: JSON.stringify({ droneId: 'D-001', force: true }),
     });
     const assignData = await assignRes.json();
@@ -129,7 +141,10 @@ async function main() {
 
     const launchRes = await fetch(`http://localhost:5001/api/admin/missions/${missionId}/launch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`,
+      },
     });
     const launchData = await launchRes.json();
     console.log(`   ✓ Mission launch status: ${launchData.status || 'Active'}`);
