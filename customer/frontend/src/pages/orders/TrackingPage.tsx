@@ -84,7 +84,7 @@ export const TrackingPage: React.FC = () => {
     const handleOnline = () => {
       setIsOnline(true);
       showToast('Network connection restored. Telemetry stream reconnected.', 'info');
-      if (order && order.status !== 'Delivered' && order.status !== 'Cancelled') {
+      if (order && order.status !== 'Cancelled') {
         realtimeDeliveryService.connectToOrderStream(order.id, order.deliveryAddress?.latitude, order.deliveryAddress?.longitude);
         api.tracking.getSnapshot(order.id)
           .then((snapshot: LiveTrackingState) => setTrackingState(snapshot))
@@ -132,7 +132,7 @@ export const TrackingPage: React.FC = () => {
           })
           .finally(() => setIsLoading(false));
 
-        if (ord.status !== 'Delivered' && ord.status !== 'Cancelled' && !isSimulatingRef.current) {
+        if (ord.status !== 'Cancelled' && !isSimulatingRef.current) {
           isSimulatingRef.current = true;
           realtimeDeliveryService.connectToOrderStream(ord.id, ord.deliveryAddress?.latitude, ord.deliveryAddress?.longitude);
         }
@@ -156,9 +156,13 @@ export const TrackingPage: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const lastSampleIdRef = useRef<number>(-1);
+
   // Real-time subscription
   useEffect(() => {
     if (!orderId) return;
+    lastSampleIdRef.current = -1;
+
     const unsubscribe = realtimeDeliveryService.subscribe(event => {
       // Do NOT update or animate fake drone movement while offline
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -166,39 +170,64 @@ export const TrackingPage: React.FC = () => {
       }
 
       if (event.orderId === orderId) {
-        setLastUpdatedSeconds(0);
-        setOrder(prev => {
-          if (!prev) return null;
-          return { ...prev, status: (event.status as any) || prev.status };
-        });
+        // Handle connection status events
+        if (event.type === 'CONNECTION_STATUS' || (event as any).connectionStatus) {
+          const conn = (event as any).connectionStatus;
+          if (conn) {
+            setTrackingState(prev => prev ? { ...prev, connectionStatus: conn } : null);
+          }
+        }
 
         if (event.location) {
           const sampleId = event.sampleId ?? (event.location as any)?.sampleId;
           const simTime = event.simTime ?? (event.location as any)?.simTime;
 
+          // Requirement 4: Reject stale packets (if incoming sampleId <= current sampleId: ignore it)
+          if (sampleId !== undefined && sampleId !== null && !isNaN(sampleId)) {
+            if (lastSampleIdRef.current >= 0 && sampleId <= lastSampleIdRef.current) {
+              return; // Stale or duplicate packet - ignore
+            }
+            lastSampleIdRef.current = sampleId;
+          }
+
+          setLastUpdatedSeconds(0);
+          setOrder(prev => {
+            if (!prev) return null;
+            return { ...prev, status: (event.status as any) || prev.status };
+          });
+
           if (typeof window !== 'undefined') {
-            (window as any).__skynavCustomerDrone = {
+            const droneSample = {
               sampleId,
               simTime,
               timestamp: event.timestamp,
               lat: event.location.latitude,
               lng: event.location.longitude,
+              latitude: event.location.latitude,
+              longitude: event.location.longitude,
               alt: event.location.altitudeMeters || 0,
               altitudeMeters: event.location.altitudeMeters || 0,
               speed: event.location.speedKmh || 0,
               speedKmh: event.location.speedKmh || 0,
               bearing: event.location.bearing || 0,
               heading: event.location.bearing || 0,
+              markerLatLng: [event.location.latitude, event.location.longitude],
               status: event.status,
               updatedAt: Date.now(),
             };
-            (window as any).__skynavCustDrone = (window as any).__skynavCustomerDrone;
+            (window as any).__skynavCustomerDrone = droneSample;
+            (window as any).__skynavCustDrone = droneSample;
+            if (sampleId) {
+              (window as any).__skynavCustomerHistory = (window as any).__skynavCustomerHistory || {};
+              (window as any).__skynavCustomerHistory[sampleId] = droneSample;
+            }
           }
 
           setTrackingState(prev => {
             if (!prev) return null;
             return {
               ...prev,
+              connectionStatus: 'connected',
               orderStatus: event.status || prev.orderStatus,
               currentDroneLocation: {
                 latitude: event.location!.latitude,
@@ -220,7 +249,6 @@ export const TrackingPage: React.FC = () => {
 
         if ((event.type === 'DELIVERY_COMPLETED' || event.status === 'Delivered') && !hasCelebrated) {
           setHasCelebrated(true);
-          realtimeDeliveryService.disconnect();
           confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 }, colors: ['#0284c7', '#10b981', '#6366f1', '#f59e0b'] });
           setTimeout(() => setIsRatingOpen(true), 1500);
         }
@@ -336,7 +364,7 @@ export const TrackingPage: React.FC = () => {
           {/* Connection indicator */}
           <div className={`tracking-connection-pill ${trackingState.connectionStatus === 'reconnecting' ? 'reconnecting' : 'connected'}`}>
             {trackingState.connectionStatus === 'reconnecting'
-              ? <><WifiOff size={12} /> Reconnecting…</>
+              ? <><WifiOff size={12} /> Live telemetry reconnecting…</>
               : <><Wifi size={12} /> Live · {lastUpdatedSeconds === 0 ? 'Just now' : `${lastUpdatedSeconds}s ago`}</>
             }
           </div>
@@ -348,6 +376,26 @@ export const TrackingPage: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {/* Non-blocking Live Telemetry Reconnecting Banner */}
+      {trackingState.connectionStatus === 'reconnecting' && !isDelivered && (
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          borderRadius: '10px',
+          padding: '0.6rem 1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          fontSize: '0.85rem',
+          color: '#b45309',
+          fontWeight: 600,
+        }}>
+          <WifiOff size={16} />
+          <span>Live telemetry reconnecting... Marker position maintained.</span>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════
           PRE-FLIGHT STATE

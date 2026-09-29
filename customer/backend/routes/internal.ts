@@ -97,7 +97,7 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
       ]);
 
       runCommand(`
-        INSERT INTO notifications (id, customer_id, title, message, type, is_read, order_id, event_id)
+        INSERT OR IGNORE INTO notifications (id, customer_id, title, message, type, is_read, order_id, event_id)
         VALUES (?, ?, 'Drone Assigned!', ?, 'delivery', 0, ?, ?)
       `, [
         `notif_${Date.now()}`,
@@ -147,7 +147,7 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
       ]);
 
       runCommand(`
-        INSERT INTO notifications (id, customer_id, title, message, type, is_read, order_id, event_id)
+        INSERT OR IGNORE INTO notifications (id, customer_id, title, message, type, is_read, order_id, event_id)
         VALUES (?, ?, 'Order Update', ?, 'order', 0, ?, ?)
       `, [
         `notif_${Date.now()}`,
@@ -240,7 +240,7 @@ router.post('/delivery-update', (req: Request, res: Response): void => {
       ]);
 
       runCommand(`
-        INSERT INTO notifications (id, customer_id, title, message, type, is_read, order_id, event_id)
+        INSERT OR IGNORE INTO notifications (id, customer_id, title, message, type, is_read, order_id, event_id)
         VALUES (?, ?, 'Drone Arrived!', 'Your delivery drone has touched down. Please provide your 4-digit OTP to collect package.', 'delivery', 0, ?, ?)
       `, [
         `notif_${Date.now()}`,

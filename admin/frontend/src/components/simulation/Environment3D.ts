@@ -11,7 +11,7 @@ export interface EnvironmentSettings {
 /**
  * Real Geographic 3D Digital Twin Environment
  * Centered on SkyHub Kurumbapalayam [11.1132, 77.0277], Coimbatore, Tamil Nadu, India
- * Covering the flight corridor south to Kalapatti / Peelamedu customer destination [11.0725, 77.0345]
+ * Covering the flight corridor south to Kurumbapalayam South Delivery Pad [11.104262, 77.028112]
  */
 export class Environment3D {
   public scene: THREE.Scene;
@@ -526,7 +526,7 @@ export class Environment3D {
   /**
    * Asynchronously loads real Digital Elevation Model (DEM) data from
    * AWS Open Data Terrarium elevation tiles (SRTM/Copernicus global 30m DEM)
-   * covering Kurumbapalayam [11.1132, 77.0277] to Kalapatti [11.0725, 77.0345].
+   * covering Kurumbapalayam [11.1132, 77.0277] to Kurumbapalayam South [11.104262, 77.028112].
    * Decodes elevation in meters: H = (R * 256 + G + B / 256) - 32768
    * Displaces vertices of the terrain PlaneGeometry to create true 3D topography.
    */
@@ -627,7 +627,7 @@ export class Environment3D {
 
   /**
    * Builds genuine 3D building geometry extruded from OpenStreetMap (OSM) footprints
-   * for the Kurumbapalayam [11.1132, 77.0277] to Kalapatti [11.0725, 77.0345] delivery corridor.
+   * for the Kurumbapalayam [11.1132, 77.0277] to Kurumbapalayam South [11.104262, 77.028112] delivery corridor.
    * Total 2,066 real OSM building polygons.
    * Ground base is placed directly on the real DEM elevation mesh surface.
    */

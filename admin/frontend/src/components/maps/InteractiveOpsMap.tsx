@@ -317,7 +317,7 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
       drones[0];
 
     if (typeof window !== 'undefined' && activeAirborneDrone) {
-      (window as any).__skynav2DDrone = {
+      const droneSample = {
         droneId: activeAirborneDrone.id,
         lat: activeAirborneDrone.location.lat,
         lng: activeAirborneDrone.location.lng,
@@ -330,6 +330,11 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
         status: activeAirborneDrone.status,
         battery: activeAirborneDrone.battery,
       };
+      (window as any).__skynav2DDrone = droneSample;
+      if (activeAirborneDrone.location.sampleId) {
+        (window as any).__skynav2DHistory = (window as any).__skynav2DHistory || {};
+        (window as any).__skynav2DHistory[activeAirborneDrone.location.sampleId] = droneSample;
+      }
       (window as any).__skynav2DMapCamera = {
         center: mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : null,
         zoom: mapInstanceRef.current ? mapInstanceRef.current.getZoom() : null,

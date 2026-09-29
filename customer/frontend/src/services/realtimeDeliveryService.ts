@@ -19,6 +19,8 @@ class RealtimeDeliveryService {
   private currentOrderId: string | null = null;
   private lastTelemetryReceivedTime: number = 0;
 
+  private lastSampleId: number = -1;
+
   public getHubLocation(): HubLocation {
     return DEFAULT_HUB;
   }
@@ -40,9 +42,31 @@ class RealtimeDeliveryService {
     });
   }
 
+  private emitStatus(status: 'connected' | 'reconnecting' | 'disconnected', message: string) {
+    this.emit({
+      type: 'CONNECTION_STATUS' as any,
+      orderId: this.currentOrderId || '',
+      status: 'in_flight' as any,
+      timestamp: new Date().toISOString(),
+      connectionStatus: status,
+      message,
+    } as any);
+  }
+
   private processTelemetryPacket(t: any, orderId: string) {
     if (!t) return;
     this.lastTelemetryReceivedTime = Date.now();
+
+    const sampleId = t.sampleId !== undefined ? Number(t.sampleId) : undefined;
+    const simTime = t.simTime !== undefined ? Number(t.simTime) : undefined;
+
+    // Requirement 4: Reject stale packets (if incoming sampleId <= current sampleId: ignore it)
+    if (sampleId !== undefined && !isNaN(sampleId)) {
+      if (this.lastSampleId >= 0 && sampleId <= this.lastSampleId) {
+        return; // Stale or duplicate packet - ignore
+      }
+      this.lastSampleId = sampleId;
+    }
 
     const isDone = t.isCompleted || t.status === 'Delivered';
     const loc = t.currentLocation || t.currentDroneLocation || (t.latitude !== undefined ? {
@@ -54,9 +78,6 @@ class RealtimeDeliveryService {
     } : undefined);
 
     if (loc && loc.latitude && loc.longitude) {
-      const sampleId = t.sampleId !== undefined ? Number(t.sampleId) : undefined;
-      const simTime = t.simTime !== undefined ? Number(t.simTime) : undefined;
-
       this.emit({
         type: isDone ? 'DELIVERY_COMPLETED' : 'DRONE_LOCATION_UPDATED',
         orderId: t.orderId || orderId,
@@ -85,6 +106,7 @@ class RealtimeDeliveryService {
     this.disconnect();
     this.currentOrderId = orderId;
     this.lastTelemetryReceivedTime = Date.now();
+    this.lastSampleId = -1;
 
     // 1. PRIMARY TRANSPORT: Server-Sent Events (SSE) via standard HTTP proxy (/api)
     if (typeof EventSource !== 'undefined') {
@@ -92,6 +114,10 @@ class RealtimeDeliveryService {
         const sseUrl = `/api/tracking/${orderId}/events`;
         const es = new EventSource(sseUrl);
         this.activeSse = es;
+
+        es.onopen = () => {
+          this.emitStatus('connected', 'Live telemetry stream active.');
+        };
 
         es.onmessage = (event) => {
           try {
@@ -105,10 +131,12 @@ class RealtimeDeliveryService {
         };
 
         es.onerror = () => {
-          // SSE natively auto-reconnects
+          // SSE connection dropped - notify non-blocking reconnecting status
+          this.emitStatus('reconnecting', 'Live telemetry reconnecting...');
         };
       } catch (e) {
         console.warn('[Realtime] SSE initialization failed:', e);
+        this.emitStatus('reconnecting', 'Live telemetry reconnecting...');
       }
     }
 
@@ -120,6 +148,10 @@ class RealtimeDeliveryService {
     try {
       const socket = new WebSocket(wsUrl);
       this.activeWs = socket;
+
+      socket.onopen = () => {
+        this.emitStatus('connected', 'Live telemetry stream active.');
+      };
 
       socket.onmessage = (event) => {
         try {

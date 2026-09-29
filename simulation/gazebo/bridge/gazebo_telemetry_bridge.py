@@ -354,25 +354,25 @@ def run_gazebo_flight_guidance_loop():
             state.sample_id += 1
             state.sample_timestamp = time.time()
 
-            # Record authoritative sample into ring buffer on every tick (20Hz)
-            sample_record = {
-                "sampleId": state.sample_id,
-                "simTime": round(state.sim_time, 3),
-                "timestamp": state.sample_timestamp,
-                "latitude": round(state.latitude, 6),
-                "longitude": round(state.longitude, 6),
-                "altitudeAgl": round(state.altitude_agl, 2),
-                "altitudeMsl": round(state.altitude_msl, 2),
-                "speedKmh": round(state.speed_kmh, 1),
-                "heading": round(state.yaw, 1),
-                "flightPhase": state.flightPhase,
-                "distanceTraveledM": round(state.distance_traveled_m, 1),
-                "obstacleDetected": state.obstacle_detected,
-                "dynamicAvoidanceActive": state.dynamic_avoidance_active,
-            }
-            state.telemetry_history.append(sample_record)
-            if len(state.telemetry_history) > 2000:
-                state.telemetry_history.pop(0)
+            def _record_sample():
+                rec = {
+                    "sampleId": state.sample_id,
+                    "simTime": round(state.sim_time, 3),
+                    "timestamp": state.sample_timestamp,
+                    "latitude": round(state.latitude, 6),
+                    "longitude": round(state.longitude, 6),
+                    "altitudeAgl": round(state.altitude_agl, 2),
+                    "altitudeMsl": round(state.altitude_msl, 2),
+                    "speedKmh": round(state.speed_kmh, 1),
+                    "heading": round(state.yaw, 1),
+                    "flightPhase": state.flightPhase,
+                    "distanceTraveledM": round(state.distance_traveled_m, 1),
+                    "obstacleDetected": state.obstacle_detected,
+                    "dynamicAvoidanceActive": state.dynamic_avoidance_active,
+                }
+                state.telemetry_history.append(rec)
+                if len(state.telemetry_history) > 10000:
+                    state.telemetry_history.pop(0)
 
             if state.flightPhase == 'CHARGING':
                 state.battery_pct = min(100.0, state.battery_pct + 5.0 * step_dt)
@@ -380,9 +380,11 @@ def run_gazebo_flight_guidance_loop():
                     state.battery_pct = 100.0
                     state.flightPhase = 'AVAILABLE'
                     print("[BATTERY] [GazeboGuidance] Battery 100%. Drone status: AVAILABLE.")
+                _record_sample()
                 continue
 
             if not state.armed or state.mission_type is None:
+                _record_sample()
                 continue
 
             state.elapsed_flight_time += step_dt
@@ -522,6 +524,7 @@ def run_gazebo_flight_guidance_loop():
 
                 # Rate-limited pose synchronization to update Gazebo NavSat world location
                 set_gazebo_pose(state.x, state.y, state.z, state.yaw)
+                _record_sample()
 
             # ── RETURN FLIGHT LOOP TO SKYHUB ──
             elif state.mission_type == 'RETURNING':
@@ -589,6 +592,7 @@ def run_gazebo_flight_guidance_loop():
                         pass
 
                 set_gazebo_pose(state.x, state.y, state.z, 0.0)
+                _record_sample()
 
 
 

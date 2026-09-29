@@ -33,6 +33,8 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
   const hasInitialFitRef = useRef<boolean>(false);
   const lastCameraUpdateRef = useRef<{ timestamp: number; band: number }>({ timestamp: 0, band: -1 });
 
+  const [mapError, setMapError] = useState<string | null>(null);
+
   // Helper to calculate approximate distance in km
   const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
@@ -67,6 +69,12 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
   // Initialize Map Once on Mount
   useEffect(() => {
     if (!containerRef.current) return;
+    let isCancelled = false;
+
+    if (mapProviderRef.current) {
+      mapProviderRef.current.destroy();
+      mapProviderRef.current = null;
+    }
 
     const provider = new LeafletMapProvider();
     mapProviderRef.current = provider;
@@ -84,6 +92,9 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
         isInteractive: true,
       })
       .then(async () => {
+        if (isCancelled) return;
+        setMapError(null);
+
         if (hubLocation?.latitude) {
           provider.updateHub(hubLocation);
         }
@@ -111,7 +122,7 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
         // Fetch and draw active No-Fly Zones
         try {
           const { zones } = await api.airspace.getZones();
-          if (zones && zones.length > 0) {
+          if (!isCancelled && zones && zones.length > 0) {
             provider.setNoFlyZones(zones);
           }
         } catch (e) {
@@ -136,11 +147,24 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
           provider.fitBounds(fitPoints, [60, 60], 16);
           hasInitialFitRef.current = true;
         }
+      })
+      .catch((err) => {
+        console.warn('Map initialization notice:', err);
+        if (!isCancelled) {
+          setMapError('Satellite imagery loading. Telemetry active.');
+        }
       });
 
     return () => {
+      isCancelled = true;
       provider.destroy();
       mapProviderRef.current = null;
+      if (containerRef.current) {
+        try {
+          (containerRef.current as any)._leaflet_id = null;
+          containerRef.current.innerHTML = '';
+        } catch {}
+      }
     };
   }, []); // Mount only
 
@@ -185,7 +209,7 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
 
     if (typeof window !== 'undefined') {
       const markerCoords = mapProviderRef.current?.getDroneMarkerLatLng?.();
-      (window as any).__skynavCustomerDrone = {
+      const droneSample = {
         sampleId: droneLocation.sampleId,
         simTime: droneLocation.simTime,
         timestamp: (droneLocation as any).timestamp,
@@ -200,7 +224,12 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
         markerLatLng: markerCoords ? [markerCoords.lat, markerCoords.lng] : [droneLocation.latitude, droneLocation.longitude],
         updatedAt: Date.now(),
       };
-      (window as any).__skynavCustDrone = (window as any).__skynavCustomerDrone;
+      (window as any).__skynavCustomerDrone = droneSample;
+      (window as any).__skynavCustDrone = droneSample;
+      if (droneLocation.sampleId) {
+        (window as any).__skynavCustomerHistory = (window as any).__skynavCustomerHistory || {};
+        (window as any).__skynavCustomerHistory[droneLocation.sampleId] = droneSample;
+      }
       (window as any).__skynavCustMapCamera = {
         center: mapProviderRef.current?.getCenter?.() || null,
         zoom: mapProviderRef.current?.getZoom?.() || null,

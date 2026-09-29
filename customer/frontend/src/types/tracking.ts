@@ -48,7 +48,8 @@ export type RealtimeCustomerEventType =
   | 'DELIVERY_APPROACHING'
   | 'DELIVERY_COMPLETED'
   | 'ORDER_CANCELLED'
-  | 'DELIVERY_DELAYED';
+  | 'DELIVERY_DELAYED'
+  | 'CONNECTION_STATUS';
 
 export interface RealtimeCustomerEvent {
   type: RealtimeCustomerEventType;
@@ -60,5 +61,6 @@ export interface RealtimeCustomerEvent {
   estimatedArrivalMins?: number;
   sampleId?: number;
   simTime?: number;
+  connectionStatus?: 'connected' | 'reconnecting' | 'disconnected';
   message: string;
 }

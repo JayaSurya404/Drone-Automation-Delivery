@@ -27,6 +27,7 @@ type TelemetryListener = (data: TelemetryUpdate) => void;
 class DroneTrackingService {
   private listeners: Map<string, Set<TelemetryListener>> = new Map(); // orderId -> listeners
   private activeSimulations: Map<string, NodeJS.Timeout> = new Map();
+  private latestTelemetry: Map<string, TelemetryUpdate> = new Map();
 
   // Calculate distance between two coordinates in km (Haversine)
   public calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -393,8 +394,8 @@ class DroneTrackingService {
       }
     }
 
-    // Broadcast to customer WebSocket subscribers
-    this.broadcast(orderId, {
+    // Broadcast to customer WebSocket / SSE subscribers
+    const updateObj: TelemetryUpdate = {
       orderId,
       droneId: telemetry.droneId,
       droneName: telemetry.droneName,
@@ -408,7 +409,9 @@ class DroneTrackingService {
       simTime: telemetry.simTime,
       isCompleted: telemetry.status === 'Delivered',
       handoverOtp: telemetry.handoverOtp || '',
-    });
+    };
+    this.latestTelemetry.set(orderId, updateObj);
+    this.broadcast(orderId, updateObj);
   }
 
   // Get current snapshot of tracking state
@@ -452,6 +455,8 @@ class DroneTrackingService {
     } catch {}
 
 
+    const cached = this.latestTelemetry.get(orderId);
+
     return {
       orderId: delivery.order_id,
       orderStatus: delivery.order_status,
@@ -471,6 +476,8 @@ class DroneTrackingService {
         altitudeMeters: delivery.current_altitude,
         speedKmh: delivery.current_speed,
         bearing: delivery.current_bearing,
+        sampleId: cached?.sampleId,
+        simTime: cached?.simTime,
       },
       droneLocation: {
         lat: delivery.current_latitude,
@@ -480,7 +487,11 @@ class DroneTrackingService {
         altitude: delivery.current_altitude,
         speed: delivery.current_speed,
         bearing: delivery.current_bearing,
+        sampleId: cached?.sampleId,
+        simTime: cached?.simTime,
       },
+      sampleId: cached?.sampleId,
+      simTime: cached?.simTime,
       flightRoute: route,
       remainingDistanceKm: delivery.remaining_distance_km,
       estimatedArrivalMins: delivery.estimated_arrival_mins,

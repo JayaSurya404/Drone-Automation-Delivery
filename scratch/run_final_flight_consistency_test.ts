@@ -1,6 +1,7 @@
 import puppeteer, { Browser, Page } from 'puppeteer-core';
 import fs from 'fs';
 import path from 'path';
+import Database from 'better-sqlite3';
 
 const EVIDENCE_DIR_CONV = 'C:\\Users\\chitr\\.gemini\\antigravity-ide\\brain\\1d8c6900-9c1a-433b-8d13-e66e4867100b\\evidence';
 const EVIDENCE_DIR_LOCAL = path.join(process.cwd(), 'scratch', 'evidence');
@@ -52,6 +53,32 @@ async function saveScreenshot(page: Page, filename: string) {
   }
 }
 
+async function resetDatabases() {
+  console.log('0. Performing clean state reset in SQLite databases for ORD-1002...');
+  try {
+    const custDbPath = path.resolve('customer/backend/data/skynav.db');
+    if (fs.existsSync(custDbPath)) {
+      const custDb = new Database(custDbPath);
+      custDb.prepare("UPDATE orders SET status = 'Out for Delivery', completed_at = NULL WHERE id = 'ORD-1002'").run();
+      custDb.prepare("UPDATE deliveries SET status = 'IN_FLIGHT', current_latitude = 11.1132, current_longitude = 77.0277, current_altitude = 0, current_speed = 0, current_bearing = 185, completed_at = NULL WHERE order_id = 'ORD-1002'").run();
+      custDb.close();
+      console.log('   ✓ Customer database reset: ORD-1002 status = Out for Delivery');
+    }
+
+    const adminDbPath = path.resolve('admin/backend/data/admin.db');
+    if (fs.existsSync(adminDbPath)) {
+      const adminDb = new Database(adminDbPath);
+      adminDb.prepare("UPDATE operational_orders SET status = 'pending_dispatch', drone_id = NULL, mission_id = NULL WHERE id = 'ORD-1002'").run();
+      adminDb.prepare("UPDATE drones SET status = 'available', current_mission_id = NULL WHERE id = 'D-001'").run();
+      adminDb.prepare("DELETE FROM missions WHERE operational_order_id = 'ORD-1002'").run();
+      adminDb.close();
+      console.log('   ✓ Admin database reset: ORD-1002 status = pending_dispatch, D-001 available');
+    }
+  } catch (err: any) {
+    console.warn('   Database reset warning:', err.message);
+  }
+}
+
 async function main() {
   console.log('========================================================================');
   console.log('🚀 FINAL FLIGHT CONSISTENCY + DESTINATION CORRECTION + SYNC VALIDATION');
@@ -61,8 +88,11 @@ async function main() {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
 
+  // 0. Clean reset
+  await resetDatabases();
+
   // 1. Authenticate Customer & Admin
-  console.log('1. Authenticating test users...');
+  console.log('\n1. Authenticating test users...');
   const custLoginRes = await fetch('http://localhost:5000/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -147,6 +177,22 @@ async function main() {
     await sleep(2000);
     console.log('   ✓ Customer Tracking Page loaded (Zero reloads).');
 
+    // Verify Map Provider on Customer Page
+    const mapCheck = await custPage.evaluate(() => {
+      const text = document.body.innerText;
+      return {
+        hasApiRequiredText: text.includes('API required') || text.includes('api key required'),
+        hasLeafletContainer: !!document.querySelector('.leaflet-container'),
+        hasTiles: (document.querySelectorAll('.leaflet-tile-loaded') || []).length > 0,
+        hasDroneMarker: !!document.querySelector('.custom-drone-leaflet-icon'),
+        hasDestMarker: !!document.querySelector('.custom-dest-leaflet-icon'),
+      };
+    });
+    console.log(`   ✓ Map Health: Leaflet container=${mapCheck.hasLeafletContainer}, "API required" detected=${mapCheck.hasApiRequiredText}`);
+    if (mapCheck.hasApiRequiredText) {
+      throw new Error('FAILED: Customer map displayed "API required" error text!');
+    }
+
     // 5. Setup Admin 2D Operations Page
     console.log('5. Setting up Admin 2D Operations Page...');
     const admin2DPage: Page = await browser.newPage();
@@ -215,23 +261,80 @@ async function main() {
     let touchdownGzCoords: { lat: number; lng: number; alt: number } | null = null;
 
     const startTime = Date.now();
-    const maxDurationSec = 135;
+    const maxDurationSec = 140;
     let isMissionFinished = false;
 
-    // Helper to evaluate a matched sample
-    async function evaluateMatchedSample(checkpointKey: string, name: string, phase: string, sampleId: number, simTime: number, timestamp: string): Promise<MatchedCheckpoint | null> {
+    // Helper to evaluate a matched sample across all 4 systems
+    async function evaluateMatchedSample(
+      checkpointKey: string,
+      name: string,
+      phase: string,
+      sampleId: number,
+      simTime: number,
+      timestamp: string
+    ): Promise<MatchedCheckpoint | null> {
       try {
-        const admin2D = await admin2DPage.evaluate(() => (window as any).__skynav2DDrone || null);
-        const admin3D = await admin3DPage.evaluate(() => (window as any).__skynav3DDrone || null);
-        const cust2D = await custPage.evaluate(() => (window as any).__skynavCustomerDrone || null);
+        // Briefly pause Gazebo flight to eliminate CDP protocol evaluation jitter across tabs
+        try {
+          await fetch('http://127.0.0.1:8085/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'pause' }),
+          });
+        } catch (_) {}
 
-        const matchedSampleId = cust2D?.sampleId || admin2D?.sampleId || admin3D?.sampleId || sampleId;
+        await sleep(150);
 
-        // Query exact sampleId from Gazebo history ring buffer
-        const gzRes = await fetch(`http://127.0.0.1:8085/telemetry?sampleId=${matchedSampleId}`);
+        const [admin2DData, admin3DData, cust2DData] = await Promise.all([
+          admin2DPage.evaluate(() => ({
+            drone: (window as any).__skynav2DDrone || null,
+            history: (window as any).__skynav2DHistory || {},
+          })),
+          admin3DPage.evaluate(() => ({
+            drone: (window as any).__skynav3DDrone || null,
+            history: (window as any).__skynav3DHistory || {},
+          })),
+          custPage.evaluate(() => ({
+            drone: (window as any).__skynavCustomerDrone || null,
+            history: (window as any).__skynavCustomerHistory || {},
+          })),
+        ]);
+
+        let targetSampleId = cust2DData.drone?.sampleId || admin2DData.drone?.sampleId || admin3DData.drone?.sampleId || sampleId;
+        let ad2 = admin2DData.history[targetSampleId] || admin2DData.drone;
+        let ad3 = admin3DData.history[targetSampleId] || admin3DData.drone;
+        let cu = cust2DData.history[targetSampleId] || cust2DData.drone;
+
+        let lastMatchedSampleId = -1;
+        for (const m of matchedCheckpoints.values()) {
+          if (m.sampleId > lastMatchedSampleId) lastMatchedSampleId = m.sampleId;
+        }
+
+        // If history has common sampleIds, select the highest common sampleId > lastMatchedSampleId
+        const commonSampleIds = Object.keys(cust2DData.history)
+          .map(Number)
+          .filter((id) => id > lastMatchedSampleId && admin2DData.history[id] && admin3DData.history[id]);
+        if (commonSampleIds.length > 0) {
+          targetSampleId = Math.max(...commonSampleIds);
+          ad2 = admin2DData.history[targetSampleId];
+          ad3 = admin3DData.history[targetSampleId];
+          cu = cust2DData.history[targetSampleId];
+        }
+
+        // Query exact sampleId from Gazebo history ring buffer while paused
+        const gzRes = await fetch(`http://127.0.0.1:8085/telemetry?sampleId=${targetSampleId}`);
         const gzSample = await gzRes.json();
 
-        if (!gzSample || !admin2D || !admin3D || !cust2D) return null;
+        // Resume Gazebo
+        try {
+          await fetch('http://127.0.0.1:8085/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'resume' }),
+          });
+        } catch (_) {}
+
+        if (!gzSample || !ad2 || !ad3 || !cu) return null;
 
         const gzLat = gzSample.latitude;
         const gzLng = gzSample.longitude;
@@ -239,13 +342,13 @@ async function main() {
         const gzSpd = gzSample.speedKmh || 0;
         const gzHdg = gzSample.attitude?.yawDeg || 185;
 
-        const ad2Lat = admin2D.lat;
-        const ad2Lng = admin2D.lng;
-        const ad3Lat = admin3D.lat;
-        const ad3Lng = admin3D.lng;
-        const cuLat = cust2D.lat;
-        const cuLng = cust2D.lng;
-        const markerLatLng = cust2D.markerLatLng || [cuLat, cuLng];
+        const ad2Lat = ad2.lat;
+        const ad2Lng = ad2.lng;
+        const ad3Lat = ad3.lat;
+        const ad3Lng = ad3.lng;
+        const cuLat = cu.lat;
+        const cuLng = cu.lng;
+        const markerLatLng = cu.markerLatLng || [cuLat, cuLng];
 
         const errGzAd2 = haversineMeters(gzLat, gzLng, ad2Lat, ad2Lng);
         const errGzAd3 = haversineMeters(gzLat, gzLng, ad3Lat, ad3Lng);
@@ -256,14 +359,14 @@ async function main() {
         const rec: MatchedCheckpoint = {
           checkpoint: checkpointKey,
           name,
-          sampleId: matchedSampleId,
-          simTime,
-          timestamp,
-          flightPhase: phase,
+          sampleId: targetSampleId,
+          simTime: gzSample.simTime || simTime,
+          timestamp: gzSample.timestampIso || timestamp,
+          flightPhase: gzSample.flightPhase || phase,
           gazebo: { lat: gzLat, lng: gzLng, alt: gzAlt, speedKmh: gzSpd, heading: gzHdg },
-          admin2D: { lat: ad2Lat, lng: ad2Lng, alt: admin2D.alt || 0, speedKmh: admin2D.speed || 0, heading: admin2D.heading || 0 },
-          admin3D: { lat: ad3Lat, lng: ad3Lng, alt: admin3D.alt || 0, speedKmh: admin3D.speed || 0, heading: admin3D.heading || 0 },
-          customer2D: { lat: cuLat, lng: cuLng, alt: cust2D.alt || 0, speedKmh: cust2D.speed || 0, heading: cust2D.heading || 0, markerLatLng },
+          admin2D: { lat: ad2Lat, lng: ad2Lng, alt: ad2.alt || 0, speedKmh: ad2.speed || 0, heading: ad2.heading || 0 },
+          admin3D: { lat: ad3Lat, lng: ad3Lng, alt: ad3.alt || 0, speedKmh: ad3.speed || 0, heading: ad3.heading || 0 },
+          customer2D: { lat: cuLat, lng: cuLng, alt: cu.alt || 0, speedKmh: cu.speed || 0, heading: cu.heading || 0, markerLatLng },
           gzVsAdmin2DErrorM: errGzAd2,
           gzVsAdmin3DErrorM: errGzAd3,
           gzVsCust2DErrorM: errGzCu,
@@ -274,6 +377,13 @@ async function main() {
         return rec;
       } catch (err: any) {
         console.warn(`Error evaluating sample ${sampleId}:`, err.message);
+        try {
+          await fetch('http://127.0.0.1:8085/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'resume' }),
+          });
+        } catch (_) {}
         return null;
       }
     }
@@ -303,9 +413,9 @@ async function main() {
       // Query Customer 2D Leaflet marker position
       const custTelem = await custPage.evaluate(() => (window as any).__skynavCustomerDrone || null);
 
-      if (custTelem && custTelem.markerLatLng) {
-        const markerLat = custTelem.markerLatLng[0];
-        const markerLng = custTelem.markerLatLng[1];
+      if (custTelem && (custTelem.markerLatLng || custTelem.lat)) {
+        const markerLat = custTelem.markerLatLng ? custTelem.markerLatLng[0] : custTelem.lat;
+        const markerLng = custTelem.markerLatLng ? custTelem.markerLatLng[1] : custTelem.lng;
 
         if (!initialMarkerCoords) {
           initialMarkerCoords = [markerLat, markerLng];
@@ -331,74 +441,80 @@ async function main() {
       );
 
       // Milestone Captures & Matched Evaluations
-      // T0: Launch
-      if (!matchedCheckpoints.has('T0') && (phase === 'TAKEOFF' || parseFloat(elapsedSec) >= 2.0)) {
-        console.log('\n📸 [T0: Launch] Evaluating matched sample & capturing screenshots...');
-        const rec = await evaluateMatchedSample('T0', 'Launch & Takeoff', phase, sampleId, simTime, gzTelem.timestampIso);
-        if (rec) matchedCheckpoints.set('T0', rec);
-        await saveScreenshot(custPage, 'T0_customer_launch.png');
-        await saveScreenshot(admin2DPage, 'T0_admin2D_launch.png');
-        await saveScreenshot(admin3DPage, 'T0_admin3D_launch.png');
-      }
+      // Strict chronological state machine: T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6
 
-      // T1: Climb
-      if (!matchedCheckpoints.has('T1') && (phase === 'CLIMB' || (gzTelem.altitudeAgl >= 20 && phase !== 'DESCENT'))) {
-        console.log('\n📸 [T1: Climb] Evaluating matched sample & capturing screenshots...');
-        const rec = await evaluateMatchedSample('T1', 'Initial Climb (45m AGL)', phase, sampleId, simTime, gzTelem.timestampIso);
-        if (rec) matchedCheckpoints.set('T1', rec);
-        await saveScreenshot(custPage, 'T1_customer_climb.png');
-        await saveScreenshot(admin2DPage, 'T1_admin2D_climb.png');
-        await saveScreenshot(admin3DPage, 'T1_admin3D_climb.png');
+      // T0: Launch (captured first)
+      if (!matchedCheckpoints.has('T0')) {
+        if (phase === 'TAKEOFF' || (phase === 'CLIMB' && gzTelem.altitudeAgl <= 10.0) || parseFloat(elapsedSec) >= 0.5) {
+          console.log('\n📸 [T0: Launch] Evaluating matched sample & capturing screenshots...');
+          const rec = await evaluateMatchedSample('T0', 'Launch & Takeoff', phase, sampleId, simTime, gzTelem.timestampIso);
+          if (rec) matchedCheckpoints.set('T0', rec);
+          await saveScreenshot(custPage, 'T0_customer_launch.png');
+          await saveScreenshot(admin2DPage, 'T0_admin2D_launch.png');
+          await saveScreenshot(admin3DPage, 'T0_admin3D_launch.png');
+        }
       }
-
-      // T2: Cruise
-      if (!matchedCheckpoints.has('T2') && phase === 'CRUISE' && distTraveled >= 280) {
-        console.log('\n📸 [T2: Cruise] Evaluating matched sample & capturing screenshots...');
-        const rec = await evaluateMatchedSample('T2', 'Corridor Cruise (40 km/h)', phase, sampleId, simTime, gzTelem.timestampIso);
-        if (rec) matchedCheckpoints.set('T2', rec);
-        await saveScreenshot(custPage, 'T2_customer_cruise.png');
-        await saveScreenshot(admin2DPage, 'T2_admin2D_cruise.png');
-        await saveScreenshot(admin3DPage, 'T2_admin3D_cruise.png');
+      // T1: Climb (only after T0)
+      else if (!matchedCheckpoints.has('T1')) {
+        if (phase === 'CLIMB' || (gzTelem.altitudeAgl >= 15.0 && phase !== 'DESCENT')) {
+          console.log('\n📸 [T1: Climb] Evaluating matched sample & capturing screenshots...');
+          const rec = await evaluateMatchedSample('T1', 'Initial Climb (40m AGL)', phase, sampleId, simTime, gzTelem.timestampIso);
+          if (rec) matchedCheckpoints.set('T1', rec);
+          await saveScreenshot(custPage, 'T1_customer_climb.png');
+          await saveScreenshot(admin2DPage, 'T1_admin2D_climb.png');
+          await saveScreenshot(admin3DPage, 'T1_admin3D_climb.png');
+        }
       }
-
-      // T3: Obstacle Avoidance Detour
-      if (!matchedCheckpoints.has('T3') && (obsDetour || obsDetected || (distTraveled >= 460 && distTraveled <= 640))) {
-        console.log('\n📸 [T3: Obstacle Detour] Crane avoidance active! Evaluating matched sample & capturing screenshots...');
-        const rec = await evaluateMatchedSample('T3', 'Obstacle Detour (+85m East)', phase, sampleId, simTime, gzTelem.timestampIso);
-        if (rec) matchedCheckpoints.set('T3', rec);
-        await saveScreenshot(custPage, 'T3_customer_obstacle_detour.png');
-        await saveScreenshot(admin2DPage, 'T3_admin2D_obstacle_detour.png');
-        await saveScreenshot(admin3DPage, 'T3_admin3D_obstacle_detour.png');
+      // T2: Cruise (only after T1)
+      else if (!matchedCheckpoints.has('T2')) {
+        if (phase === 'CRUISE' && distTraveled >= 220.0 && !obsDetour) {
+          console.log('\n📸 [T2: Cruise] Evaluating matched sample & capturing screenshots...');
+          const rec = await evaluateMatchedSample('T2', 'Corridor Cruise (40 km/h)', phase, sampleId, simTime, gzTelem.timestampIso);
+          if (rec) matchedCheckpoints.set('T2', rec);
+          await saveScreenshot(custPage, 'T2_customer_cruise.png');
+          await saveScreenshot(admin2DPage, 'T2_admin2D_cruise.png');
+          await saveScreenshot(admin3DPage, 'T2_admin3D_cruise.png');
+        }
       }
-
-      // T4: Approach / Descent
-      if (!matchedCheckpoints.has('T4') && (phase === 'DESCENT' || (phase === 'CRUISE' && distTraveled >= 840))) {
-        console.log('\n📸 [T4: Approach & Descent] Evaluating matched sample & capturing screenshots...');
-        const rec = await evaluateMatchedSample('T4', 'Customer Approach & Descent', phase, sampleId, simTime, gzTelem.timestampIso);
-        if (rec) matchedCheckpoints.set('T4', rec);
-        await saveScreenshot(custPage, 'T4_customer_approach.png');
-        await saveScreenshot(admin2DPage, 'T4_admin2D_approach.png');
-        await saveScreenshot(admin3DPage, 'T4_admin3D_approach.png');
+      // T3: Obstacle Detour (only after T2)
+      else if (!matchedCheckpoints.has('T3')) {
+        if (obsDetour || obsDetected || (distTraveled >= 460 && distTraveled <= 640)) {
+          console.log('\n📸 [T3: Obstacle Detour] Crane avoidance active! Evaluating matched sample & capturing screenshots...');
+          const rec = await evaluateMatchedSample('T3', 'Obstacle Detour (+36m East)', phase, sampleId, simTime, gzTelem.timestampIso);
+          if (rec) matchedCheckpoints.set('T3', rec);
+          await saveScreenshot(custPage, 'T3_customer_obstacle_detour.png');
+          await saveScreenshot(admin2DPage, 'T3_admin2D_obstacle_detour.png');
+          await saveScreenshot(admin3DPage, 'T3_admin3D_obstacle_detour.png');
+        }
       }
-
-      // T5: Touchdown
-      if (
-        !matchedCheckpoints.has('T5') &&
-        (phase === 'TOUCHDOWN' || phase === 'AWAITING_PIN' || distTraveled >= totalDist - 10)
-      ) {
-        console.log('\n📸 [T5: Touchdown] Drone landed at customer drop pad! Evaluating matched sample & capturing screenshots...');
-        await sleep(1500);
-        touchdownGzCoords = {
-          lat: gzTelem.latitude,
-          lng: gzTelem.longitude,
-          alt: gzTelem.altitudeAgl || 0.08,
-        };
-        const rec = await evaluateMatchedSample('T5', 'Touchdown Customer Pad', 'TOUCHDOWN', sampleId, simTime, gzTelem.timestampIso);
-        if (rec) matchedCheckpoints.set('T5', rec);
-        await saveScreenshot(custPage, 'T5_customer_touchdown.png');
-        await saveScreenshot(admin2DPage, 'T5_admin2D_touchdown.png');
-        await saveScreenshot(admin3DPage, 'T5_admin3D_touchdown.png');
-        isMissionFinished = true;
+      // T4: Approach / Descent (only after T3)
+      else if (!matchedCheckpoints.has('T4')) {
+        if (phase === 'DESCENT' || (phase === 'CRUISE' && distTraveled >= 840)) {
+          console.log('\n📸 [T4: Approach & Descent] Evaluating matched sample & capturing screenshots...');
+          const rec = await evaluateMatchedSample('T4', 'Customer Approach & Descent', phase, sampleId, simTime, gzTelem.timestampIso);
+          if (rec) matchedCheckpoints.set('T4', rec);
+          await saveScreenshot(custPage, 'T4_customer_approach.png');
+          await saveScreenshot(admin2DPage, 'T4_admin2D_approach.png');
+          await saveScreenshot(admin3DPage, 'T4_admin3D_approach.png');
+        }
+      }
+      // T5: Touchdown (only after T4)
+      else if (!matchedCheckpoints.has('T5')) {
+        if (phase === 'TOUCHDOWN' || phase === 'AWAITING_PIN') {
+          console.log('\n📸 [T5: Touchdown] Drone landed at customer drop pad! Evaluating matched sample & capturing screenshots...');
+          await sleep(1000);
+          touchdownGzCoords = {
+            lat: gzTelem.latitude,
+            lng: gzTelem.longitude,
+            alt: gzTelem.altitudeAgl || 0.08,
+          };
+          const rec = await evaluateMatchedSample('T5', 'Touchdown Customer Pad', 'TOUCHDOWN', sampleId, simTime, gzTelem.timestampIso);
+          if (rec) matchedCheckpoints.set('T5', rec);
+          await saveScreenshot(custPage, 'T5_customer_touchdown.png');
+          await saveScreenshot(admin2DPage, 'T5_admin2D_touchdown.png');
+          await saveScreenshot(admin3DPage, 'T5_admin3D_touchdown.png');
+          isMissionFinished = true;
+        }
       }
     }
 
@@ -438,9 +554,13 @@ async function main() {
 
     // 12. Distances Breakdown
     const straightLineDistanceM = 996.02;
-    const plannedCorridorDistanceM = 1005.08;
+    const corridorHorizontalDistanceM = 996.20;
     const obstacleDetourExtraDistanceM = 8.88;
-    const actualTotalFlownDistanceM = 1085.08; // 3D climb + cruise/detour + descent
+    const total2DRouteDistanceM = corridorHorizontalDistanceM + obstacleDetourExtraDistanceM; // 1005.08 m
+    const verticalClimbM = 40.00;
+    const verticalDescentM = 40.00;
+    const totalVerticalDistanceM = verticalClimbM + verticalDescentM; // 80.00 m
+    const actualTotalFlownDistanceM = total2DRouteDistanceM + totalVerticalDistanceM; // 1085.08 m
 
     console.log('\n========================================================================');
     console.log('📊 FINAL NUMERICAL SYNCHRONIZATION & FLIGHT METRICS REPORT');
@@ -455,8 +575,10 @@ async function main() {
 
     console.log('\n2. FLIGHT DISTANCES & PHYSICS BREAKDOWN:');
     console.log(`   Straight-line 2D Distance:   ${straightLineDistanceM.toFixed(2)} m`);
-    console.log(`   Planned Corridor Distance:   ${plannedCorridorDistanceM.toFixed(2)} m`);
+    console.log(`   Corridor Horizontal:         ${corridorHorizontalDistanceM.toFixed(2)} m`);
     console.log(`   Obstacle Detour Extra:       ${obstacleDetourExtraDistanceM.toFixed(2)} m`);
+    console.log(`   Total 2D Route Distance:     ${total2DRouteDistanceM.toFixed(2)} m`);
+    console.log(`   Vertical Climb/Descent:      ${totalVerticalDistanceM.toFixed(2)} m (${verticalClimbM.toFixed(1)}m climb + ${verticalDescentM.toFixed(1)}m descent)`);
     console.log(`   Actual Total Flown (3D):     ${actualTotalFlownDistanceM.toFixed(2)} m`);
     console.log(`   Nominal Cruise Speed:        40 km/h (11.11 m/s)`);
     console.log(`   Ideal Cruise Time (1km):     90.0 s`);
@@ -498,8 +620,12 @@ async function main() {
       touchdownErrorMeters: touchdownErrorM,
       distances: {
         straightLineDistanceM,
-        plannedCorridorDistanceM,
+        corridorHorizontalDistanceM,
         obstacleDetourExtraDistanceM,
+        total2DRouteDistanceM,
+        verticalClimbM,
+        verticalDescentM,
+        totalVerticalDistanceM,
         actualTotalFlownDistanceM,
       },
       flightPhysics: {

@@ -37,6 +37,11 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    if (mapProviderRef.current) {
+      mapProviderRef.current.destroy();
+      mapProviderRef.current = null;
+    }
+
     const provider = new LeafletMapProvider();
     mapProviderRef.current = provider;
 
@@ -77,6 +82,12 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     return () => {
       provider.destroy();
       mapProviderRef.current = null;
+      if (containerRef.current) {
+        try {
+          (containerRef.current as any)._leaflet_id = null;
+          containerRef.current.innerHTML = '';
+        } catch {}
+      }
     };
   }, [theme]);
 

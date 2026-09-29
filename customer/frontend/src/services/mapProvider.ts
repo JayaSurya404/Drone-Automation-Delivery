@@ -1,3 +1,4 @@
+import L from 'leaflet';
 import { DroneLocation, HubLocation } from '../types/tracking';
 import { NoFlyZone } from '../types/airspace';
 
@@ -32,10 +33,10 @@ export interface IMapProvider {
   destroy(): void;
 }
 
-// Leaflet implementation of IMapProvider - 100% Light Theme
+// Leaflet implementation of IMapProvider - 100% Light Theme with ESRI World Imagery + CartoDB Labels
 export class LeafletMapProvider implements IMapProvider {
   private mapInstance: any = null;
-  private L: any = null;
+  private L: any = L;
   private droneMarker: any = null;
   private destMarker: any = null;
   private hubMarker: any = null;
@@ -53,13 +54,28 @@ export class LeafletMapProvider implements IMapProvider {
   private onLocationSelectCallback?: (lat: number, lng: number) => void;
 
   public async initialize(options: MapRendererOptions): Promise<void> {
-    const L = await import('leaflet');
-    this.L = L.default || L;
+    this.L = L;
     this.onLocationSelectCallback = options.onLocationSelect;
     this.isLocationPicker = !!options.onLocationSelect;
 
+    // Safely remove any existing map instance on this provider
     if (this.mapInstance) {
-      this.mapInstance.remove();
+      try {
+        this.mapInstance.remove();
+      } catch (e) {
+        console.warn('Error removing existing mapInstance:', e);
+      }
+      this.mapInstance = null;
+    }
+
+    // Safely clear any lingering Leaflet internal ID on the container DOM element
+    if (options.containerElement) {
+      if ((options.containerElement as any)._leaflet_id) {
+        try {
+          (options.containerElement as any)._leaflet_id = null;
+        } catch {}
+      }
+      options.containerElement.innerHTML = '';
     }
 
     this.mapInstance = this.L.map(options.containerElement, {
@@ -73,6 +89,7 @@ export class LeafletMapProvider implements IMapProvider {
     });
 
     // High quality ESRI World Imagery satellite base layer + CartoDB labels matching Admin Satellite Map
+    // 100% public, no API key required
     this.L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       {
@@ -178,11 +195,17 @@ export class LeafletMapProvider implements IMapProvider {
     // Expose actual Leaflet marker position globally for verification and testing
     if (typeof window !== 'undefined' && this.droneMarker) {
       const pos = this.droneMarker.getLatLng();
-      (window as any).__skynavCustomerDrone = {
+      const droneSample = {
+        sampleId: location.sampleId,
+        simTime: location.simTime,
+        timestamp: (location as any).timestamp || new Date().toISOString(),
         lat: pos.lat,
         lng: pos.lng,
+        latitude: pos.lat,
+        longitude: pos.lng,
         alt: location.altitudeMeters || 0,
         altitudeMeters: location.altitudeMeters || 0,
+        altitude: location.altitudeMeters || 0,
         speed: location.speedKmh || 0,
         speedKmh: location.speedKmh || 0,
         heading,
@@ -190,7 +213,12 @@ export class LeafletMapProvider implements IMapProvider {
         markerLatLng: [pos.lat, pos.lng],
         updatedAt: Date.now(),
       };
-      (window as any).__skynavCustDrone = (window as any).__skynavCustomerDrone;
+      (window as any).__skynavCustomerDrone = droneSample;
+      (window as any).__skynavCustDrone = droneSample;
+      if (location.sampleId) {
+        (window as any).__skynavCustomerHistory = (window as any).__skynavCustomerHistory || {};
+        (window as any).__skynavCustomerHistory[location.sampleId] = droneSample;
+      }
     }
 
     // Traveled route maintenance
@@ -504,9 +532,11 @@ export class LeafletMapProvider implements IMapProvider {
       }
       this.traveledPoints = [];
       this.pendingDroneLocation = null;
-      this.flightPolyline = null;
-      this.geofenceCircle = null;
-      this.mapInstance.remove();
+      try {
+        this.mapInstance.remove();
+      } catch (e) {
+        console.warn('Error removing mapInstance on destroy:', e);
+      }
       this.mapInstance = null;
     }
   }

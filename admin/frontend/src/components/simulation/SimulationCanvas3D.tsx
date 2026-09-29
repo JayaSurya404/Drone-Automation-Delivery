@@ -365,7 +365,7 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
     drone.setHighlightStatus(droneHighlightStatus);
 
     if (typeof window !== 'undefined') {
-      (window as any).__skynav3DDrone = {
+      const droneSample3D = {
         droneId: liveDrone?.id || 'D-001',
         lat: liveDrone?.location.lat || 11.1132,
         lng: liveDrone?.location.lng || 77.0277,
@@ -385,6 +385,11 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
         osmRoadsCount: env.totalOsmRoads,
         visualClearance: env.checkBuildingClearance(basePos),
       };
+      (window as any).__skynav3DDrone = droneSample3D;
+      if (liveDrone?.location.sampleId) {
+        (window as any).__skynav3DHistory = (window as any).__skynav3DHistory || {};
+        (window as any).__skynav3DHistory[liveDrone.location.sampleId] = droneSample3D;
+      }
       (window as any).__skynav3DCamera = {
         position: cameraRef.current ? {
           x: parseFloat(cameraRef.current.position.x.toFixed(2)),
