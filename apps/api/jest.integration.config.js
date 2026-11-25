@@ -8,4 +8,5 @@ module.exports = {
     "^.+\\.(t|j)s$": "ts-jest",
   },
   testTimeout: 20000,
+  maxWorkers: 1,
 };
