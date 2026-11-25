@@ -23,6 +23,9 @@ const STORAGE_KEY = 'skynav_auth_user';
 const ROUTE_PERMISSION_MAP: Record<string, string> = {
   '/dashboard': 'dashboard.read',
   '/simulation': 'simulation.read',
+  '/intelligence': 'vision.read',
+  '/swarm': 'swarm.read',
+  '/digital-twin': 'simulation.read',
   '/operations': 'missions.read',
   '/orders': 'orders.read',
   '/products': 'catalog.read',

@@ -36,6 +36,9 @@ import { AuditLogsPage } from './pages/System/AuditLogsPage';
 import { AdminManagementPage } from './pages/System/AdminManagementPage';
 import { SettingsPage } from './pages/System/SettingsPage';
 import { SimulationCenter } from './pages/Simulation/SimulationCenter';
+import { IntelligencePage } from './pages/Intelligence/IntelligencePage';
+import { SwarmPage } from './pages/Swarm/SwarmPage';
+import { DigitalTwinPage } from './pages/DigitalTwin/DigitalTwinPage';
 
 // Main Layout Wrapper Component
 const MainLayout: React.FC = () => {
@@ -98,6 +101,9 @@ export const App: React.FC = () => {
                   <Route element={<MainLayout />}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/simulation" element={<SimulationCenter />} />
+                    <Route path="/intelligence" element={<IntelligencePage />} />
+                    <Route path="/swarm" element={<SwarmPage />} />
+                    <Route path="/digital-twin" element={<DigitalTwinPage />} />
                     <Route path="/operations" element={<LiveOperations />} />
                     <Route path="/orders" element={<OrdersPage />} />
                     <Route path="/products" element={<ProductsPage />} />

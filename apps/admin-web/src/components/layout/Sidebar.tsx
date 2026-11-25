@@ -30,6 +30,9 @@ import {
   Shield,
   Sparkles,
   X,
+  Eye,
+  Share2,
+  Cpu,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -62,6 +65,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobileOpe
         { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { label: 'Simulation Center', path: '/simulation', icon: Sparkles, isSim: true },
         { label: 'Live Operations', path: '/operations', icon: Radio },
+      ],
+    },
+    {
+      title: 'INTELLIGENCE',
+      items: [
+        { label: 'AI & Vision', path: '/intelligence', icon: Eye, isSim: true },
+        { label: 'Swarm Balancer', path: '/swarm', icon: Share2, isSim: true },
+        { label: 'Digital Twin', path: '/digital-twin', icon: Cpu, isSim: true },
       ],
     },
     {
