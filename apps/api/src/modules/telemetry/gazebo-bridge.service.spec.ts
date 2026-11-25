@@ -95,7 +95,7 @@ describe("GazeboBridgeService", () => {
         speedKmh: 50,
       }),
     });
-    global.fetch = mockFetch as any;
+    global.fetch = mockFetch as unknown as typeof fetch;
 
     prisma.drone.findFirst.mockResolvedValue({ id: "drone-uuid-007" });
 
