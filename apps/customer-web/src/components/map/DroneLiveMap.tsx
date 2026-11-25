@@ -155,14 +155,15 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
         }
       });
 
+    const container = containerRef.current;
     return () => {
       isCancelled = true;
       provider.destroy();
       mapProviderRef.current = null;
-      if (containerRef.current) {
+      if (container) {
         try {
-          (containerRef.current as any)._leaflet_id = null;
-          containerRef.current.innerHTML = '';
+          (container as any)._leaflet_id = null;
+          container.innerHTML = '';
         } catch {}
       }
     };

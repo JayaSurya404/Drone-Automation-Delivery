@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"admin-web lint passed\""
+    "lint": "eslint ."
   },
   "dependencies": {
     "@skynav/api-client": "workspace:*",
@@ -24,10 +24,12 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@skynav/config": "workspace:*",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
+    "eslint": "^9.18.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",

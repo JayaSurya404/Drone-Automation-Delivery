@@ -239,8 +239,9 @@ export const SimulationCanvas3D: React.FC<SimulationCanvas3DProps> = ({
       domEl.removeEventListener('wheel', handleWheel);
       domEl.removeEventListener('contextmenu', handleContextMenu);
 
-      if (mountRef.current) {
-        mountRef.current.innerHTML = '';
+      const mount = mountRef.current;
+      if (mount) {
+        mount.innerHTML = '';
       }
       renderer.dispose();
     };
