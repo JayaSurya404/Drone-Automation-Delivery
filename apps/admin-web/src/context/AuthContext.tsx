@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ApiClient } from '@skynav/api-client';
+import { ApiClient, decodeJwtPayload } from '@skynav/api-client';
 import { AdminUser, AdminRole } from '../types/skynav';
 import { mockStore } from '../services/mockDataStore';
 
@@ -17,8 +17,6 @@ interface AuthContextType {
   hasPermission: (pathOrRoles: string | AdminRole[]) => boolean;
   getDefaultRouteForRole: (role?: AdminRole) => string;
 }
-
-const STORAGE_KEY = 'skynav_auth_user';
 
 const ROUTE_PERMISSION_MAP: Record<string, string> = {
   '/dashboard': 'dashboard.read',
@@ -52,15 +50,8 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AdminUser | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {}
-    return null;
-  });
+  // In-memory user state only — never persisted to localStorage
+  const [user, setUser] = useState<AdminUser | null>(null);
 
   // Silent session refresh on mount via httpOnly admin refresh cookie (in-memory access token)
   useEffect(() => {
@@ -71,6 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (authRes && isMounted) {
           const u = authRes.user;
           const role: AdminRole = (u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole) || 'super_admin';
+          const decoded = decodeJwtPayload<{ permissions?: string[]; roles?: string[] }>(authRes.accessToken);
+          const permissions = decoded?.permissions || [];
           const fullUser: AdminUser = {
             id: u.id,
             name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'Admin User',
@@ -79,16 +72,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
             status: 'Active',
             lastLogin: 'Active Session',
-            permissions: u.roles?.includes('super_admin') ? ['*'] : (u.roles || ['*']),
+            permissions: u.roles?.includes('super_admin') ? ['*'] : permissions,
           };
           setUser(fullUser);
           mockStore.refreshSession();
         } else if (isMounted) {
-          // If silent refresh failed and no active token in memory, clear stale user cache
           if (!adminApiClient.getAccessToken()) {
             setUser(null);
-            localStorage.removeItem(STORAGE_KEY);
-            sessionStorage.removeItem(STORAGE_KEY);
           }
         }
       })
@@ -123,6 +113,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const u = authRes.user;
       const primaryRole: AdminRole = (u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole) || role || 'super_admin';
+      const decoded = decodeJwtPayload<{ permissions?: string[]; roles?: string[] }>(authRes.accessToken);
+      const permissions = decoded?.permissions || [];
       const authenticatedUser: AdminUser = {
         id: u.id,
         name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'Admin User',
@@ -131,12 +123,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
         status: 'Active',
         lastLogin: 'Active Session',
-        permissions: u.roles?.includes('super_admin') ? ['*'] : (u.roles || ['*']),
+        permissions: u.roles?.includes('super_admin') ? ['*'] : permissions,
       };
 
       setUser(authenticatedUser);
-      // Persist profile metadata (non-sensitive; token is kept strictly in-memory in adminApiClient)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
       mockStore.refreshSession();
 
       return { success: true };
@@ -146,10 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    adminApiClient.logout().catch(() => {});
+    adminApiClient.logout().catch(() => { });
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(STORAGE_KEY);
     mockStore.clearSession();
   };
 

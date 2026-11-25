@@ -100,7 +100,7 @@ export const SimulationCenter: React.FC = () => {
       setMissions([...allMissions]);
       setGeofences([...allGeofences]);
 
-      const configuredDroneId = (window as any).SKYNAV_GAZEBO_DRONE_ID || import.meta.env.VITE_GAZEBO_DRONE_ID;
+      const configuredDroneId = (window as any).SKYNAV_GAZEBO_DRONE_ID || (import.meta as any).env?.VITE_GAZEBO_DRONE_ID;
       const gazeboDrone = allDrones.find((d) => (configuredDroneId && (d.id === configuredDroneId || d.name === configuredDroneId)) || d.id === 'D-001') || allDrones[0];
       const active = gazeboDrone ||
         allDrones.find((d) => d.status === 'in_flight' || d.status === 'returning' || (d.status as any) === 'touchdown' || d.status === 'charging') ||
