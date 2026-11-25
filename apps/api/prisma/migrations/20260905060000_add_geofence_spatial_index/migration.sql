@@ -1,0 +1,12 @@
+-- Phase 12 performance fix: `geofences.polygon` had no spatial index at all
+-- (confirmed via a full audit of every migration — the only spatial-index
+-- precedent in this schema is the hand-authored GIN full-text index on
+-- `products`, following the same pattern here since Prisma's schema DSL
+-- cannot express an index on an `Unsupported(...)` column type). Every
+-- `ST_Contains`/`ST_Intersects` call in GeofencingService (service-area
+-- checks at checkout, route/point violation checks at mission creation and
+-- on every in-flight tick) was sequentially scanning every row in this
+-- table to evaluate the geometry predicate. A GIST index lets PostGIS use
+-- the geometry's bounding box to skip non-candidate rows before running the
+-- expensive exact predicate.
+CREATE INDEX "geofences_polygon_gist_idx" ON "geofences" USING GIST ("polygon");

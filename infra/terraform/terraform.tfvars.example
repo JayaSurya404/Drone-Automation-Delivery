@@ -1,0 +1,21 @@
+# Copy to production.tfvars / staging.tfvars (both gitignored) and fill in
+# real values. Never commit a filled-in copy of this file.
+
+fly_org     = "your-fly-org-slug"
+region      = "iad"
+environment = "production" # or "staging"
+
+api_image           = "registry.fly.io/skynav-api-production:REPLACE_WITH_GIT_SHA"
+customer_web_image  = "registry.fly.io/skynav-customer-web-production:REPLACE_WITH_GIT_SHA"
+admin_web_image     = "registry.fly.io/skynav-admin-web-production:REPLACE_WITH_GIT_SHA"
+
+# Secrets — generate fresh values, never reuse anything from .env.example.
+# database_url                   = "postgresql://..."
+# redis_url                      = "rediss://..."
+# storage_access_key             = "..."
+# storage_secret_key             = "..."
+# jwt_access_secret              = "$(openssl rand -hex 32)"
+# telemetry_ingest_api_key       = "$(openssl rand -hex 32)"
+# bootstrap_super_admin_password = "..."
+# stripe_secret_key              = ""   # leave empty to keep Stripe disabled/test-mode
+# stripe_webhook_secret          = ""

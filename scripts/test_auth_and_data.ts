@@ -10,8 +10,8 @@ if (!ADMIN_SEED_PASSWORD) {
   throw new Error('Set ADMIN_SEED_PASSWORD in .env before running scripts/test_auth_and_data.ts');
 }
 
-const custDb = new Database(path.resolve('customer/backend/data/skynav.db'));
-const adminDb = new Database(path.resolve('admin/backend/data/admin.db'));
+const custDb = new Database(path.resolve('legacy/customer-backend/data/skynav.db'));
+const adminDb = new Database(path.resolve('legacy/admin-backend/data/admin.db'));
 
 async function runAuthAndDataAuditTest() {
   console.log('====================================================');

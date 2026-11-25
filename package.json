@@ -1,29 +1,32 @@
 {
-  "name": "skynav-drone-platform",
+  "name": "skynav",
   "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "workspaces": [
-    "customer/backend",
-    "customer/frontend",
-    "admin/backend",
-    "admin/frontend",
-    "shared/contracts"
-  ],
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev:customer:backend": "npm run dev --workspace=customer-backend",
-    "dev:customer:frontend": "npm run dev --workspace=customer-frontend",
-    "dev:customer": "concurrently -k -n \"CUST_API,CUST_WEB\" -c \"cyan,blue\" \"npm run dev:customer:backend\" \"npm run dev:customer:frontend\"",
-    "dev:admin:backend": "npm run dev --workspace=admin-backend",
-    "dev:admin:frontend": "npm run dev --workspace=skynav-admin-control-center",
-    "dev:admin": "concurrently -k -n \"ADMIN_API,ADMIN_WEB\" -c \"magenta,yellow\" \"npm run dev:admin:backend\" \"npm run dev:admin:frontend\"",
-    "dev:all": "concurrently -k -n \"CUST_API,CUST_WEB,ADMIN_API,ADMIN_WEB\" -c \"cyan,blue,magenta,yellow\" \"npm run dev:customer:backend\" \"npm run dev:customer:frontend\" \"npm run dev:admin:backend\" \"npm run dev:admin:frontend\"",
-    "seed:customer": "npm run seed --workspace=customer-backend",
-    "seed:admin": "npm run seed --workspace=admin-backend",
-    "seed:all": "npm run seed:customer && npm run seed:admin",
-    "build": "npm run build --workspaces"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "playwright test",
+    "db:generate": "turbo run db:generate --filter=@skynav/api",
+    "db:migrate": "turbo run db:migrate --filter=@skynav/api",
+    "db:migrate:deploy": "turbo run db:migrate:deploy --filter=@skynav/api",
+    "db:seed": "turbo run db:seed --filter=@skynav/api",
+    "clean": "turbo run clean",
+    "dev:legacy": "concurrently -k \"pnpm --filter=@skynav/legacy-customer-backend dev\" \"pnpm --filter=@skynav/legacy-admin-backend dev\"",
+    "seed:legacy": "pnpm --filter=@skynav/legacy-customer-backend seed && pnpm --filter=@skynav/legacy-admin-backend seed"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.62.1",
+    "concurrently": "^9.1.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
   }
 }

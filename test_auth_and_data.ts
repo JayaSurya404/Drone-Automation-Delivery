@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { queryOne, runCommand } from './customer/backend/db/database.js';
+import { queryOne, runCommand } from './legacy/customer-backend/db/database.js';
 
 const CUSTOMER_API = 'http://127.0.0.1:5000';
 const ADMIN_API = 'http://127.0.0.1:5001';

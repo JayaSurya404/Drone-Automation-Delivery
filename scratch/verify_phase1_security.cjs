@@ -7,7 +7,7 @@ console.log('=== PHASE 1 SECURITY VERIFICATION ===');
 
 // 1. Fail-fast check
 console.log('\n[1] Testing Fail-Fast Startup...');
-const failAdmin = spawnSync(process.execPath, ['admin/backend/dist/admin/backend/server.js'], {
+const failAdmin = spawnSync(process.execPath, ['legacy/admin-backend/dist/legacy/admin-backend/server.js'], {
   env: { ...process.env, ADMIN_JWT_SECRET: '', SKYNAV_INTERNAL_SERVICE_KEY: '' },
   encoding: 'utf8',
   timeout: 8000,
@@ -18,7 +18,7 @@ if (failAdmin.status === 0) {
 }
 console.log('  ✔ Admin backend failed fast as expected');
 
-const failCust = spawnSync(process.execPath, ['customer/backend/dist/customer/backend/server.js'], {
+const failCust = spawnSync(process.execPath, ['legacy/customer-backend/dist/legacy/customer-backend/server.js'], {
   env: { ...process.env, JWT_SECRET: 'skynav@123', SKYNAV_INTERNAL_SERVICE_KEY: '' },
   encoding: 'utf8',
   timeout: 8000,
@@ -32,8 +32,8 @@ console.log('  ✔ Customer backend failed fast as expected');
 // 2. Start Live Servers
 async function main() {
   console.log('\n[2] Starting Both Backends for Runtime Security Checks...');
-  const custProc = spawn(process.execPath, ['customer/backend/dist/customer/backend/server.js'], { stdio: ['ignore', 'inherit', 'inherit'] });
-  const adminProc = spawn(process.execPath, ['admin/backend/dist/admin/backend/server.js'], { stdio: ['ignore', 'inherit', 'inherit'] });
+  const custProc = spawn(process.execPath, ['legacy/customer-backend/dist/legacy/customer-backend/server.js'], { stdio: ['ignore', 'inherit', 'inherit'] });
+  const adminProc = spawn(process.execPath, ['legacy/admin-backend/dist/legacy/admin-backend/server.js'], { stdio: ['ignore', 'inherit', 'inherit'] });
 
   const stop = () => {
     try { custProc.kill(); } catch {}
@@ -193,7 +193,7 @@ async function main() {
 
     // 9. Dispatch Force / D-001 Bypass Removal Check
     console.log('\n[9] Testing Dispatch Force & D-001 Bypass Removal...');
-    const adb = new Database('admin/backend/data/admin.db');
+    const adb = new Database('legacy/admin-backend/data/admin.db');
     const firstOrder = adb.prepare('SELECT id FROM operational_orders LIMIT 1').get();
     if (firstOrder) {
       adb.prepare("UPDATE drones SET status = 'charging' WHERE id = 'D-001'").run();

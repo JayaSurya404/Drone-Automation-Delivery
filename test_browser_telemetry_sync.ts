@@ -226,7 +226,7 @@ async function runBrowserTelemetryVerification() {
     if (d001 && d001.status !== 'available') {
       console.log(`  ℹ Resetting D-001 from "${d001.status}" to "available" at SkyHub Kurumbapalayam...`);
       const Database = (await import('better-sqlite3')).default;
-      const db = new Database(path.join(process.cwd(), 'admin', 'backend', 'data', 'admin.db'));
+      const db = new Database(path.join(process.cwd(), 'legacy', 'admin-backend', 'data', 'admin.db'));
       db.prepare("UPDATE drones SET status = 'available', latitude = 11.1132, longitude = 77.0277, altitude = 0, speed = 0, battery = 100, current_mission_id = NULL WHERE id = 'D-001'").run();
       db.close();
       await delay(500);

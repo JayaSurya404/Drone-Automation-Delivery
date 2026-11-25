@@ -1,0 +1,47 @@
+# Fly.io deploy config for apps/api. Terraform (infra/terraform) creates the
+# app shell/secrets/IPs/certs; `flyctl deploy -c infra/fly/api.fly.toml`
+# handles the actual image deploy and machine configuration — this is Fly's
+# own recommended split (Terraform for durable resources, flyctl+fly.toml
+# for rolling out a new release), not a partial/incomplete Terraform setup.
+#
+# `app` is filled in per environment by CI (see .github/workflows/deploy.yml)
+# via `flyctl deploy --app skynav-api-<environment>` rather than hardcoded
+# here, so the same file serves both staging and production.
+
+primary_region = "iad"
+
+[build]
+  dockerfile = "../../apps/api/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = false   # a WebSocket-serving API should not cold-stop between requests
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+  # Rolling deploy: a new machine must pass this before the old one is
+  # retired, so a bad deploy never takes down the whole app.
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "10s"
+    method = "GET"
+    path = "/health/ready"
+    protocol = "http"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[deploy]
+  strategy = "rolling"

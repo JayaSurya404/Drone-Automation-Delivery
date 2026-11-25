@@ -40,6 +40,8 @@ credentials.json
 server/data/
 customer/backend/data/
 admin/backend/data/
+legacy/customer-backend/data/
+legacy/admin-backend/data/
 data/*.db
 
 # Production & Build outputs

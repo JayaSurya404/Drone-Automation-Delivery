@@ -1,0 +1,43 @@
+# Fly.io deploy config for apps/customer-web. See api.fly.toml's header
+# comment for the Terraform/flyctl split this assumes.
+
+primary_region = "iad"
+
+[build]
+  dockerfile = "../../apps/customer-web/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  # API_INTERNAL_URL is NOT set here — it differs between staging and
+  # production (Fly's private 6PN network address of each environment's own
+  # API app), so it's a `flyctl secrets set API_INTERNAL_URL=http://skynav-api-<env>.internal:4000`
+  # per app instead of a value baked into this shared file. See
+  # docs/DEPLOYMENT.md.
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"   # stateless frontend — fine to scale to zero when idle
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/"
+    protocol = "http"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[deploy]
+  strategy = "rolling"

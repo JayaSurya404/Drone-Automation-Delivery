@@ -1,0 +1,1352 @@
+// SkyNav — Prisma schema
+//
+// Phase 2 (Authentication and RBAC) adds the Identity/RBAC entity group from
+// docs/PROJECT_CONTEXT.md ("Core entity groups"). Permissions are modeled as
+// a data-driven role -> module.action matrix (blueprint Section O) so new
+// roles/permissions never require a code change, only a seed/data change.
+// No other domain entities exist yet — those land starting Phase 3.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model User {
+  id                         String    @id @default(uuid())
+  email                      String    @unique
+  passwordHash               String    @map("password_hash")
+  firstName                  String?   @map("first_name")
+  lastName                   String?   @map("last_name")
+  isActive                   Boolean   @default(true) @map("is_active")
+  isEmailVerified            Boolean   @default(false) @map("is_email_verified")
+  emailVerificationTokenHash String?   @unique @map("email_verification_token_hash")
+  emailVerificationExpiresAt DateTime? @map("email_verification_expires_at")
+  passwordResetTokenHash     String?   @unique @map("password_reset_token_hash")
+  passwordResetExpiresAt     DateTime? @map("password_reset_expires_at")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  roles              UserRole[]
+  refreshTokens      RefreshToken[]
+  auditLogs          AuditLog[]           @relation("AuditActor")
+  cart               Cart?
+  wishlistItems      WishlistItem[]
+  addresses          CustomerAddress[]
+  orders             Order[]
+  operatedMissions   Mission[]            @relation("MissionOperator")
+  createdGeofences   Geofence[]           @relation("GeofenceCreatedBy")
+  approvedMissions   Mission[]            @relation("MissionApprovedBy")
+  createdSwarms      Swarm[]              @relation("SwarmCreatedBy")
+  createdSwarmPlans  SwarmPlan[]          @relation("SwarmPlanCreatedBy")
+  createdSimulations SimulationScenario[] @relation("SimulationScenarioCreatedBy")
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  module      String
+  action      String
+  description String?
+
+  roles RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+/// Refresh tokens are opaque random strings; only a SHA-256 hash is ever
+/// persisted. `familyId` links every token descended from one login so
+/// rotation-reuse detection (blueprint Section O) can revoke the whole
+/// lineage the instant a already-rotated token is presented again.
+model RefreshToken {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  tokenHash           String    @unique @map("token_hash")
+  familyId            String    @map("family_id")
+  replacedByTokenHash String?   @map("replaced_by_token_hash")
+  revokedAt           DateTime? @map("revoked_at")
+  expiresAt           DateTime  @map("expires_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  createdByIp         String?   @map("created_by_ip")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog / Inventory (Phase 3)
+// ---------------------------------------------------------------------------
+
+/// Self-referencing category tree (blueprint Section N).
+model Category {
+  id          String   @id @default(uuid())
+  parentId    String?  @map("parent_id")
+  name        String
+  slug        String   @unique
+  description String?
+  position    Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  categoryId  String?  @map("category_id")
+  name        String
+  slug        String   @unique
+  description String?
+  basePrice   Decimal  @map("base_price") @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category      Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  variants      ProductVariant[]
+  images        ProductImage[]
+  cartItems     CartItem[]
+  wishlistItems WishlistItem[]
+  orderItems    OrderItem[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("products")
+}
+
+/// The sellable unit — every product has at least one variant (a simple
+/// product just has one named e.g. "Default"), so inventory/cart/pricing
+/// always reference a variant, never a bare product.
+model ProductVariant {
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  sku           String   @unique
+  name          String
+  priceOverride Decimal? @map("price_override") @db.Decimal(10, 2)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventoryItems InventoryItem[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id         String   @id @default(uuid())
+  productId  String   @map("product_id")
+  storageKey String   @map("storage_key")
+  altText    String?  @map("alt_text")
+  position   Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+/// Location stored as PostGIS geography (blueprint Section N) even though no
+/// module queries it spatially until Phase 8 (geofencing/service-area) — the
+/// column type is set correctly now to avoid a later migration. `Unsupported`
+/// because Prisma Client can't natively type PostGIS columns; read/write it
+/// via raw SQL when a future phase needs to (see prisma/seed.ts).
+model FulfillmentHub {
+  id        String                                @id @default(uuid())
+  name      String
+  code      String                                @unique
+  address   String
+  location  Unsupported("geography(Point, 4326)")
+  isActive  Boolean                               @default(true) @map("is_active")
+  createdAt DateTime                              @default(now()) @map("created_at")
+  updatedAt DateTime                              @updatedAt @map("updated_at")
+
+  inventoryItems InventoryItem[]
+  deliveries     Delivery[]
+  homeDrones     Drone[]
+
+  @@map("fulfillment_hubs")
+}
+
+model InventoryItem {
+  id                String   @id @default(uuid())
+  variantId         String   @map("variant_id")
+  hubId             String   @map("hub_id")
+  quantityOnHand    Int      @default(0) @map("quantity_on_hand")
+  lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  variant        ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  hub            FulfillmentHub  @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
+
+  @@unique([variantId, hubId])
+  @@index([hubId])
+  @@map("inventory_items")
+}
+
+enum StockMovementType {
+  RECEIPT
+  SALE
+  ADJUSTMENT
+  RETURN
+}
+
+/// Append-only audit trail for every quantity change (blueprint Section N).
+model StockMovement {
+  id              String            @id @default(uuid())
+  inventoryItemId String            @map("inventory_item_id")
+  type            StockMovementType
+  quantityDelta   Int               @map("quantity_delta")
+  reason          String?
+  actorId         String?           @map("actor_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryItemId, createdAt])
+  @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------------------
+// Cart / Wishlist (Phase 3 — foundational only, per explicit Phase 3 scope
+// decision recorded in docs/CURRENT_STATUS.md: authenticated-customer,
+// server-persisted CRUD only. No guest cart/IndexedDB merge, no checkout, no
+// addresses — those remain Phase 4 per docs/ROADMAP.md.)
+// ---------------------------------------------------------------------------
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String   @map("cart_id")
+  productId String   @map("product_id")
+  variantId String   @map("variant_id")
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+  @@map("cart_items")
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("wishlist_items")
+}
+
+// ---------------------------------------------------------------------------
+// Checkout / Orders / Payments (Phase 4)
+//
+// Deviation from docs/prompts/phase-04-checkout-orders.md, recorded here per
+// project convention: that prompt says "address fields on User" (embedded,
+// singular); blueprint Section E explicitly lists "saved addresses" (plural)
+// as a storefront feature. A proper one-to-many CustomerAddress table is used
+// instead — the more correct, extensible design matching the plural spec, and
+// standard for any real e-commerce app. See docs/ARCHITECTURE.md.
+//
+// Order state machine is the Phase 4 subset of blueprint Section Q: orders
+// stop at Confirmed/PaymentFailed/Cancelled — HubAssigned onward is Phase 5+.
+// ---------------------------------------------------------------------------
+
+model CustomerAddress {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  label         String?
+  recipientName String   @map("recipient_name")
+  line1         String
+  line2         String?
+  city          String
+  state         String?
+  postalCode    String   @map("postal_code")
+  country       String   @default("US")
+  phone         String?
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+  @@map("customer_addresses")
+}
+
+enum OrderStatus {
+  CREATED
+  PAYMENT_PENDING
+  PAID
+  CONFIRMED
+  PAYMENT_FAILED
+  CANCELLED
+}
+
+/// One order per checkout attempt. `shippingAddress` is a point-in-time JSON
+/// snapshot (never mutates even if the source CustomerAddress later changes);
+/// `addressId` is kept only as a soft, nullable back-reference for
+/// convenience/analytics (SetNull if the address is later deleted).
+model Order {
+  id              String      @id @default(uuid())
+  orderNumber     String      @unique @map("order_number")
+  userId          String      @map("user_id")
+  addressId       String?     @map("address_id")
+  status          OrderStatus @default(CREATED)
+  shippingAddress Json        @map("shipping_address")
+  deliverySlot    String?     @map("delivery_slot")
+  subtotal        Decimal     @db.Decimal(10, 2)
+  deliveryFee     Decimal     @default(0) @map("delivery_fee") @db.Decimal(10, 2)
+  taxAmount       Decimal     @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount  Decimal     @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
+  currency        String      @default("USD")
+  cancelledAt     DateTime?   @map("cancelled_at")
+  cancelReason    String?     @map("cancel_reason")
+  confirmedAt     DateTime?   @map("confirmed_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  address  CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  items    OrderItem[]
+  payment  Payment?
+  delivery Delivery?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+/// Line items snapshot product/variant name, SKU, and price at order time —
+/// catalog changes after the fact must never alter a historical order.
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String   @map("order_id")
+  productId   String   @map("product_id")
+  variantId   String   @map("variant_id")
+  productName String   @map("product_name")
+  variantName String   @map("variant_name")
+  sku         String
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  quantity    Int
+  lineTotal   Decimal  @map("line_total") @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+enum PaymentProviderType {
+  SIMULATED
+  STRIPE
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+/// One payment record per order. `providerReference` is the provider's own
+/// id for the charge/intent (e.g. a Stripe PaymentIntent id) — used to
+/// correlate an inbound webhook back to this row.
+model Payment {
+  id                String              @id @default(uuid())
+  orderId           String              @unique @map("order_id")
+  provider          PaymentProviderType
+  status            PaymentStatus       @default(PENDING)
+  amount            Decimal             @db.Decimal(10, 2)
+  currency          String              @default("USD")
+  providerReference String?             @map("provider_reference")
+  failureReason     String?             @map("failure_reason")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  order  Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events PaymentEvent[]
+
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+/// Idempotency ledger for provider callbacks (webhooks or the simulated
+/// provider's own confirmation step, which is routed through the exact same
+/// code path). The unique constraint is what makes duplicate delivery of the
+/// same event a no-op instead of a double state transition / double stock
+/// effect — enforced at the database level, safe under concurrent delivery.
+model PaymentEvent {
+  id              String              @id @default(uuid())
+  paymentId       String?             @map("payment_id")
+  provider        PaymentProviderType
+  providerEventId String              @map("provider_event_id")
+  type            String
+  payload         Json?
+  processedAt     DateTime            @default(now()) @map("processed_at")
+
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@map("payment_events")
+}
+
+// ---------------------------------------------------------------------------
+// Delivery Management (Phase 5)
+//
+// One Delivery per Order (1:1), created reactively when OrdersModule emits
+// `order.confirmed` — never by a direct cross-module call (see
+// docs/ARCHITECTURE.md "Delivery Management"). `deliveryAddress` is copied
+// verbatim from the already-immutable `Order.shippingAddress` snapshot, not
+// re-derived from the (mutable) `CustomerAddress` — no duplication of order
+// line items here; package contents are read through the `order` relation
+// at display time instead of being denormalized onto Delivery.
+//
+// Status vocabulary matches blueprint Section Q's canonical
+// Order/Delivery/Mission chain (`HubAssigned -> ... -> Completed`) so this
+// phase doesn't invent its own naming that a later phase would have to
+// reconcile. Until Phase 6/7 introduce real Drone/Mission entities, every
+// transition from `HubAssigned` through `DeliveredPendingVerification` is
+// **manually** advanced by a Delivery Coordinator — none of it is
+// drone/mission-driven yet, per the phase-05 prompt's explicit instruction.
+// ---------------------------------------------------------------------------
+
+enum DeliveryStatus {
+  PENDING_ASSIGNMENT
+  HUB_ASSIGNED
+  MISSION_PLANNED
+  DRONE_DISPATCHED
+  IN_TRANSIT
+  ARRIVED_AT_DESTINATION
+  DELIVERED_PENDING_VERIFICATION
+  COMPLETED
+  VERIFICATION_FAILED
+  REDELIVERY_SCHEDULED
+  CANCELLED
+  RETURNED_TO_HUB
+}
+
+enum DeliveryPriority {
+  STANDARD
+  EXPRESS
+}
+
+enum DeliveryVerificationMethod {
+  OTP
+  QR
+}
+
+/// `verificationCodeHash` is the only trace of the verification secret ever
+/// persisted (SHA-256, same convention as `token.util.ts`'s email/reset
+/// tokens) — the raw code is never written to Postgres. It lives briefly,
+/// TTL-bound, in Redis so the owning customer can (re-)view it while it's
+/// valid; see `DeliveryService` for the full rationale.
+model Delivery {
+  id                    String           @id @default(uuid())
+  orderId               String           @unique @map("order_id")
+  hubId                 String?          @map("hub_id")
+  status                DeliveryStatus   @default(PENDING_ASSIGNMENT)
+  priority              DeliveryPriority @default(STANDARD)
+  deliveryAddress       Json             @map("delivery_address")
+  specialInstructions   String?          @map("special_instructions")
+  scheduledWindowStart  DateTime?        @map("scheduled_window_start")
+  scheduledWindowEnd    DateTime?        @map("scheduled_window_end")
+  estimatedDeliveryAt   DateTime?        @map("estimated_delivery_at")
+  verificationCodeHash  String?          @map("verification_code_hash")
+  verificationExpiresAt DateTime?        @map("verification_expires_at")
+  verificationAttempts  Int              @default(0) @map("verification_attempts")
+  verifiedAt            DateTime?        @map("verified_at")
+  cancelledAt           DateTime?        @map("cancelled_at")
+  cancelReason          String?          @map("cancel_reason")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  hub             FulfillmentHub?  @relation(fields: [hubId], references: [id], onDelete: SetNull)
+  events          DeliveryEvent[]
+  proofOfDelivery ProofOfDelivery?
+  mission         Mission?
+
+  @@index([status])
+  @@index([hubId])
+  @@index([createdAt])
+  @@map("deliveries")
+}
+
+/// Append-only status timeline — the same "immutable audit trail" pattern as
+/// `StockMovement`. `actorId` is null for system-triggered transitions (e.g.
+/// the initial `PENDING_ASSIGNMENT` row created off `order.confirmed`).
+model DeliveryEvent {
+  id         String          @id @default(uuid())
+  deliveryId String          @map("delivery_id")
+  fromStatus DeliveryStatus? @map("from_status")
+  toStatus   DeliveryStatus  @map("to_status")
+  note       String?
+  actorId    String?         @map("actor_id")
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId, createdAt])
+  @@map("delivery_events")
+}
+
+/// Created once, at successful OTP/QR verification. `imageStorageKey` is an
+/// optional MinIO object (uploaded separately by a coordinator, the same
+/// upload pattern as `ProductImage`) — there is no drone/camera to auto-
+/// capture a photo yet, so this is a manual, honest placeholder for that seam.
+model ProofOfDelivery {
+  id              String                     @id @default(uuid())
+  deliveryId      String                     @unique @map("delivery_id")
+  method          DeliveryVerificationMethod
+  imageStorageKey String?                    @map("image_storage_key")
+  recipientNote   String?                    @map("recipient_note")
+  verifiedAt      DateTime                   @default(now()) @map("verified_at")
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@map("proof_of_deliveries")
+}
+
+// ---------------------------------------------------------------------------
+// Drone & Fleet Management (Phase 6)
+//
+// Scope decision (recorded here per project convention): docs/ROADMAP.md and
+// docs/prompts/phase-06-drone-fleet-management.md scope Phase 6 to the drone
+// registry + simulator only ("no missions" is explicit in the phase-06
+// prompt's "Do NOT implement yet" list), with Mission/Waypoint/MissionEvent
+// deferred to Phase 7. The user's live Phase 6 kickoff instructions for this
+// session explicitly and extensively requested mission creation/lifecycle,
+// waypoints, a mission engine, and full delivery-to-mission integration NOW,
+// while explicitly excluding Phase 7's realtime WebSocket transport/live map
+// and Phase 8/9's weather/geofencing/AI route optimization. Resolved toward
+// the more detailed, current instruction: this phase pulls forward the
+// non-realtime portions of Phase 7 (Mission/Waypoint/MissionEvent + a
+// deterministic mission engine) while deliberately leaving out Socket.IO/live
+// map UI (still Phase 7) and AI/weather/geofencing (Phase 8/9). See
+// docs/ARCHITECTURE.md "Drone & Fleet Management" for the full writeup.
+//
+// `TelemetrySample` is NOT partitioned by day as blueprint Section N
+// describes for the eventual high-write table — Prisma has no native
+// partitioning support, and Phase 6/7's simulated telemetry volume is far
+// below what would need it. A plain indexed table is used instead, with the
+// partitioning upgrade documented as a future step if real telemetry volume
+// ever demands it (same "deviate now, document the upgrade path" pattern as
+// prior phases).
+// ---------------------------------------------------------------------------
+
+enum DroneAdapterType {
+  SIMULATED
+  MAVLINK
+}
+
+enum DroneStatus {
+  IDLE
+  ASSIGNED
+  ARMED
+  IN_FLIGHT
+  RETURNING
+  LANDED
+  CHARGING
+  MAINTENANCE
+  EMERGENCY
+  OFFLINE
+}
+
+/// A registered fleet drone. Live flight fields (`currentLat`/`currentLng`/
+/// `altitudeMeters`/`speedMps`/`headingDegrees`/`batteryPercent`/
+/// `signalStrengthPercent`) are updated by `TelemetryService.ingest()` — the
+/// single write path for both the in-process mission-engine simulation and
+/// the standalone `services/drone-simulator` process's telemetry-ingest
+/// calls, so a Drone row always reflects the most recent sample regardless of
+/// which adapter produced it.
+model Drone {
+  id                     String           @id @default(uuid())
+  serialNumber           String           @unique @map("serial_number")
+  name                   String
+  model                  String
+  adapterType            DroneAdapterType @default(SIMULATED) @map("adapter_type")
+  status                 DroneStatus      @default(IDLE)
+  homeHubId              String?          @map("home_hub_id")
+  batteryPercent         Int              @default(100) @map("battery_percent")
+  batteryHealthPercent   Int              @default(100) @map("battery_health_percent")
+  batteryCycles          Int              @default(0) @map("battery_cycles")
+  currentLat             Float?           @map("current_lat")
+  currentLng             Float?           @map("current_lng")
+  altitudeMeters         Float?           @map("altitude_meters")
+  speedMps               Float?           @map("speed_mps")
+  headingDegrees         Float?           @map("heading_degrees")
+  signalStrengthPercent  Int?             @map("signal_strength_percent")
+  maxPayloadKg           Float            @default(2.5) @map("max_payload_kg")
+  maxRangeKm             Float            @default(10) @map("max_range_km")
+  maxSpeedMps            Float            @default(15) @map("max_speed_mps")
+  maxAltitudeMeters      Float            @default(120) @map("max_altitude_meters")
+  isMaintenanceMode      Boolean          @default(false) @map("is_maintenance_mode")
+  maintenanceNote        String?          @map("maintenance_note")
+  lastMaintenanceAt      DateTime?        @map("last_maintenance_at")
+  lastTelemetryAt        DateTime?        @map("last_telemetry_at")
+  totalFlightHours       Float            @default(0) @map("total_flight_hours")
+  totalMissionsCompleted Int              @default(0) @map("total_missions_completed")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+
+  homeHub             FulfillmentHub?      @relation(fields: [homeHubId], references: [id], onDelete: SetNull)
+  missions            Mission[]
+  healthLogs          DroneHealthLog[]
+  batteryLogs         BatteryLog[]
+  telemetrySamples    TelemetrySample[]
+  visionAnalyses      VisionAnalysis[]
+  swarmMemberships    SwarmMember[]
+  swarmAssignments    SwarmAssignment[]
+  simulationScenarios SimulationScenario[]
+
+  @@index([status])
+  @@index([homeHubId])
+  @@map("drones")
+}
+
+/// Append-only status/health timeline — same audit-trail pattern as
+/// `StockMovement`/`DeliveryEvent`. Written on every status change and on
+/// every fault condition (low battery, signal loss, emergency).
+model DroneHealthLog {
+  id         String      @id @default(uuid())
+  droneId    String?     @map("drone_id")
+  status     DroneStatus
+  note       String?
+  metadata   Json?
+  recordedAt DateTime    @default(now()) @map("recorded_at")
+
+  drone Drone? @relation(fields: [droneId], references: [id], onDelete: SetNull)
+
+  @@index([droneId, recordedAt])
+  @@map("drone_health_logs")
+}
+
+/// Append-only battery-level samples, written by `TelemetryService.ingest()`
+/// on every telemetry sample so battery-drain history is queryable
+/// independent of the higher-frequency `TelemetrySample` table.
+model BatteryLog {
+  id             String   @id @default(uuid())
+  droneId        String?  @map("drone_id")
+  batteryPercent Int      @map("battery_percent")
+  event          String?
+  recordedAt     DateTime @default(now()) @map("recorded_at")
+
+  drone Drone? @relation(fields: [droneId], references: [id], onDelete: SetNull)
+
+  @@index([droneId, recordedAt])
+  @@map("battery_logs")
+}
+
+enum MissionType {
+  DELIVERY
+  RETURN_TO_HOME
+}
+
+enum MissionStatus {
+  PLANNED
+  DISPATCHED
+  IN_PROGRESS
+  RETURNING
+  COMPLETED
+  ABORTED
+}
+
+/// NOMINAL unless an in-flight (or pre-dispatch) safety condition is
+/// currently active. `LOW_BATTERY`/`EMERGENCY`/`GEOFENCE_BREACH` are severe
+/// enough to also change `status` (RETURNING / ABORTED); `SIGNAL_LOSS` is
+/// transient and can clear back to NOMINAL on a later simulated tick
+/// without necessarily aborting the mission. `WEATHER_HOLD` (Phase 8) is
+/// set at mission-planning time when weather is unsafe at the origin, or
+/// mid-flight on weather escalation — unlike the other severe states it
+/// does NOT abort the mission; it blocks `start()` from dispatching (or
+/// triggers RTH if already flying) until a recheck clears it — see
+/// `MissionsService`'s safety-gate logic and `docs/ARCHITECTURE.md`'s
+/// "Weather, Geofencing, and Safety" section.
+enum MissionSafetyState {
+  NOMINAL
+  LOW_BATTERY
+  SIGNAL_LOSS
+  EMERGENCY
+  WEATHER_HOLD
+  GEOFENCE_BREACH
+}
+
+/// Phase 9 — `DeliveryRiskAnalyzer`'s output tier. Distinct from
+/// `MissionSafetyState`: safety states represent an active hard-safety
+/// condition the mission engine itself detected (weather/geofence/battery/
+/// signal), where this represents a computed, explainable *risk estimate*
+/// gating a human approval step before dispatch — see `requiresApproval`
+/// below and `docs/ARCHITECTURE.md`'s AI Intelligence section.
+enum MissionRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// One Mission per Delivery (1:1) — created explicitly by a Delivery
+/// Coordinator/Fleet Manager once a delivery has a hub assigned (Phase 5),
+/// bridging Delivery to the Drone/simulated-flight layer. `originLat/Lng` is
+/// the assigned hub's real PostGIS coordinate; `destinationLat/Lng` is a
+/// deterministic placeholder derived from the delivery id (no real
+/// geocoding exists until a future phase — see `MissionsService.resolveDestination()`).
+/// `riskScore`/`riskLevel`/`requiresApproval`/`approvedBy`/`approvedAt`
+/// (Phase 9) are the one AI-decision outcome that needs to be queried
+/// synchronously on every `start()` call (the approval gate) — everything
+/// else the AI layer computes (route alternatives, ETA factors, drone
+/// rankings) lives in `AiDecisionLog` instead, per "don't store every
+/// transient calculation."
+model Mission {
+  id               String             @id @default(uuid())
+  deliveryId       String             @unique @map("delivery_id")
+  droneId          String?            @map("drone_id")
+  operatorId       String?            @map("operator_id")
+  type             MissionType        @default(DELIVERY)
+  status           MissionStatus      @default(PLANNED)
+  safetyState      MissionSafetyState @default(NOMINAL) @map("safety_state")
+  originLat        Float              @map("origin_lat")
+  originLng        Float              @map("origin_lng")
+  destinationLat   Float              @map("destination_lat")
+  destinationLng   Float              @map("destination_lng")
+  rthTriggered     Boolean            @default(false) @map("rth_triggered")
+  abortReason      String?            @map("abort_reason")
+  riskScore        Float?             @map("risk_score")
+  riskLevel        MissionRiskLevel?  @map("risk_level")
+  requiresApproval Boolean            @default(false) @map("requires_approval")
+  approvedById     String?            @map("approved_by_id")
+  approvedAt       DateTime?          @map("approved_at")
+  plannedAt        DateTime           @default(now()) @map("planned_at")
+  startedAt        DateTime?          @map("started_at")
+  arrivedAt        DateTime?          @map("arrived_at")
+  completedAt      DateTime?          @map("completed_at")
+  abortedAt        DateTime?          @map("aborted_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  delivery         Delivery          @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  drone            Drone?            @relation(fields: [droneId], references: [id], onDelete: SetNull)
+  operator         User?             @relation("MissionOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  approvedBy       User?             @relation("MissionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  waypoints        Waypoint[]
+  events           MissionEvent[]
+  telemetrySamples TelemetrySample[]
+
+  @@index([status])
+  @@index([droneId])
+  @@index([createdAt])
+  @@map("missions")
+}
+
+enum WaypointStatus {
+  PENDING
+  REACHED
+  SKIPPED
+}
+
+/// A naive straight-line route (blueprint/roadmap's explicit Phase-7-v1
+/// "waypoint queue, straight-line" — pulled forward here since a mission
+/// needs *some* route to fly; AI-optimized routing is Phase 9's
+/// `RouteOptimizer`, not this).
+model Waypoint {
+  id             String         @id @default(uuid())
+  missionId      String         @map("mission_id")
+  sequence       Int
+  lat            Float
+  lng            Float
+  altitudeMeters Float          @default(60) @map("altitude_meters")
+  status         WaypointStatus @default(PENDING)
+  reachedAt      DateTime?      @map("reached_at")
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, sequence])
+  @@map("waypoints")
+}
+
+/// Append-only mission timeline — dispatch/progress/RTH/override/abort, the
+/// same audit-trail pattern as `DeliveryEvent`. `actorId` is set only for
+/// human-triggered entries (start, operator override); null for
+/// simulation-driven entries (waypoint reached, low-battery RTH trigger).
+model MissionEvent {
+  id         String         @id @default(uuid())
+  missionId  String         @map("mission_id")
+  type       String
+  fromStatus MissionStatus? @map("from_status")
+  toStatus   MissionStatus? @map("to_status")
+  actorId    String?        @map("actor_id")
+  note       String?
+  metadata   Json?
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId, createdAt])
+  @@index([type, createdAt])
+  @@map("mission_events")
+}
+
+/// High-frequency telemetry samples — written by `TelemetryService.ingest()`,
+/// the single path both the in-process mission-engine simulation and the
+/// standalone `services/drone-simulator` process's HTTP ingest calls go
+/// through. See the "Phase 6" note above re: not partitioned by day.
+model TelemetrySample {
+  id                    String   @id @default(uuid())
+  droneId               String?  @map("drone_id")
+  missionId             String?  @map("mission_id")
+  lat                   Float
+  lng                   Float
+  altitudeMeters        Float?   @map("altitude_meters")
+  speedMps              Float?   @map("speed_mps")
+  headingDegrees        Float?   @map("heading_degrees")
+  batteryPercent        Int      @map("battery_percent")
+  signalStrengthPercent Int?     @map("signal_strength_percent")
+  recordedAt            DateTime @default(now()) @map("recorded_at")
+
+  drone   Drone?   @relation(fields: [droneId], references: [id], onDelete: SetNull)
+  mission Mission? @relation(fields: [missionId], references: [id], onDelete: SetNull)
+
+  @@index([droneId, recordedAt])
+  @@index([missionId, recordedAt])
+  @@map("telemetry_samples")
+}
+
+/// `SERVICE_AREA` — a mission's destination must fall inside at least one
+/// active zone of this type for the delivery to be servicable by drone (if
+/// none are configured at all, the check is permissive — see
+/// `GeofencingService.checkServiceArea`, a deliberate "no policy configured
+/// yet" default matching Phase 4's `ServiceAreaChecker` stub philosophy).
+/// `NO_FLY`/`RESTRICTED` — a mission's route must not intersect any active
+/// zone of either type; `RESTRICTED` also covers "airport/restricted-area
+/// proximity" per the phase-08 prompt — modeled as an ordinary polygon (a
+/// buffered circle around the restricted point, drawn once at creation
+/// time) rather than a second geometry kind, so every containment/
+/// intersection query stays one code path (`ST_Contains`/`ST_Intersects`
+/// against `polygon`, never hand-rolled distance math, per
+/// `PROJECT_CONTEXT.md` #5).
+enum GeofenceType {
+  SERVICE_AREA
+  NO_FLY
+  RESTRICTED
+}
+
+/// Polygon-only by design (see `GeofenceType` doc above) — `Unsupported`
+/// because Prisma Client can't natively type PostGIS columns; read/written
+/// via raw SQL (`GeofencingService`), same convention as
+/// `FulfillmentHub.location`. `geometry(Polygon,4326)` rather than
+/// `geography` (used by `FulfillmentHub.location`) because `ST_Contains`/
+/// `ST_Intersects` — the only predicates this table needs — operate on
+/// `geometry`, not `geography`, without a cast; distance-based queries
+/// aren't needed here since proximity zones are pre-buffered into polygons.
+model Geofence {
+  id          String                                @id @default(uuid())
+  name        String
+  type        GeofenceType
+  description String?
+  polygon     Unsupported("geometry(Polygon,4326)")
+  isActive    Boolean                               @default(true) @map("is_active")
+  createdById String?                               @map("created_by_id")
+  createdAt   DateTime                              @default(now()) @map("created_at")
+  updatedAt   DateTime                              @updatedAt @map("updated_at")
+
+  createdBy User? @relation("GeofenceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([type, isActive])
+  @@map("geofences")
+}
+
+enum WeatherCondition {
+  CLEAR
+  CLOUDY
+  RAIN
+  STORM
+  SNOW
+  FOG
+}
+
+enum WeatherProviderSource {
+  LOCAL
+  OPEN_METEO
+}
+
+/// Append-only, per blueprint Section V ("stored historically... for
+/// analytics and post-incident review") — a fresh row is inserted whenever
+/// `WeatherService`'s cache TTL expires for a zone, never updated in place.
+/// `zoneKey` is an opaque cache/grouping key (`hub:<hubId>` today — see
+/// `WeatherService.hubZoneKey`), not a foreign key, so weather can be looked
+/// up for any lat/lng grouping a future caller needs without a schema
+/// change.
+model WeatherSnapshot {
+  id                   String                @id @default(uuid())
+  zoneKey              String                @map("zone_key")
+  lat                  Float
+  lng                  Float
+  windSpeedMps         Float                 @map("wind_speed_mps")
+  windDirectionDegrees Float?                @map("wind_direction_degrees")
+  precipitationMm      Float                 @map("precipitation_mm")
+  temperatureCelsius   Float                 @map("temperature_celsius")
+  condition            WeatherCondition
+  source               WeatherProviderSource
+  fetchedAt            DateTime              @default(now()) @map("fetched_at")
+
+  @@index([zoneKey, fetchedAt])
+  @@map("weather_snapshots")
+}
+
+enum AiDecisionType {
+  ROUTE_OPTIMIZATION
+  ETA_PREDICTION
+  RISK_ASSESSMENT
+  DRONE_RECOMMENDATION
+  REROUTE
+}
+
+/// Phase 9 — one append-only, auditable record per *final* AI decision
+/// (never every transient candidate/scoring pass considered along the way,
+/// per the phase instruction "do not store every transient calculation").
+/// `deliveryId`/`missionId` are loose string references, not FK relations —
+/// the same convention `AuditLog.targetId` already uses — because a
+/// decision can legitimately predate a `Mission` row (an ETA prediction at
+/// hub-assignment time has only a `deliveryId`) and because this is a log,
+/// not a queried-by-join entity. `inputs`/`outputs` are the full
+/// versioned, explainable payload (candidates considered, factors, reason
+/// codes); `summary` is the one-line human-readable explanation surfaced
+/// directly in the admin UI without needing to parse JSON.
+model AiDecisionLog {
+  id         String         @id @default(uuid())
+  type       AiDecisionType
+  deliveryId String?        @map("delivery_id")
+  missionId  String?        @map("mission_id")
+  summary    String
+  inputs     Json
+  outputs    Json
+  score      Float?
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  @@index([deliveryId, createdAt])
+  @@index([missionId, createdAt])
+  @@index([type, createdAt])
+  @@map("ai_decision_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Analytics (Phase 10)
+//
+// Scope decision (recorded here per project convention): `docs/ROADMAP.md`
+// and `docs/prompts/phase-10-analytics.md` describe an `AnalyticsEventRaw`
+// append-only capture table plus BullMQ background jobs computing scheduled
+// rollups. This session's live kickoff instructions explicitly said to
+// "prefer live database aggregation over premature data warehousing," "do
+// not create redundant warehouse tables unless the approved Phase 10
+// architecture explicitly requires them," and to justify any cache
+// introduced — the opposite emphasis from precomputed rollups. Resolved
+// toward the more detailed, current instruction: Phase 10 adds no new
+// tables at all. `AnalyticsService` computes every KPI with bounded,
+// indexed, on-demand aggregate queries directly over the existing
+// operational tables (`orders`, `payments`, `deliveries`, `missions`,
+// `mission_events`, `drones`, `battery_logs`, `ai_decision_logs`,
+// `inventory_items`) — see `docs/ARCHITECTURE.md`'s "Analytics" section for
+// the full query design and the one place a short-TTL Redis cache is used
+// (the dashboard-summary endpoint only, documented there). BullMQ itself
+// remains unintroduced (`docker-compose.yml` already provisions Redis for
+// it per `PROJECT_CONTEXT.md`, but no phase through Phase 9 has actually
+// wired a queue) — nothing in this phase's bounded, read-only aggregation
+// needed background job scheduling. The five new `@@index([createdAt])`/
+// `@@index([type, createdAt])`/`@@index([status, createdAt])` additions
+// above (on `orders`, `payments`, `deliveries`, `missions`, `mission_events`)
+// exist specifically for this phase's date-range-filtered aggregate queries.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Advanced Drone Intelligence (Phase 11)
+//
+// Scope decision (recorded here per project convention -- see
+// docs/ARCHITECTURE.md's "Advanced Drone Intelligence" section for the full
+// writeup): the written docs/ROADMAP.md / docs/prompts/phase-11-*.md scope
+// this phase as DemandForecaster/PredictiveMaintenance plus interface-level
+// hooks only for computer vision, swarm coordination, and digital-twin
+// simulation ("do not over-build them"). This session's live kickoff
+// instead specified full, simulation-first modular systems for computer
+// vision, landing-zone intelligence, visual navigation, swarm coordination/
+// load-balancing, and digital-twin simulation -- and did not request
+// DemandForecaster/PredictiveMaintenance at all. Per the explicit user
+// decision recorded for this session, the live kickoff's scope is what's
+// implemented below; forecasting/predictive-maintenance are not part of
+// this phase.
+//
+// Every new capability builds on the *existing* domain services rather
+// than a parallel implementation: landing-zone/route/simulation logic all
+// call GeofencingService/WeatherService/the Phase 9 AI heuristics
+// (HeuristicRouteOptimizer, evaluateBatteryFeasibility, scoreDeliveryRisk,
+// rankDroneCandidates) directly rather than reimplementing route, weather,
+// or risk logic. Digital-twin simulation runs are deliberately NOT routed
+// through AiService's decision-log wrapper -- that would mix simulated/
+// dry-run entries into AiDecisionLog, the audit trail for *real* dispatch
+// decisions (Part 12's "isolated from production mission state").
+//
+// No table stores raw camera frames or full simulation internals -- vision
+// analyses store structured, bounded detection summaries; simulation runs
+// store computed results and named risk findings, never a full internal
+// trace. "Shared route intelligence" (Part 8) intentionally introduces NO
+// new table: RouteIntelligenceService derives auditable observations live
+// from existing Mission/MissionEvent/BatteryLog rows within a bounded
+// lookback/sample cap, the same "prefer live aggregation over premature
+// warehousing" principle Phase 10 established.
+// ---------------------------------------------------------------------------
+
+enum VisionDetectionClass {
+  PERSON
+  VEHICLE
+  ANIMAL
+  OBSTACLE
+  STRUCTURE
+  VEGETATION
+  OPEN_GROUND
+}
+
+enum LandingZoneVerdict {
+  SUITABLE
+  MARGINAL
+  UNSUITABLE
+}
+
+enum SwarmStatus {
+  ACTIVE
+  DISBANDED
+}
+
+enum SwarmMemberRole {
+  LEADER
+  FOLLOWER
+}
+
+enum SwarmPlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SimulationStatus {
+  COMPLETED
+  FAILED
+}
+
+enum SimulationRiskCategory {
+  LOW_BATTERY
+  UNSAFE_LANDING_ZONE
+  ROUTE_OBSTRUCTION
+  GEOFENCE_CONFLICT
+  WEATHER_CONFLICT
+  PAYLOAD_CONSTRAINT
+  DRONE_AVAILABILITY_CONFLICT
+}
+
+enum SimulationRiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// One append-only row per simulated computer-vision frame analysis
+/// (ComputerVisionAdapter.analyzeFrame()) -- never a raw frame/image,
+/// always the structured, bounded output (`objects` is a small JSON array
+/// of `{class, confidence, boundingBox?}`). `missionId`/`deliveryId` are
+/// loose string references (same convention as `AiDecisionLog`) since an
+/// analysis can be requested standalone (admin CV demo) with neither.
+model VisionAnalysis {
+  id                        String   @id @default(uuid())
+  droneId                   String?  @map("drone_id")
+  missionId                 String?  @map("mission_id")
+  deliveryId                String?  @map("delivery_id")
+  lat                       Float
+  lng                       Float
+  altitudeMeters            Float    @map("altitude_meters")
+  objects                   Json
+  landingZoneCandidateCount Int      @default(0) @map("landing_zone_candidate_count")
+  obstructed                Boolean  @default(false)
+  humanDetected             Boolean  @default(false) @map("human_detected")
+  modelProvider             String   @default("SIMULATED") @map("model_provider")
+  summary                   String
+  createdAt                 DateTime @default(now()) @map("created_at")
+
+  drone                  Drone?                  @relation(fields: [droneId], references: [id], onDelete: SetNull)
+  landingZoneEvaluations LandingZoneEvaluation[]
+
+  @@index([droneId, createdAt])
+  @@index([missionId, createdAt])
+  @@map("vision_analyses")
+}
+
+/// A scored evaluation of one candidate landing zone (Part 2). Never
+/// bypasses geofencing -- LandingZoneService calls the existing
+/// GeofencingService.findPointViolations() for the safety component.
+model LandingZoneEvaluation {
+  id               String             @id @default(uuid())
+  missionId        String?            @map("mission_id")
+  deliveryId       String?            @map("delivery_id")
+  visionAnalysisId String?            @map("vision_analysis_id")
+  lat              Float
+  lng              Float
+  radiusMeters     Float              @map("radius_meters")
+  sizeScore        Int                @map("size_score")
+  obstructionScore Int                @map("obstruction_score")
+  safetyScore      Int                @map("safety_score")
+  proximityScore   Int                @map("proximity_score")
+  suitabilityScore Int                @map("suitability_score")
+  verdict          LandingZoneVerdict
+  reasons          Json
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  visionAnalysis VisionAnalysis? @relation(fields: [visionAnalysisId], references: [id], onDelete: SetNull)
+
+  @@index([missionId, createdAt])
+  @@index([deliveryId, createdAt])
+  @@map("landing_zone_evaluations")
+}
+
+/// A named group of drones for cooperative planning (Part 4) -- a
+/// simulation/planning construct, not a claim that multiple physical UAVs
+/// are flying a coordinated formation.
+model Swarm {
+  id          String      @id @default(uuid())
+  name        String
+  status      SwarmStatus @default(ACTIVE)
+  createdById String?     @map("created_by_id")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  createdBy User?         @relation("SwarmCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  members   SwarmMember[]
+  plans     SwarmPlan[]
+
+  @@map("swarms")
+}
+
+model SwarmMember {
+  id       String          @id @default(uuid())
+  swarmId  String          @map("swarm_id")
+  droneId  String          @map("drone_id")
+  role     SwarmMemberRole @default(FOLLOWER)
+  joinedAt DateTime        @default(now()) @map("joined_at")
+
+  swarm Swarm @relation(fields: [swarmId], references: [id], onDelete: Cascade)
+  drone Drone @relation(fields: [droneId], references: [id], onDelete: Cascade)
+
+  @@unique([swarmId, droneId])
+  @@index([droneId])
+  @@map("swarm_members")
+}
+
+/// One cooperative task-allocation pass over a swarm's member drones (Part
+/// 4/5) -- SwarmPlanningService computes SwarmAssignment rows via the same
+/// explainable scoring DroneSelectionService already uses for a
+/// single-drone recommendation, applied greedily across a batch of delivery
+/// targets so no drone is double-booked within one plan.
+model SwarmPlan {
+  id          String          @id @default(uuid())
+  swarmId     String          @map("swarm_id")
+  status      SwarmPlanStatus @default(DRAFT)
+  objective   String
+  summary     String
+  createdById String?         @map("created_by_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  swarm       Swarm             @relation(fields: [swarmId], references: [id], onDelete: Cascade)
+  createdBy   User?             @relation("SwarmPlanCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments SwarmAssignment[]
+
+  @@index([swarmId, createdAt])
+  @@map("swarm_plans")
+}
+
+model SwarmAssignment {
+  id                       String   @id @default(uuid())
+  swarmPlanId              String   @map("swarm_plan_id")
+  droneId                  String?  @map("drone_id")
+  deliveryId               String?  @map("delivery_id")
+  targetLat                Float    @map("target_lat")
+  targetLng                Float    @map("target_lng")
+  sequence                 Int
+  estimatedDistanceMeters  Float    @map("estimated_distance_meters")
+  estimatedDurationSeconds Int      @map("estimated_duration_seconds")
+  batteryFeasibility       String   @map("battery_feasibility")
+  payloadSuitable          Boolean  @map("payload_suitable")
+  score                    Int
+  reason                   String
+  createdAt                DateTime @default(now()) @map("created_at")
+
+  swarmPlan SwarmPlan @relation(fields: [swarmPlanId], references: [id], onDelete: Cascade)
+  drone     Drone?    @relation(fields: [droneId], references: [id], onDelete: SetNull)
+
+  @@index([swarmPlanId, sequence])
+  @@map("swarm_assignments")
+}
+
+/// A named, reusable "what-if" scenario for the digital twin (Part 6) -- a
+/// starting-conditions template, never a real order/delivery.
+model SimulationScenario {
+  id              String   @id @default(uuid())
+  name            String
+  createdById     String?  @map("created_by_id")
+  originLat       Float    @map("origin_lat")
+  originLng       Float    @map("origin_lng")
+  destinationLat  Float    @map("destination_lat")
+  destinationLng  Float    @map("destination_lng")
+  droneId         String?  @map("drone_id")
+  payloadKg       Float    @map("payload_kg")
+  priority        String   @default("STANDARD")
+  weatherOverride Json?    @map("weather_override")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  createdBy User?           @relation("SimulationScenarioCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  drone     Drone?          @relation(fields: [droneId], references: [id], onDelete: SetNull)
+  runs      SimulationRun[]
+
+  @@index([createdAt])
+  @@map("simulation_scenarios")
+}
+
+/// One executed simulation of a SimulationScenario -- fully isolated from
+/// production mission state (Part 12): never creates a Mission/Delivery
+/// row, never moves a real drone. Computed via the same route/battery/risk
+/// heuristics real missions use, so results are honestly comparable, not a
+/// separate toy model.
+model SimulationRun {
+  id                          String           @id @default(uuid())
+  scenarioId                  String           @map("scenario_id")
+  status                      SimulationStatus
+  routeSelected               Boolean          @map("route_selected")
+  distanceMeters              Float?           @map("distance_meters")
+  durationSeconds             Int?             @map("duration_seconds")
+  estimatedBatteryUsedPercent Float?           @map("estimated_battery_used_percent")
+  riskScore                   Float?           @map("risk_score")
+  riskLevel                   String?          @map("risk_level")
+  summary                     String
+  startedAt                   DateTime         @map("started_at")
+  completedAt                 DateTime         @map("completed_at")
+  createdAt                   DateTime         @default(now()) @map("created_at")
+
+  scenario     SimulationScenario      @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  riskFindings SimulationRiskFinding[]
+
+  @@index([scenarioId, createdAt])
+  @@map("simulation_runs")
+}
+
+model SimulationRiskFinding {
+  id              String                 @id @default(uuid())
+  simulationRunId String                 @map("simulation_run_id")
+  category        SimulationRiskCategory
+  severity        SimulationRiskSeverity
+  message         String
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  simulationRun SimulationRun @relation(fields: [simulationRunId], references: [id], onDelete: Cascade)
+
+  @@index([simulationRunId])
+  @@map("simulation_risk_findings")
+}
+
+// ---------------------------------------------------------------------------
