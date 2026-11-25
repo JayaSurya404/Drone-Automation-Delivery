@@ -307,10 +307,10 @@ describe("AI route optimization, ETA, and risk (integration)", () => {
       localWeatherProvider.setOverride(zoneKey, { windSpeedMps: 2, condition: "FOG" });
 
       const droneId = await createDrone("RISKY");
-      // Zero battery health (15/15 risk points) — a real degraded-drone
-      // scenario, set the same way `missions.integration.spec.ts` sets a
-      // drone's status directly for its own test setup.
-      await prisma.drone.update({ where: { id: droneId }, data: { batteryHealthPercent: 0, batteryPercent: 15 } });
+      // Low battery above the 20% return-to-home floor but below the 25%
+      // feasibility reserve floor, plus degraded battery health (0%) — produces
+      // a HIGH risk assessment requiring operator approval while still being dispatchable once approved.
+      await prisma.drone.update({ where: { id: droneId }, data: { batteryHealthPercent: 0, batteryPercent: 24 } });
 
       const deliveryId = await createDeliveryAtHubAssigned(`RISKY-${suffix}`, "EXPRESS"); // +5 risk points
       const missionRes = await request(app.getHttpServer()).post("/api/v1/missions").set(auth(coordinatorToken)).send({ deliveryId });
@@ -322,7 +322,7 @@ describe("AI route optimization, ETA, and risk (integration)", () => {
         .set(auth(coordinatorToken))
         .send({ droneId });
       expect(assignRes.status).toBe(201);
-      // Weather CAUTION (20) + battery INSUFFICIENT at 15% (30) + battery
+      // Weather CAUTION (20) + battery INSUFFICIENT at 24% (30) + battery
       // health 0% (15) + EXPRESS priority (5) = 70, at/above the default
       // HIGH threshold.
       expect(assignRes.body.data.riskLevel).toBe("HIGH");
@@ -347,8 +347,9 @@ describe("AI route optimization, ETA, and risk (integration)", () => {
       const doubleApprove = await request(app.getHttpServer()).post(`/api/v1/missions/${missionId}/approve`).set(auth(coordinatorToken)).send({});
       expect(doubleApprove.status).toBe(409);
 
-      // Weather is only CAUTION (never UNSAFE), so the risk gate was the
-      // only thing blocking dispatch — it now proceeds.
+      // Weather is only CAUTION (never UNSAFE), and drone battery (24%) is
+      // above the 20% return-to-home floor, so the risk gate was the
+      // only thing blocking dispatch — once approved, it proceeds.
       const startRes = await request(app.getHttpServer()).post(`/api/v1/missions/${missionId}/start`).set(auth(coordinatorToken)).send({});
       expect(startRes.status).toBe(201);
       expect(startRes.body.data.status).toBe("DISPATCHED");

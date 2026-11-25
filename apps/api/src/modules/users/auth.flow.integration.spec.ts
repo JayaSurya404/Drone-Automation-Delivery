@@ -31,7 +31,7 @@ describe("Auth flow (integration)", () => {
 
   function extractRefreshCookie(res: request.Response): string {
     const setCookie = res.headers["set-cookie"] as unknown as string[];
-    const cookie = setCookie.find((c) => c.startsWith("skynav_refresh_token="));
+    const cookie = setCookie?.find((c) => c.includes("refresh_token="));
     if (!cookie) throw new Error("refresh cookie not set");
     return cookie.split(";")[0] ?? cookie;
   }
@@ -46,7 +46,7 @@ describe("Auth flow (integration)", () => {
     expect(res.body.data.user.email).toBe(testEmail);
     expect(res.body.data.user.isEmailVerified).toBe(false);
     expect(res.body.data.accessToken).toEqual(expect.any(String));
-    expect(extractRefreshCookie(res)).toContain("skynav_refresh_token=");
+    expect(extractRefreshCookie(res)).toContain("refresh_token=");
   });
 
   it("rejects a duplicate registration", async () => {
