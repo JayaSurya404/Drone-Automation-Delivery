@@ -95,7 +95,46 @@ jobs:
       - name: Seed Database
         run: pnpm db:seed
 
+      - name: Start Built API Server
+        run: |
+          node apps/api/dist/main.js &
+          echo "Waiting for API server to become ready on http://localhost:4000/health..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health; then
+              echo "API is ready!"
+              break
+            fi
+            sleep 1
+          done
+        env:
+          PORT: 4000
+          NODE_ENV: development
+          DATABASE_URL: postgresql://skynav:skynav@localhost:5432/skynav?schema=public
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: local-dev-only-secret-change-me-1234567890abcdef
+          SKYNAV_INTERNAL_SERVICE_KEY: internal-service-secret-key-32chars
+          STORAGE_ENDPOINT: localhost
+          STORAGE_PORT: 9000
+          STORAGE_ACCESS_KEY: skynav
+          STORAGE_SECRET_KEY: skynav123
+          STORAGE_BUCKET: skynav-delivery-local
+          STORAGE_USE_SSL: false
+
       - name: Execute Full End-to-End Workflow Verification
         run: npx tsx test_full_workflow.ts
         env:
           API_URL: http://localhost:4000
+
+      - name: Install Playwright Browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        run: |
+          pnpm --filter @skynav/customer-web preview --port 5173 &
+          pnpm --filter @skynav/admin-web preview --port 5174 &
+          sleep 4
+          pnpm test:e2e
+        env:
+          CI: true
+          E2E_CUSTOMER_WEB_URL: http://localhost:5173
+          E2E_ADMIN_WEB_URL: http://localhost:5174
