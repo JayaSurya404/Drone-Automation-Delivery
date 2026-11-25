@@ -39,7 +39,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
     private readonly configService: ConfigService<EnvConfig, true>,
-  ) {}
+  ) { }
 
   @Post("register")
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -172,14 +172,11 @@ export class AuthController {
   private resolveIncomingCookie(req: Request): { name: string; token: string } | null {
     const { defaultCookie, adminCookie, customerCookie } = this.getRefreshCookieNames();
     const clientApp = req.headers["x-client-app"] as string | undefined;
-    const origin = (req.headers["origin"] as string | undefined) ?? (req.headers["referer"] as string | undefined);
-    const isAdminHint = clientApp === "admin" || (origin && origin.includes("5174"));
-    const isCustomerHint = clientApp === "customer" || (origin && origin.includes("5173"));
 
-    if (isAdminHint && req.cookies?.[adminCookie]) {
+    if (clientApp === "admin" && req.cookies?.[adminCookie]) {
       return { name: adminCookie, token: req.cookies[adminCookie] };
     }
-    if (isCustomerHint && req.cookies?.[customerCookie]) {
+    if (clientApp === "customer" && req.cookies?.[customerCookie]) {
       return { name: customerCookie, token: req.cookies[customerCookie] };
     }
     if (req.cookies?.[customerCookie]) {
@@ -206,11 +203,9 @@ export class AuthController {
 
     if (!explicitCookieName) {
       const clientApp = req?.headers["x-client-app"] as string | undefined;
-      const origin = (req?.headers["origin"] as string | undefined) ?? (req?.headers["referer"] as string | undefined);
-      const isAdminHint = clientApp === "admin" || (origin && origin.includes("5174"));
       const isStaffUser = user?.roles ? user.roles.some((r) => r !== "customer" && r !== "guest") : false;
 
-      if (isAdminHint || isStaffUser) {
+      if (clientApp === "admin" || isStaffUser) {
         cookieName = adminCookie;
       } else if (clientApp === "customer" || user) {
         cookieName = customerCookie;
@@ -224,17 +219,6 @@ export class AuthController {
       path: "/api/v1/auth",
       expires: tokens.refreshTokenExpiresAt,
     });
-
-    // In non-browser integration test runs without custom cookie names configured, ensure defaultCookie is available
-    if (cookieName !== defaultCookie && !process.env.ADMIN_REFRESH_COOKIE_NAME) {
-      res.cookie(defaultCookie, tokens.refreshToken, {
-        httpOnly: true,
-        secure: this.configService.get("NODE_ENV", { infer: true }) === "production",
-        sameSite: "lax",
-        path: "/api/v1/auth",
-        expires: tokens.refreshTokenExpiresAt,
-      });
-    }
   }
 
   private clearAllRefreshCookies(res: Response): void {
