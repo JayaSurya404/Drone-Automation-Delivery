@@ -168,15 +168,31 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
     group.clearLayers();
 
     geofences.forEach((gf) => {
+      if (!gf) return;
       if (gf.type === 'delivery' && !layers.deliveryZones) return;
       if (gf.type === 'nofly' && !layers.restrictedZones) return;
       if (gf.type === 'caution' && !layers.cautionZones) return;
+
+      const rawCoords = gf.coordinates || (gf as any).points;
+      if (!Array.isArray(rawCoords) || rawCoords.length < 3) return;
+
+      const coords: [number, number][] = rawCoords
+        .map((p: any) => {
+          if (Array.isArray(p)) return [Number(p[0]), Number(p[1])] as [number, number];
+          if (p && typeof p === 'object' && p.lat !== undefined && p.lng !== undefined) {
+            return [Number(p.lat), Number(p.lng)] as [number, number];
+          }
+          return null;
+        })
+        .filter((p): p is [number, number] => p !== null && !isNaN(p[0]) && !isNaN(p[1]));
+
+      if (coords.length < 3) return;
 
       const fillColor =
         gf.type === 'delivery' ? '#10b981' : gf.type === 'nofly' ? '#ef4444' : '#f59e0b';
       const fillOpacity = gf.type === 'delivery' ? 0.18 : gf.type === 'nofly' ? 0.28 : 0.22;
 
-      const polygon = L.polygon(gf.coordinates as [number, number][], {
+      const polygon = L.polygon(coords, {
         color: fillColor,
         fillColor,
         fillOpacity,

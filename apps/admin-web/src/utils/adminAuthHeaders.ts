@@ -1,4 +1,4 @@
-import { adminApiClient } from '../context/AuthContext';
+import { adminApiClient } from '../services/adminApiClient';
 
 export function getAdminAuthToken(): string | null {
   return adminApiClient.getAccessToken();

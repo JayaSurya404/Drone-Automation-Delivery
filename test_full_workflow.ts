@@ -251,7 +251,11 @@ async function runE2EIntegrationTest() {
   const fleetRes = await fetch(`${API_BASE}/api/v1/drones`, { headers: adminHeaders });
   const fleetJson = await fleetRes.json();
   const fleet = fleetJson.data?.drones || fleetJson.data?.items || (Array.isArray(fleetJson.data) ? fleetJson.data : []);
-  const availableDrone = fleet.find((d: any) => d.status === 'IDLE' && !d.isMaintenanceMode) || fleet[0];
+  const availableDrone =
+    fleet.find((d: any) => d.currentLat > 10 && d.status === 'IDLE' && !d.isMaintenanceMode && d.batteryPercent > 80) ||
+    fleet.find((d: any) => d.currentLat > 10 && d.status === 'IDLE' && !d.isMaintenanceMode) ||
+    fleet.find((d: any) => d.status === 'IDLE' && !d.isMaintenanceMode) ||
+    fleet[0];
 
   if (!availableDrone) {
     throw new Error('No available drones found in Kurumbapalayam fleet!');
@@ -348,8 +352,7 @@ async function runE2EIntegrationTest() {
       currentStatus === 'DELIVERED_PENDING_VERIFICATION' ||
       currentStatus === 'ARRIVED_AT_DESTINATION' ||
       currentStatus === 'ARRIVED' ||
-      tracking.mission?.status === 'COMPLETED' ||
-      tick >= 30
+      tracking.mission?.status === 'COMPLETED'
     ) {
       arrivedAtDestination = true;
       console.log(`\n  🎯 DRONE TOUCHDOWN AT CUSTOMER DESTINATION!`);
@@ -370,7 +373,10 @@ async function runE2EIntegrationTest() {
     headers: { Authorization: `Bearer ${customerToken}` },
   });
   const codeJson = await codeRes.json();
-  const verificationCode = codeJson.data?.code || '4827';
+  const verificationCode = codeJson.data?.code;
+  if (!verificationCode) {
+    throw new Error(`Failed to retrieve verification code: ${JSON.stringify(codeJson)}`);
+  }
   console.log(`  ✔ Retrieved Handover Verification Code: ${verificationCode}`);
 
   const verifyRes = await fetch(`${API_BASE}/api/v1/deliveries/${delivery.id}/verify`, {
@@ -384,11 +390,10 @@ async function runE2EIntegrationTest() {
 
   if (!verifyRes.ok) {
     const err = await verifyRes.text();
-    console.warn(`  ⚠️ Verify call notice: ${err}`);
-  } else {
-    const verifyJson = await verifyRes.json();
-    console.log(`  ✔ Verification Successful: Status="${verifyJson.data.status}"`);
+    throw new Error(`Delivery verification failed: ${err}`);
   }
+  const verifyJson = await verifyRes.json();
+  console.log(`  ✔ Verification Successful: Status="${verifyJson.data.status}"`);
   passedSteps++;
 
   // 12. Verify Delivery Completion on Admin Side & Return Flight Initiation

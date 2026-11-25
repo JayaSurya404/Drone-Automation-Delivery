@@ -52,7 +52,9 @@ class MockDataStore {
   private pollInterval: number | null = null;
 
   constructor() {
-    this.initDataConnection();
+    if (typeof window !== 'undefined') {
+      setTimeout(() => this.initDataConnection(), 0);
+    }
   }
 
   public refreshSession() {

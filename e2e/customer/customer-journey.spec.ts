@@ -19,7 +19,7 @@ test.describe('customer portal journey', () => {
     await emailInput.fill(email);
     await passwordInput.fill(password);
 
-    const submitBtn = page.locator('button[type="submit"]');
+    const submitBtn = page.locator('button:has-text("Sign In to Customer Portal"), form button[type="submit"]').first();
     await submitBtn.click();
 
     // Verify successful login
@@ -27,7 +27,7 @@ test.describe('customer portal journey', () => {
 
     // Browse products
     await page.goto('/products');
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator('#root')).toBeVisible();
   });
 
   test('unauthenticated user trying to access orders is redirected to login', async ({ page, context }) => {

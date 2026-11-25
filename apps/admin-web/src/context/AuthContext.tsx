@@ -1,16 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ApiClient, decodeJwtPayload } from '@skynav/api-client';
+import { decodeJwtPayload } from '@skynav/api-client';
+import { adminApiClient } from '../services/adminApiClient';
 import { AdminUser, AdminRole } from '../types/skynav';
 import { mockStore } from '../services/mockDataStore';
 
-export const adminApiClient = new ApiClient({
-  baseUrl: '',
-  clientType: 'admin',
-});
+export { adminApiClient };
 
 interface AuthContextType {
   user: AdminUser | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, role?: AdminRole, rememberMe?: boolean, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   switchRole: (role: AdminRole) => void;
@@ -52,6 +51,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // In-memory user state only — never persisted to localStorage
   const [user, setUser] = useState<AdminUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Silent session refresh on mount via httpOnly admin refresh cookie (in-memory access token)
   useEffect(() => {
@@ -85,6 +85,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch(() => {
         if (isMounted && !adminApiClient.getAccessToken()) {
           setUser(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
         }
       });
 
@@ -164,6 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         isAuthenticated: !!user,
+        isLoading,
         login,
         logout,
         switchRole,

@@ -22,7 +22,7 @@ test.describe('admin operator journey', () => {
   });
 
   test('admin dashboard, fleet, operations, and intelligence pages load with real data', async ({ page }) => {
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator('#root')).toBeVisible();
 
     await page.goto('/fleet');
     await expect(page).toHaveURL(/\/fleet/);
