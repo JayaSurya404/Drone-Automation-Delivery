@@ -6,6 +6,7 @@ WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY apps/api/prisma apps/api/prisma
 COPY apps/customer-web/package.json apps/customer-web/package.json
 COPY apps/admin-web/package.json apps/admin-web/package.json
 COPY services/drone-simulator/package.json services/drone-simulator/package.json

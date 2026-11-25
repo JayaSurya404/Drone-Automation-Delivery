@@ -9,6 +9,7 @@ WORKDIR /app
 FROM base AS build
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY apps/api/prisma apps/api/prisma
 COPY apps/customer-web/package.json apps/customer-web/package.json
 COPY apps/admin-web/package.json apps/admin-web/package.json
 COPY services/drone-simulator/package.json services/drone-simulator/package.json
@@ -22,7 +23,7 @@ COPY packages packages
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" \
     pnpm --filter @skynav/api exec prisma generate
 RUN pnpm --filter @skynav/api... build
-RUN CI=true pnpm install --prod --frozen-lockfile
+RUN CI=true pnpm install --prod --frozen-lockfile --ignore-scripts
 
 FROM base AS runtime
 ENV NODE_ENV=production
