@@ -46,10 +46,11 @@ export class AuthController {
   async register(
     @Body() dto: RegisterDto,
     @Ip() ip: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseBody> {
     const { user, tokens } = await this.authService.register(dto, { ip });
-    this.setRefreshCookie(res, tokens);
+    this.setRefreshCookie(res, tokens, req, user);
     return this.toResponseBody(user, tokens);
   }
 
@@ -93,9 +94,10 @@ export class AuthController {
 
     if (incoming) {
       await this.authService.logout(incoming.token);
+      res.clearCookie(incoming.name, { path: "/api/v1/auth" });
+    } else {
+      this.clearAllRefreshCookies(res);
     }
-
-    this.clearAllRefreshCookies(res);
   }
 
   /** Phase 12 hardening — ends every session for the current user, not just this device (see `AuthService.logoutAll()`'s doc comment). */
@@ -172,18 +174,19 @@ export class AuthController {
     const clientApp = req.headers["x-client-app"] as string | undefined;
     const origin = (req.headers["origin"] as string | undefined) ?? (req.headers["referer"] as string | undefined);
     const isAdminHint = clientApp === "admin" || (origin && origin.includes("5174"));
+    const isCustomerHint = clientApp === "customer" || (origin && origin.includes("5173"));
 
     if (isAdminHint && req.cookies?.[adminCookie]) {
       return { name: adminCookie, token: req.cookies[adminCookie] };
     }
-    if (!isAdminHint && req.cookies?.[customerCookie]) {
+    if (isCustomerHint && req.cookies?.[customerCookie]) {
+      return { name: customerCookie, token: req.cookies[customerCookie] };
+    }
+    if (req.cookies?.[customerCookie]) {
       return { name: customerCookie, token: req.cookies[customerCookie] };
     }
     if (req.cookies?.[adminCookie]) {
       return { name: adminCookie, token: req.cookies[adminCookie] };
-    }
-    if (req.cookies?.[customerCookie]) {
-      return { name: customerCookie, token: req.cookies[customerCookie] };
     }
     if (req.cookies?.[defaultCookie]) {
       return { name: defaultCookie, token: req.cookies[defaultCookie] };

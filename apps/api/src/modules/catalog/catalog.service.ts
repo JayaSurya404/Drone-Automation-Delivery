@@ -237,6 +237,22 @@ export class CatalogService {
       },
       include: productWithRelationsInclude,
     });
+
+    // Ensure initial stock record exists at active fulfillment hubs for each created variant
+    const activeHubs = await this.prisma.fulfillmentHub.findMany({ where: { isActive: true } });
+    for (const variant of product.variants) {
+      for (const hub of activeHubs) {
+        await this.prisma.inventoryItem.create({
+          data: {
+            variantId: variant.id,
+            hubId: hub.id,
+            quantityOnHand: 50,
+            lowStockThreshold: 5,
+          },
+        }).catch(() => {});
+      }
+    }
+
     return this.toDetailView(product);
   }
 

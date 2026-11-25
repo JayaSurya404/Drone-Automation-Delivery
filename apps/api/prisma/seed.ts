@@ -424,13 +424,13 @@ async function main() {
   const bootstrapPassword = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD ?? "ChangeMe123!";
   console.log(`Ensuring bootstrap Super Admin (${bootstrapEmail})...`);
   const existingAdmin = await prisma.user.findUnique({ where: { email: bootstrapEmail } });
+  const adminPasswordHash = await argon2.hash(bootstrapPassword, { type: argon2.argon2id });
   if (!existingAdmin) {
-    const passwordHash = await argon2.hash(bootstrapPassword, { type: argon2.argon2id });
     const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: "super_admin" } });
     await prisma.user.create({
       data: {
         email: bootstrapEmail,
-        passwordHash,
+        passwordHash: adminPasswordHash,
         firstName: "Super",
         lastName: "Admin",
         isActive: true,
@@ -439,19 +439,25 @@ async function main() {
       },
     });
     console.log("Bootstrap Super Admin created.");
+  } else {
+    await prisma.user.update({
+      where: { email: bootstrapEmail },
+      data: { passwordHash: adminPasswordHash },
+    });
+    console.log("Bootstrap Super Admin password verified/updated.");
   }
 
   const customerEmail = process.env.CUSTOMER_SEED_EMAIL ?? "customer@skynav.local";
   const customerPassword = process.env.CUSTOMER_SEED_PASSWORD ?? "ChangeMe123!";
   console.log(`Ensuring bootstrap Customer (${customerEmail})...`);
   const existingCustomer = await prisma.user.findUnique({ where: { email: customerEmail } });
+  const customerPasswordHash = await argon2.hash(customerPassword, { type: argon2.argon2id });
   if (!existingCustomer) {
-    const passwordHash = await argon2.hash(customerPassword, { type: argon2.argon2id });
     const customerRole = await prisma.role.findUniqueOrThrow({ where: { name: "customer" } });
     await prisma.user.create({
       data: {
         email: customerEmail,
-        passwordHash,
+        passwordHash: customerPasswordHash,
         firstName: "Priya",
         lastName: "Sundaram",
         isActive: true,
@@ -460,6 +466,12 @@ async function main() {
       },
     });
     console.log("Bootstrap Customer created.");
+  } else {
+    await prisma.user.update({
+      where: { email: customerEmail },
+      data: { passwordHash: customerPasswordHash },
+    });
+    console.log("Bootstrap Customer password verified/updated.");
   }
 
   console.log("Ensuring fulfillment hubs (SkyHub Kurumbapalayam & Downtown)...");

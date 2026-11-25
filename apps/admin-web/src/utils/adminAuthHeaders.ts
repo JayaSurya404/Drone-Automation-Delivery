@@ -1,15 +1,15 @@
+import { adminApiClient } from '../context/AuthContext';
+
 export function getAdminAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return localStorage.getItem('skynav_admin_token') || sessionStorage.getItem('skynav_admin_token');
-  } catch {
-    return null;
-  }
+  return adminApiClient.getAccessToken();
 }
 
 export function getAdminAuthHeaders(extra?: Record<string, string>): Record<string, string> {
   const token = getAdminAuthToken();
-  const headers: Record<string, string> = { ...(extra || {}) };
+  const headers: Record<string, string> = {
+    'x-client-app': 'admin',
+    ...(extra || {}),
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }

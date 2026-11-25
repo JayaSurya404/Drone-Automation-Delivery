@@ -140,6 +140,7 @@ import {
 
 export interface ApiClientOptions {
   baseUrl: string;
+  clientType?: "customer" | "admin";
 }
 
 export class ApiError extends Error {
@@ -154,10 +155,12 @@ export class ApiError extends Error {
 
 export class ApiClient {
   private readonly baseUrl: string;
+  private readonly clientType?: "customer" | "admin";
   private accessToken: string | null = null;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    this.clientType = options.clientType;
   }
 
   setAccessToken(token: string | null): void {
@@ -192,20 +195,32 @@ export class ApiClient {
 
   /** Uses the httpOnly refresh cookie; resolves to null if there's no valid session. */
   async refresh(): Promise<AuthResponse | null> {
+    const headers: Record<string, string> = {};
+    if (this.clientType) {
+      headers["x-client-app"] = this.clientType;
+    }
     const response = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
       method: "POST",
+      headers,
       credentials: "include",
     });
     if (!response.ok) {
       return null;
     }
     const body = await this.unwrap(response);
-    return authResponseSchema.parse(body);
+    const parsed = authResponseSchema.parse(body);
+    this.accessToken = parsed.accessToken;
+    return parsed;
   }
 
   async logout(): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (this.clientType) {
+      headers["x-client-app"] = this.clientType;
+    }
     await fetch(`${this.baseUrl}/api/v1/auth/logout`, {
       method: "POST",
+      headers,
       credentials: "include",
     });
     this.accessToken = null;
@@ -1102,9 +1117,13 @@ export class ApiClient {
   }
 
   private async postAuth(path: string, body: unknown): Promise<AuthResponse> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (this.clientType) {
+      headers["x-client-app"] = this.clientType;
+    }
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       credentials: "include",
       body: JSON.stringify(body),
     });
@@ -1112,7 +1131,9 @@ export class ApiClient {
       const errorBody = await response.json().catch(() => null);
       throw new ApiError(errorBody?.error?.message ?? "Request failed", response.status);
     }
-    return authResponseSchema.parse(await this.unwrap(response));
+    const parsed = authResponseSchema.parse(await this.unwrap(response));
+    this.accessToken = parsed.accessToken;
+    return parsed;
   }
 
   private async unwrap(response: Response): Promise<unknown> {

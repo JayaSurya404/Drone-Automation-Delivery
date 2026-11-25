@@ -16,7 +16,7 @@ export interface CategoryTreeNode extends Category {
 }
 export const categoryTreeNodeSchema: z.ZodType<CategoryTreeNode> = categorySchema.extend({
   children: z.lazy(() => z.array(categoryTreeNodeSchema)),
-});
+}) as unknown as z.ZodType<CategoryTreeNode>;
 
 export const productImageSchema = z.object({
   id: z.string(),

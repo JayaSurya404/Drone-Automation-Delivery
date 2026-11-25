@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { ApiClient } from '@skynav/api-client';
 import { AdminUser, AdminRole } from '../types/skynav';
 import { mockStore } from '../services/mockDataStore';
+
+export const adminApiClient = new ApiClient({
+  baseUrl: '',
+  clientType: 'admin',
+});
 
 interface AuthContextType {
   user: AdminUser | null;
@@ -13,73 +19,81 @@ interface AuthContextType {
 }
 
 const STORAGE_KEY = 'skynav_auth_user';
-const TOKEN_KEY = 'skynav_admin_token';
 
-// Role-to-Route Permission Matrix (Single Full-Access Admin Account)
-const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
-  admin: ['*'],
-  super_admin: ['*'],
-  ops_admin: ['*'],
-  fleet_manager: ['*'],
-  dispatch_manager: ['*'],
-  support_admin: ['*'],
-  analytics_admin: ['*'],
-  analyst: ['*'],
+const ROUTE_PERMISSION_MAP: Record<string, string> = {
+  '/dashboard': 'dashboard.read',
+  '/simulation': 'simulation.read',
+  '/operations': 'missions.read',
+  '/orders': 'orders.read',
+  '/products': 'catalog.read',
+  '/missions': 'missions.read',
+  '/packages': 'orders.read',
+  '/routes': 'missions.read',
+  '/fleet': 'drones.read',
+  '/battery-health': 'drones.read',
+  '/maintenance': 'drones.read',
+  '/customers': 'users.read',
+  '/merchants': 'catalog.read',
+  '/geofencing': 'geofencing.read',
+  '/emergency': 'incidents.read',
+  '/payments': 'orders.read',
+  '/analytics': 'analytics.read',
+  '/reports': 'analytics.read',
+  '/notifications': 'notifications.read',
+  '/support': 'support.read',
+  '/audit-logs': 'audit.read',
+  '/admins': 'users.read',
+  '/settings': 'system.manage',
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Try to restore saved user from localStorage or sessionStorage
   const [user, setUser] = useState<AdminUser | null>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
       if (stored) {
         return JSON.parse(stored);
       }
-    } catch {
-      // Ignore parse error
-    }
+    } catch {}
     return null;
   });
 
-  // Verify session on mount with backend /api/admin/auth/me
+  // Silent session refresh on mount via httpOnly admin refresh cookie (in-memory access token)
   useEffect(() => {
     let isMounted = true;
-    const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
 
-    if (token) {
-      fetch('/api/admin/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            if (isMounted && data.user) {
-              const fullUser: AdminUser = {
-                ...data.user,
-                lastLogin: 'Active Session',
-                permissions: ['*'],
-              };
-              setUser(fullUser);
-              const storage = localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage;
-              storage.setItem(STORAGE_KEY, JSON.stringify(fullUser));
-            }
-          } else {
-            // Token expired or invalid
-            if (isMounted) {
-              setUser(null);
-              localStorage.removeItem(TOKEN_KEY);
-              localStorage.removeItem(STORAGE_KEY);
-              sessionStorage.removeItem(TOKEN_KEY);
-              sessionStorage.removeItem(STORAGE_KEY);
-            }
+    adminApiClient.refresh()
+      .then(async (authRes) => {
+        if (authRes && isMounted) {
+          const u = authRes.user;
+          const role: AdminRole = (u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole) || 'super_admin';
+          const fullUser: AdminUser = {
+            id: u.id,
+            name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'Admin User',
+            email: u.email,
+            role,
+            avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+            status: 'Active',
+            lastLogin: 'Active Session',
+            permissions: u.roles?.includes('super_admin') ? ['*'] : (u.roles || ['*']),
+          };
+          setUser(fullUser);
+          mockStore.refreshSession();
+        } else if (isMounted) {
+          // If silent refresh failed and no active token in memory, clear stale user cache
+          if (!adminApiClient.getAccessToken()) {
+            setUser(null);
+            localStorage.removeItem(STORAGE_KEY);
+            sessionStorage.removeItem(STORAGE_KEY);
           }
-        })
-        .catch(() => {
-          // Network error - retain cached user if present
-        });
-    }
+        }
+      })
+      .catch(() => {
+        if (isMounted && !adminApiClient.getAccessToken()) {
+          setUser(null);
+        }
+      });
 
     return () => {
       isMounted = false;
@@ -93,42 +107,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (
     email: string,
     role: AdminRole = 'admin',
-    rememberMe = true,
+    _rememberMe = true,
     password?: string
   ): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = email.trim().toLowerCase();
 
     try {
-      const res = await fetch('/api/admin/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          password: password || '',
-          role,
-        }),
+      const authRes = await adminApiClient.login({
+        email: cleanEmail,
+        password: password || '',
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'Invalid administrator credentials.' };
-      }
-
+      const u = authRes.user;
+      const primaryRole: AdminRole = (u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole) || role || 'super_admin';
       const authenticatedUser: AdminUser = {
-        ...data.user,
+        id: u.id,
+        name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'Admin User',
+        email: u.email,
+        role: primaryRole,
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+        status: 'Active',
         lastLogin: 'Active Session',
-        permissions: ['*'],
+        permissions: u.roles?.includes('super_admin') ? ['*'] : (u.roles || ['*']),
       };
 
       setUser(authenticatedUser);
-
-      const storage = rememberMe ? localStorage : sessionStorage;
-      const otherStorage = rememberMe ? sessionStorage : localStorage;
-
-      storage.setItem(TOKEN_KEY, data.token);
-      storage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
-      otherStorage.removeItem(TOKEN_KEY);
-      otherStorage.removeItem(STORAGE_KEY);
+      // Persist profile metadata (non-sensitive; token is kept strictly in-memory in adminApiClient)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
       mockStore.refreshSession();
 
       return { success: true };
@@ -138,22 +143,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    adminApiClient.logout().catch(() => {});
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(TOKEN_KEY);
     mockStore.clearSession();
   };
 
   const switchRole = (_role: AdminRole) => {
-    // Single full-access admin account mode active - no role switching needed
+    // Role comes from backend RBAC claims
   };
 
-  const hasPermission = (_pathOrRoles: string | AdminRole[]): boolean => {
+  const hasPermission = (pathOrRoles: string | AdminRole[]): boolean => {
     if (!user) return false;
-    // Single admin account has authoritative full access across all operations
-    return true;
+    // Super admin with wildcard has authoritative access across all routes and operations
+    if (user.role === 'super_admin' || user.permissions?.includes('*')) return true;
+
+    if (typeof pathOrRoles === 'string') {
+      const requiredPerm = ROUTE_PERMISSION_MAP[pathOrRoles];
+      if (!requiredPerm) return true;
+      return user.permissions?.includes(requiredPerm) ?? false;
+    }
+
+    return pathOrRoles.includes(user.role);
   };
 
   return (

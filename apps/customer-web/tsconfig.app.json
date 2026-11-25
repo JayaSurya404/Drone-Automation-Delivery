@@ -15,6 +15,11 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@skynav/api-client": ["../../packages/api-client/src/index.ts"],
+      "@skynav/shared-types": ["../../packages/shared-types/src/index.ts"]
+    },
 
     /* Linting */
     "noUnusedLocals": false,

@@ -1,5 +1,6 @@
 import { ValidationPipe, type INestApplication, type NestApplicationOptions } from "@nestjs/common";
 import cookieParser from "cookie-parser";
+import type { Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { resolveCorsOrigins } from "./config/cors.util";
 
@@ -21,6 +22,34 @@ export const NEST_APP_OPTIONS: NestApplicationOptions = { rawBody: true };
  * (global prefix, cookies, validation) that the real server applies.
  */
 export function configureApp(app: INestApplication): void {
+  // Backward-compatibility rewrite middleware for legacy frontend routes (/api/... and /api/admin/...)
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    const url: string = req.url ?? "";
+    if (url.startsWith("/api/") && !url.startsWith("/api/v1/") && !url.startsWith("/api/docs")) {
+      if (url === "/api/health") {
+        req.url = "/health";
+      } else if (url.startsWith("/api/admin/")) {
+        const sub = url.slice("/api/admin/".length);
+        if (sub.startsWith("auth/login")) req.url = "/api/v1/auth/login";
+        else if (sub.startsWith("auth/me")) req.url = "/api/v1/auth/me";
+        else if (sub.startsWith("fleet")) req.url = "/api/v1/drones" + sub.slice(5);
+        else if (sub.startsWith("orders")) req.url = "/api/v1/orders/admin" + sub.slice(6);
+        else if (sub.startsWith("missions")) req.url = "/api/v1/missions" + sub.slice(8);
+        else if (sub.startsWith("geofences")) req.url = "/api/v1/geofences" + sub.slice(9);
+        else if (sub.startsWith("audit-logs")) req.url = "/api/v1/audit" + sub.slice(10);
+        else if (sub.startsWith("notifications")) req.url = "/api/v1/notifications" + sub.slice(13);
+        else if (sub.startsWith("products")) req.url = "/api/v1/products" + sub.slice(8);
+        else req.url = "/api/v1/" + sub;
+      } else {
+        const sub = url.slice("/api/".length);
+        if (sub.startsWith("health")) req.url = "/health";
+        else if (sub.startsWith("checkout/orders")) req.url = "/api/v1/orders/checkout";
+        else req.url = "/api/v1/" + sub;
+      }
+    }
+    next();
+  });
+
   app.use(cookieParser());
 
   // Swagger UI (served at `/api/docs`, see main.ts) needs inline scripts/styles

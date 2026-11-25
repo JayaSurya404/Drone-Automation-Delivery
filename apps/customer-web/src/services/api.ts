@@ -1,3 +1,4 @@
+import { ApiClient } from '@skynav/api-client';
 import { storage } from './storage';
 import { supabaseService } from './supabaseService';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -10,14 +11,20 @@ import { FAQItem, SupportTicket, SupportTicketCategory } from '../types/support'
 import { LiveTrackingState } from '../types/tracking';
 import { NoFlyZone, DropZoneSafetyEvaluation } from '../types/airspace';
 
+export const customerApiClient = new ApiClient({
+  baseUrl: '',
+  clientType: 'customer',
+});
+
 const API_BASE_URL = '/api';
 
 // Helper for making authenticated HTTP requests to backend when needed
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = storage.get<string | null>(storage.keys.AUTH_TOKEN, null);
+  const token = customerApiClient.getAccessToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'x-client-app': 'customer',
     ...(options.headers as Record<string, string> || {}),
   };
 
@@ -29,12 +36,17 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || data.message || `Request failed with status ${response.status}`);
+    throw new Error(data.error?.message || data.error || data.message || `Request failed with status ${response.status}`);
+  }
+
+  if (data && typeof data === 'object' && 'data' in data && data.success === true) {
+    return data.data as T;
   }
 
   return data as T;
@@ -76,10 +88,26 @@ export const api = {
         return { user, token: data.session.access_token };
       }
 
-      return request<{ user: CustomerUser; token: string }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      const res = await customerApiClient.login({
+        email: payload.email.trim(),
+        password: payload.password,
       });
+
+      const u = res.user;
+      const user: CustomerUser = {
+        id: u.id,
+        name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email.split('@')[0],
+        email: u.email,
+        phone: '+91 98765 43210',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        accountStatus: 'active',
+        isVerified: u.isEmailVerified,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        notificationPreferences: { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
+      };
+
+      return { user, token: res.accessToken };
     },
 
     getProfile: async (): Promise<CustomerUser> => {
@@ -109,10 +137,34 @@ export const api = {
         };
       }
 
-      return request<{ user: CustomerUser; token: string; requiresVerification: boolean; email?: string; message: string; deliveryPin?: string }>('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      const res = await customerApiClient.register({
+        email: payload.email.trim(),
+        password: payload.password,
+        firstName: payload.name.trim().split(' ')[0] || 'Customer',
+        lastName: payload.name.trim().split(' ').slice(1).join(' ') || undefined,
       });
+
+      const u = res.user;
+      const user: CustomerUser = {
+        id: u.id,
+        name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email.split('@')[0],
+        email: u.email,
+        phone: payload.phone || '+91 98765 43210',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        accountStatus: 'active',
+        isVerified: u.isEmailVerified,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        notificationPreferences: { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
+      };
+
+      return {
+        user,
+        token: res.accessToken,
+        requiresVerification: !u.isEmailVerified,
+        email: u.email,
+        message: 'Account created successfully!',
+      };
     },
 
     verifyAccount: async (payload: { code: string; email?: string }): Promise<{ success: boolean; user: CustomerUser; token: string; message: string }> => {
@@ -162,7 +214,7 @@ export const api = {
         await supabase.auth.signOut();
       } else {
         try {
-          await request('/auth/logout', { method: 'POST' });
+          await customerApiClient.logout();
         } catch {}
       }
       storage.remove(storage.keys.AUTH_USER);

@@ -88,13 +88,15 @@ export const ProductsPage: React.FC = () => {
       ]);
 
       if (prodsRes.ok) {
-        const prods = await prodsRes.json();
-        setProducts(prods);
+        const prodsJson = await prodsRes.json();
+        const prods = prodsJson?.data?.items ?? prodsJson?.data ?? prodsJson;
+        setProducts(Array.isArray(prods) ? prods : []);
       }
 
       if (catsRes.ok) {
-        const cats = await catsRes.json();
-        setCategories(cats);
+        const catsJson = await catsRes.json();
+        const cats = catsJson?.data?.items ?? catsJson?.data ?? catsJson;
+        setCategories(Array.isArray(cats) ? cats : []);
       }
     } catch (err) {
       console.error('Failed to load products from admin backend:', err);

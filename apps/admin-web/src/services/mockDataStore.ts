@@ -17,6 +17,21 @@ import {
 import { BASE_CENTER } from '../data/mockData';
 import { getAdminAuthHeaders, getAdminAuthToken } from '../utils/adminAuthHeaders';
 
+function extractData<T>(raw: any): T {
+  if (raw && typeof raw === 'object') {
+    if (raw.data !== undefined) {
+      if (raw.data && typeof raw.data === 'object' && Array.isArray(raw.data.items)) {
+        return raw.data.items as T;
+      }
+      return raw.data as T;
+    }
+    if (Array.isArray(raw.items)) {
+      return raw.items as T;
+    }
+  }
+  return raw as T;
+}
+
 class MockDataStore {
   private drones: Drone[] = [];
   private orders: Order[] = [];
@@ -89,7 +104,7 @@ class MockDataStore {
       // 1. Fetch real orders from Admin Backend
       const ordersRes = await fetch('/api/admin/orders', { headers });
       if (ordersRes.ok) {
-        const rawOrders = await ordersRes.json();
+        const rawOrders = extractData<any[]>(await ordersRes.json());
         if (Array.isArray(rawOrders)) {
           this.orders = rawOrders.map((o: any) => ({
             id: o.id,
@@ -123,7 +138,7 @@ class MockDataStore {
       // 2. Fetch real fleet from Admin Backend
       const fleetRes = await fetch('/api/admin/fleet', { headers });
       if (fleetRes.ok) {
-        const rawFleet = await fleetRes.json();
+        const rawFleet = extractData<any[]>(await fleetRes.json());
         if (Array.isArray(rawFleet)) {
           this.drones = rawFleet.map((d: any) => ({
             id: d.id,
@@ -153,7 +168,7 @@ class MockDataStore {
       // 3. Fetch missions from Admin Backend
       const missionsRes = await fetch('/api/admin/missions', { headers });
       if (missionsRes.ok) {
-        const rawMissions = await missionsRes.json();
+        const rawMissions = extractData<any[]>(await missionsRes.json());
         if (Array.isArray(rawMissions)) {
           this.missions = rawMissions.map((m: any) => ({
             id: m.id,
@@ -182,7 +197,7 @@ class MockDataStore {
       // 4. Fetch geofences from Admin Backend
       const geoRes = await fetch('/api/admin/geofences', { headers });
       if (geoRes.ok) {
-        const rawGeo = await geoRes.json();
+        const rawGeo = extractData<any[]>(await geoRes.json());
         if (Array.isArray(rawGeo)) {
           this.geofences = rawGeo;
         }
@@ -191,7 +206,7 @@ class MockDataStore {
       // 5. Fetch emergencies from Admin Backend
       const emgRes = await fetch('/api/admin/emergencies', { headers });
       if (emgRes.ok) {
-        const rawEmg = await emgRes.json();
+        const rawEmg = extractData<any[]>(await emgRes.json());
         if (Array.isArray(rawEmg)) {
           this.emergencies = rawEmg;
         }
@@ -200,7 +215,7 @@ class MockDataStore {
       // 6. Fetch maintenance records from Admin Backend
       const maintRes = await fetch('/api/admin/maintenance', { headers });
       if (maintRes.ok) {
-        const rawMaint = await maintRes.json();
+        const rawMaint = extractData<any[]>(await maintRes.json());
         if (Array.isArray(rawMaint)) {
           this.maintenance = rawMaint;
         }
@@ -209,7 +224,7 @@ class MockDataStore {
       // 7. Fetch audit logs from Admin Backend
       const auditRes = await fetch('/api/admin/audit-logs', { headers });
       if (auditRes.ok) {
-        const rawAudit = await auditRes.json();
+        const rawAudit = extractData<any[]>(await auditRes.json());
         if (Array.isArray(rawAudit)) {
           this.auditLogs = rawAudit;
         }
@@ -218,7 +233,7 @@ class MockDataStore {
       // 8. Fetch system notifications from Admin Backend
       const notifRes = await fetch('/api/admin/notifications', { headers });
       if (notifRes.ok) {
-        const rawNotifs = await notifRes.json();
+        const rawNotifs = extractData<any[]>(await notifRes.json());
         if (Array.isArray(rawNotifs)) {
           this.notifications = rawNotifs;
         }
@@ -227,7 +242,7 @@ class MockDataStore {
       // 9. Fetch customers from Admin Backend
       const custRes = await fetch('/api/admin/customers', { headers });
       if (custRes.ok) {
-        const rawCust = await custRes.json();
+        const rawCust = extractData<any[]>(await custRes.json());
         if (Array.isArray(rawCust)) {
           this.customers = rawCust;
         }
@@ -236,7 +251,7 @@ class MockDataStore {
       // 10. Fetch payments from Admin Backend
       const payRes = await fetch('/api/admin/payments', { headers });
       if (payRes.ok) {
-        const rawPay = await payRes.json();
+        const rawPay = extractData<any[]>(await payRes.json());
         if (Array.isArray(rawPay)) {
           this.payments = rawPay;
         }
@@ -245,7 +260,7 @@ class MockDataStore {
       // 11. Fetch merchants from Admin Backend
       const merRes = await fetch('/api/admin/merchants', { headers });
       if (merRes.ok) {
-        const rawMer = await merRes.json();
+        const rawMer = extractData<any[]>(await merRes.json());
         if (Array.isArray(rawMer)) {
           this.merchants = rawMer;
         }
@@ -254,7 +269,7 @@ class MockDataStore {
       // 12. Fetch support tickets from Admin Backend
       const tckRes = await fetch('/api/admin/tickets', { headers });
       if (tckRes.ok) {
-        const rawTck = await tckRes.json();
+        const rawTck = extractData<any[]>(await tckRes.json());
         if (Array.isArray(rawTck)) {
           this.tickets = rawTck;
         }
@@ -263,7 +278,7 @@ class MockDataStore {
       // 13. Fetch admin users from Admin Backend
       const admRes = await fetch('/api/admin/admins', { headers });
       if (admRes.ok) {
-        const rawAdm = await admRes.json();
+        const rawAdm = extractData<any[]>(await admRes.json());
         if (Array.isArray(rawAdm)) {
           this.admins = rawAdm;
         }

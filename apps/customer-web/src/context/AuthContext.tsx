@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { CustomerUser, LoginPayload, RegisterPayload, ResetPasswordPayload, PendingAction } from '../types/auth';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { storage } from '../services/storage';
-import { api } from '../services/api';
+import { api, customerApiClient } from '../services/api';
 
 const PENDING_ACTION_KEY = 'drone_customer_pending_action';
 
@@ -100,28 +100,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initAuth = async () => {
       if (!isSupabaseConfigured()) {
-        const storedUser = storage.get<CustomerUser | null>(storage.keys.AUTH_USER, null);
-        const storedToken = storage.get<string | null>(storage.keys.AUTH_TOKEN, null);
-        if (storedUser && storedToken && mounted) {
-          setUser(storedUser);
-          setToken(storedToken);
-          // Verify with database /auth/me
-          try {
-            const me = await api.auth.getProfile();
-            if (mounted) {
-              setUser(me);
-              storage.set(storage.keys.AUTH_USER, me);
-            }
-          } catch {
-            if (mounted) {
-              setUser(null);
-              setToken(null);
-              storage.remove(storage.keys.AUTH_USER);
-              storage.remove(storage.keys.AUTH_TOKEN);
-            }
+        try {
+          const authRes = await customerApiClient.refresh();
+          if (authRes && mounted) {
+            const u = authRes.user;
+            const mappedUser: CustomerUser = {
+              id: u.id,
+              name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email.split('@')[0],
+              email: u.email,
+              phone: '+91 98765 43210',
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+              accountStatus: 'active',
+              isVerified: u.isEmailVerified,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              notificationPreferences: { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
+            };
+            setUser(mappedUser);
+            setToken(authRes.accessToken);
+            storage.set(storage.keys.AUTH_USER, mappedUser);
+          } else if (mounted) {
+            setUser(null);
+            setToken(null);
+            storage.remove(storage.keys.AUTH_USER);
+            storage.remove(storage.keys.AUTH_TOKEN);
           }
+        } catch {
+          if (mounted) {
+            setUser(null);
+            setToken(null);
+            storage.remove(storage.keys.AUTH_USER);
+            storage.remove(storage.keys.AUTH_TOKEN);
+          }
+        } finally {
+          if (mounted) setIsLoading(false);
         }
-        if (mounted) setIsLoading(false);
         return;
       }
 
@@ -199,7 +212,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(res.user);
         setToken(res.token);
         storage.set(storage.keys.AUTH_USER, res.user);
-        storage.set(storage.keys.AUTH_TOKEN, res.token);
         if (payload.email?.trim().toLowerCase() === 'customer@skynav') {
           storage.set('skynav_permanent_delivery_pin', '4827');
         }

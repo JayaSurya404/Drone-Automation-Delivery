@@ -18,9 +18,7 @@
     "db:migrate": "turbo run db:migrate --filter=@skynav/api",
     "db:migrate:deploy": "turbo run db:migrate:deploy --filter=@skynav/api",
     "db:seed": "turbo run db:seed --filter=@skynav/api",
-    "clean": "turbo run clean",
-    "dev:legacy": "concurrently -k \"pnpm --filter=@skynav/legacy-customer-backend dev\" \"pnpm --filter=@skynav/legacy-admin-backend dev\"",
-    "seed:legacy": "pnpm --filter=@skynav/legacy-customer-backend seed && pnpm --filter=@skynav/legacy-admin-backend seed"
+    "clean": "turbo run clean"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
