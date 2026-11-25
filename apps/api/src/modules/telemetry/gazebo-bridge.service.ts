@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TelemetryService } from "./telemetry.service";
 
@@ -19,16 +20,42 @@ export interface GazeboTelemetryPayload {
 export class GazeboBridgeService implements OnModuleInit, OnModuleDestroy {
   private pollInterval: NodeJS.Timeout | null = null;
   private readonly bridgeUrl: string;
+  private readonly isEnabled: boolean;
+  private readonly serviceKey: string;
+  private readonly configuredDroneId: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly telemetryService: TelemetryService,
+    private readonly configService: ConfigService,
   ) {
-    this.bridgeUrl = process.env.GAZEBO_BRIDGE_URL || "http://127.0.0.1:8085";
+    this.bridgeUrl =
+      this.configService.get<string>("GAZEBO_BRIDGE_URL", { infer: true }) ||
+      process.env.GAZEBO_BRIDGE_URL ||
+      "http://127.0.0.1:8085";
+
+    this.serviceKey =
+      this.configService.get<string>("SKYNAV_INTERNAL_SERVICE_KEY", { infer: true }) ||
+      process.env.SKYNAV_INTERNAL_SERVICE_KEY ||
+      "";
+
+    this.configuredDroneId =
+      this.configService.get<string>("GAZEBO_DRONE_ID", { infer: true }) ||
+      process.env.GAZEBO_DRONE_ID ||
+      "";
+
+    const isProduction =
+      (this.configService.get<string>("NODE_ENV", { infer: true }) || process.env.NODE_ENV) === "production";
+    const bridgeEnabledFlag =
+      (this.configService.get<string>("GAZEBO_BRIDGE_ENABLED", { infer: true }) ||
+        process.env.GAZEBO_BRIDGE_ENABLED) === "true";
+
+    // Enable ONLY when GAZEBO_BRIDGE_ENABLED=true (default false, forced off in production)
+    this.isEnabled = !isProduction && bridgeEnabledFlag;
   }
 
   onModuleInit(): void {
-    if (process.env.NODE_ENV === "test") {
+    if (!this.isEnabled) {
       return;
     }
     // Poll Gazebo bridge every 2s
@@ -45,8 +72,15 @@ export class GazeboBridgeService implements OnModuleInit, OnModuleDestroy {
   }
 
   async pollGazebo(): Promise<void> {
+    if (!this.isEnabled) return;
     try {
+      const headers: Record<string, string> = {};
+      if (this.serviceKey) {
+        headers["x-service-key"] = this.serviceKey;
+      }
+
       const res = await fetch(`${this.bridgeUrl}/telemetry`, {
+        headers,
         signal: AbortSignal.timeout(800),
       });
       if (!res.ok) {
@@ -54,13 +88,17 @@ export class GazeboBridgeService implements OnModuleInit, OnModuleDestroy {
       }
       const data = (await res.json()) as GazeboTelemetryPayload;
       if (data && data.isNativeGazeboRunning && data.simulationMode === "REAL_GAZEBO_MODE") {
-        // Resolve target drone (default to D-001 or serial SKN-DRN-001)
+        const droneIdentifier = this.configuredDroneId || data.droneId;
+        if (!droneIdentifier) {
+          return;
+        }
+
         const drone = await this.prisma.drone.findFirst({
           where: {
             OR: [
-              { name: "D-001" },
-              { serialNumber: "SKN-DRN-001" },
-              { serialNumber: data.droneId || "" },
+              { id: droneIdentifier },
+              { name: droneIdentifier },
+              { serialNumber: droneIdentifier },
             ],
           },
         });
@@ -85,10 +123,15 @@ export class GazeboBridgeService implements OnModuleInit, OnModuleDestroy {
   }
 
   async sendCommand(command: Record<string, unknown>): Promise<boolean> {
+    if (!this.isEnabled) return false;
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (this.serviceKey) {
+        headers["x-service-key"] = this.serviceKey;
+      }
       const res = await fetch(`${this.bridgeUrl}/command`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(command),
         signal: AbortSignal.timeout(1500),
       });

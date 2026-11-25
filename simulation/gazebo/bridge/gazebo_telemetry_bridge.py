@@ -604,19 +604,31 @@ class GazeboBridgeHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, x-service-key')
         self.end_headers()
         self.wfile.write(json.dumps(data, indent=2).encode('utf-8'))
+
+    def check_auth(self):
+        expected_key = os.environ.get("SKYNAV_INTERNAL_SERVICE_KEY", "").strip()
+        if expected_key:
+            req_key = self.headers.get("x-service-key", "").strip()
+            if req_key != expected_key:
+                self._send_json(401, {"error": "Unauthorized: invalid or missing x-service-key header"})
+                return False
+        return True
 
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, x-service-key')
         self.end_headers()
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path not in ('/', '/health'):
+            if not self.check_auth():
+                return
         with lock:
             if parsed.path in ('/', '/health', '/status'):
                 is_running, pid = check_native_gazebo_process()
@@ -801,6 +813,8 @@ class GazeboBridgeHandler(BaseHTTPRequestHandler):
                 self._send_json(404, {"error": "Endpoint not found"})
 
     def do_POST(self):
+        if not self.check_auth():
+            return
         content_len = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_len).decode('utf-8') if content_len > 0 else "{}"
         try:
