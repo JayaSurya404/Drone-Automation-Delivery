@@ -1,0 +1,38 @@
+# Render Free-Tier Deployment Configuration
+# SkyNav Autonomous Drone Delivery API + Managed PostgreSQL with PostGIS
+services:
+  - type: web
+    name: skynav-api
+    runtime: node
+    plan: free
+    region: singapore # Closest free region to South India / Coimbatore
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @skynav/api exec prisma generate && pnpm --filter @skynav/api build
+    startCommand: node apps/api/dist/main.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skynav-postgres
+          property: connectionString
+      - key: REDIS_URL
+        sync: false # Set Upstash free Redis URL
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: TELEMETRY_INGEST_API_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://skynav-customer.vercel.app,https://skynav-admin.vercel.app
+      - key: BOOTSTRAP_SUPER_ADMIN_EMAIL
+        value: admin@skynav.local
+      - key: BOOTSTRAP_SUPER_ADMIN_PASSWORD
+        sync: false # User supplies via Render dashboard
+
+databases:
+  - name: skynav-postgres
+    plan: free
+    region: singapore
+    databaseName: skynav
+    user: skynav

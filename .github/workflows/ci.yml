@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, feature/claude-stack-upgrade]
+  push:
+    branches: [main, feature/claude-stack-upgrade]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: skynav
+          POSTGRES_PASSWORD: skynav
+          POSTGRES_DB: skynav
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U skynav"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure environment
+        run: cp .env.example .env
+
+      - name: Start MinIO Object Storage
+        run: |
+          docker run -d --name minio -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=skynav -e MINIO_ROOT_PASSWORD=skynav123 \
+            minio/minio:latest server /data --console-address ":9001"
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 2
+          done
+
+      # Security rule: High severity vulnerabilities fail the build immediately (no warning bypass)
+      - name: Dependency Security Audit
+        run: pnpm audit --audit-level=high --prod
+
+      - name: Secret Scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint Codebase
+        run: pnpm lint
+
+      - name: Typecheck TypeScript Monorepo
+        run: pnpm typecheck
+
+      - name: Unit Tests
+        run: pnpm test
+
+      - name: Apply Database Migrations
+        run: pnpm db:migrate:deploy
+
+      - name: Integration Tests (including Tab Session Isolation)
+        run: pnpm test:integration
+
+      - name: Build All Artifacts
+        run: pnpm build
+
+      - name: Seed Database
+        run: pnpm db:seed
+
+      - name: Execute Full End-to-End Workflow Verification
+        run: npx tsx test_full_workflow.ts
+        env:
+          API_URL: http://localhost:4000
