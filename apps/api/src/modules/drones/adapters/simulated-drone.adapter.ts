@@ -31,7 +31,9 @@ import type {
 export class SimulatedDroneAdapter implements DroneAdapter {
   static readonly STEP_DEGREES = 0.004;
   static readonly BATTERY_DRAIN_PER_STEP = 3;
-  static readonly CRUISE_SPEED_MPS = 12;
+  static readonly CRUISE_SPEED_MPS = 13.889; // 50 km/h
+  static readonly CRUISE_ALTITUDE_METERS = 45;
+  static readonly RETURN_ALTITUDE_METERS = 40;
   static readonly ARRIVAL_THRESHOLD_DEGREES = 0.0005;
 
   private readonly drones = new Map<string, SimDroneState>();

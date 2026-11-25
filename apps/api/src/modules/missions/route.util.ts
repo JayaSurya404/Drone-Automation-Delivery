@@ -1,19 +1,35 @@
 import { createHash } from "node:crypto";
+import { corridorRoutePlanner } from "./corridor-route-planner.util";
 
-/**
- * Naive straight-line route generation — the roadmap's own words for Phase
- * 7-v1 ("waypoint queue, straight-line") pulled forward here since a mission
- * needs *some* route to fly. AI-optimized routing (wind/geofence/battery-aware)
- * is Phase 9's `RouteOptimizer`, not this.
- */
 export interface RoutePoint {
   lat: number;
   lng: number;
   altitudeMeters: number;
 }
 
-const CRUISE_ALTITUDE_METERS = 60;
+export const CRUISE_ALTITUDE_METERS = 45;
+export const RETURN_ALTITUDE_METERS = 40;
 
+/**
+ * Builds a route respecting the Kurumbapalayam flight corridor and 45m cruising altitude.
+ */
+export function buildCorridorRoute(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  isReturn = false,
+): RoutePoint[] {
+  const result = corridorRoutePlanner.planRoute(origin.lat, origin.lng, destination.lat, destination.lng, isReturn);
+  const altitude = isReturn ? RETURN_ALTITUDE_METERS : CRUISE_ALTITUDE_METERS;
+  return result.waypoints.slice(1).map(([lat, lng]) => ({
+    lat,
+    lng,
+    altitudeMeters: altitude,
+  }));
+}
+
+/**
+ * Straight-line fallback route generation at 45m altitude.
+ */
 export function buildStraightLineRoute(
   origin: { lat: number; lng: number },
   destination: { lat: number; lng: number },
@@ -27,11 +43,7 @@ export function buildStraightLineRoute(
 }
 
 /**
- * Deterministic placeholder "geocode": no real address-to-coordinate
- * resolution exists until a future phase (this app has never stored
- * lat/lng on an address — see `docs/ARCHITECTURE.md`), so the destination is
- * a small, stable offset from the assigned hub, seeded by the delivery id so
- * the same delivery always resolves to the same point.
+ * Deterministic placeholder "geocode": seeded by delivery id for stable coordinates.
  */
 export function resolveDeterministicDestination(
   deliveryId: string,

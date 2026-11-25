@@ -572,6 +572,12 @@ export class MissionsService implements OnModuleInit, OnModuleDestroy {
     }
 
     const drone = await this.prisma.drone.findUniqueOrThrow({ where: { id: mission.droneId } });
+    const lowBatteryThreshold = this.configService.get("DRONE_LOW_BATTERY_THRESHOLD_PERCENT", { infer: true });
+    if (drone.batteryPercent <= lowBatteryThreshold) {
+      throw new ConflictException(
+        `Cannot dispatch — drone battery (${drone.batteryPercent}%) is at or below the return-home reserve threshold (${lowBatteryThreshold}%)`,
+      );
+    }
     this.dronesService.ensureSimulatedAdapterRegistered(drone);
 
     await this.droneAdapter.connect(mission.droneId);

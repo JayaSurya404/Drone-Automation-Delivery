@@ -59,10 +59,11 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Ip() ip: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseBody> {
     const { user, tokens } = await this.authService.login(dto, { ip });
-    this.setRefreshCookie(res, tokens);
+    this.setRefreshCookie(res, tokens, req, user);
     return this.toResponseBody(user, tokens);
   }
 
@@ -74,29 +75,27 @@ export class AuthController {
     @Ip() ip: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseBody> {
-    const cookieName = this.configService.get("REFRESH_COOKIE_NAME", { infer: true });
-    const rawRefreshToken = req.cookies?.[cookieName] as string | undefined;
+    const incoming = this.resolveIncomingCookie(req);
 
-    if (!rawRefreshToken) {
+    if (!incoming) {
       throw new BadRequestException("No refresh session found");
     }
 
-    const { user, tokens } = await this.authService.refresh(rawRefreshToken, { ip });
-    this.setRefreshCookie(res, tokens);
+    const { user, tokens } = await this.authService.refresh(incoming.token, { ip });
+    this.setRefreshCookie(res, tokens, req, user, incoming.name);
     return this.toResponseBody(user, tokens);
   }
 
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
-    const cookieName = this.configService.get("REFRESH_COOKIE_NAME", { infer: true });
-    const rawRefreshToken = req.cookies?.[cookieName] as string | undefined;
+    const incoming = this.resolveIncomingCookie(req);
 
-    if (rawRefreshToken) {
-      await this.authService.logout(rawRefreshToken);
+    if (incoming) {
+      await this.authService.logout(incoming.token);
     }
 
-    res.clearCookie(cookieName, { path: "/api/v1/auth" });
+    this.clearAllRefreshCookies(res);
   }
 
   /** Phase 12 hardening — ends every session for the current user, not just this device (see `AuthService.logoutAll()`'s doc comment). */
@@ -105,8 +104,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async logoutAll(@CurrentUser() user: AuthenticatedUser, @Res({ passthrough: true }) res: Response): Promise<void> {
     await this.authService.logoutAll(user.sub);
-    const cookieName = this.configService.get("REFRESH_COOKIE_NAME", { infer: true });
-    res.clearCookie(cookieName, { path: "/api/v1/auth" });
+    this.clearAllRefreshCookies(res);
   }
 
   /**
@@ -162,8 +160,60 @@ export class AuthController {
     };
   }
 
-  private setRefreshCookie(res: Response, tokens: TokenPair): void {
-    const cookieName = this.configService.get("REFRESH_COOKIE_NAME", { infer: true });
+  private getRefreshCookieNames(): { defaultCookie: string; adminCookie: string; customerCookie: string } {
+    const defaultCookie = this.configService.get("REFRESH_COOKIE_NAME", { infer: true }) ?? "skynav_refresh_token";
+    const adminCookie = process.env.ADMIN_REFRESH_COOKIE_NAME ?? "skynav_admin_refresh_token";
+    const customerCookie = process.env.CUSTOMER_REFRESH_COOKIE_NAME ?? "skynav_customer_refresh_token";
+    return { defaultCookie, adminCookie, customerCookie };
+  }
+
+  private resolveIncomingCookie(req: Request): { name: string; token: string } | null {
+    const { defaultCookie, adminCookie, customerCookie } = this.getRefreshCookieNames();
+    const clientApp = req.headers["x-client-app"] as string | undefined;
+    const origin = (req.headers["origin"] as string | undefined) ?? (req.headers["referer"] as string | undefined);
+    const isAdminHint = clientApp === "admin" || (origin && origin.includes("5174"));
+
+    if (isAdminHint && req.cookies?.[adminCookie]) {
+      return { name: adminCookie, token: req.cookies[adminCookie] };
+    }
+    if (!isAdminHint && req.cookies?.[customerCookie]) {
+      return { name: customerCookie, token: req.cookies[customerCookie] };
+    }
+    if (req.cookies?.[adminCookie]) {
+      return { name: adminCookie, token: req.cookies[adminCookie] };
+    }
+    if (req.cookies?.[customerCookie]) {
+      return { name: customerCookie, token: req.cookies[customerCookie] };
+    }
+    if (req.cookies?.[defaultCookie]) {
+      return { name: defaultCookie, token: req.cookies[defaultCookie] };
+    }
+    return null;
+  }
+
+  private setRefreshCookie(
+    res: Response,
+    tokens: TokenPair,
+    req?: Request,
+    user?: PublicUser,
+    explicitCookieName?: string,
+  ): void {
+    const { defaultCookie, adminCookie, customerCookie } = this.getRefreshCookieNames();
+    let cookieName = explicitCookieName ?? defaultCookie;
+
+    if (!explicitCookieName) {
+      const clientApp = req?.headers["x-client-app"] as string | undefined;
+      const origin = (req?.headers["origin"] as string | undefined) ?? (req?.headers["referer"] as string | undefined);
+      const isAdminHint = clientApp === "admin" || (origin && origin.includes("5174"));
+      const isStaffUser = user?.roles ? user.roles.some((r) => r !== "customer" && r !== "guest") : false;
+
+      if (isAdminHint || isStaffUser) {
+        cookieName = adminCookie;
+      } else if (clientApp === "customer" || user) {
+        cookieName = customerCookie;
+      }
+    }
+
     res.cookie(cookieName, tokens.refreshToken, {
       httpOnly: true,
       secure: this.configService.get("NODE_ENV", { infer: true }) === "production",
@@ -171,5 +221,24 @@ export class AuthController {
       path: "/api/v1/auth",
       expires: tokens.refreshTokenExpiresAt,
     });
+
+    // In non-browser integration test runs without custom cookie names configured, ensure defaultCookie is available
+    if (cookieName !== defaultCookie && !process.env.ADMIN_REFRESH_COOKIE_NAME) {
+      res.cookie(defaultCookie, tokens.refreshToken, {
+        httpOnly: true,
+        secure: this.configService.get("NODE_ENV", { infer: true }) === "production",
+        sameSite: "lax",
+        path: "/api/v1/auth",
+        expires: tokens.refreshTokenExpiresAt,
+      });
+    }
+  }
+
+  private clearAllRefreshCookies(res: Response): void {
+    const { defaultCookie, adminCookie, customerCookie } = this.getRefreshCookieNames();
+    const cookieOptions = { path: "/api/v1/auth" };
+    res.clearCookie(defaultCookie, cookieOptions);
+    res.clearCookie(adminCookie, cookieOptions);
+    res.clearCookie(customerCookie, cookieOptions);
   }
 }

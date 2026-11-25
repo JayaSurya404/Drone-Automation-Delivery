@@ -19,10 +19,20 @@ export class ServiceAuthGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const provided = request.headers["x-service-api-key"];
+    const provided =
+      (request.headers["x-service-api-key"] as string | undefined) ??
+      (request.headers["x-service-key"] as string | undefined);
     const expected = this.configService.get("TELEMETRY_INGEST_API_KEY", { infer: true });
+    const fallbackExpected = process.env.SKYNAV_INTERNAL_SERVICE_KEY;
 
-    if (typeof provided !== "string" || !this.matches(provided, expected)) {
+    if (typeof provided !== "string") {
+      throw new UnauthorizedException("Invalid or missing service credential");
+    }
+
+    const matchesExpected = expected ? this.matches(provided, expected) : false;
+    const matchesFallback = fallbackExpected ? this.matches(provided, fallbackExpected) : false;
+
+    if (!matchesExpected && !matchesFallback) {
       throw new UnauthorizedException("Invalid or missing service credential");
     }
     return true;

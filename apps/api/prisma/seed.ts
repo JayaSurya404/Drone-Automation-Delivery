@@ -1,7 +1,3 @@
-// Seeds the 11 roles from docs/PROJECT_BLUEPRINT.md Section F with a
-// reasonable starting permission matrix, plus a bootstrap Super Admin
-// account so the admin console is reachable on a fresh database. Idempotent
-// — safe to re-run (upserts throughout).
 import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
 import { randomUUID } from "node:crypto";
@@ -50,7 +46,6 @@ const PERMISSIONS: Array<{ module: string; action: string; description: string }
   { module: "incidents", action: "read", description: "View incident reports" },
   { module: "analytics", action: "read", description: "View analytics dashboards" },
   { module: "system", action: "configure", description: "Change system configuration" },
-  // Advanced Drone Intelligence (Phase 11)
   { module: "vision", action: "read", description: "View computer-vision analyses and landing-zone evaluations" },
   { module: "vision", action: "analyze", description: "Trigger a simulated computer-vision frame analysis or landing-zone evaluation" },
   { module: "swarm", action: "read", description: "View swarms, membership, and swarm plans" },
@@ -63,43 +58,173 @@ const PERMISSIONS: Array<{ module: string; action: string; description: string }
 
 const ALL_PERMISSION_KEYS = PERMISSIONS.map((p) => `${p.module}.${p.action}`);
 
-// --- Demo catalog data (Phase 3) --------------------------------------
-// Realistic seed data so every later phase (checkout, delivery, drone
-// assignment...) has real products/hubs/stock to build against. Parent
-// categories must precede their children in this array.
-
-interface DemoCategory {
+interface SeedCategory {
   slug: string;
   name: string;
   description: string;
   parentSlug?: string;
 }
 
-const DEMO_CATEGORIES: DemoCategory[] = [
-  { slug: "groceries", name: "Groceries", description: "Everyday food and pantry staples" },
+const CATEGORIES: SeedCategory[] = [
+  // ── TARGET Master Categories (Indian Catalog) ──
+  { slug: "food", name: "Hot Meals & Food", description: "Fresh chef-crafted meals, authentic South Indian breakfast, and hot specialties delivered in 65°C thermal pods." },
+  { slug: "medicine", name: "Medicine & Health", description: "Emergency trauma response kits, analgesics, test strips, inhalers, and urgent medical supplies." },
+  { slug: "groceries", name: "Fresh Groceries", description: "Fresh farm pasteurized milk, aromatic Coimbatore filter coffee, pantry staples, and kitchen essentials." },
+  { slug: "electronics", name: "Tech & Electronics", description: "Ultra-fast GaN chargers, heavy-duty emergency power banks, and certified durable cables." },
+  { slug: "documents", name: "Instant Documents", description: "Tamper-evident biometric sealed pouches for urgent contracts, certificates, and notarized deeds." },
+  { slug: "daily-essentials", name: "Daily Essentials", description: "Traditional cold-pressed cooking oils, home lifestyle goods, and urgent daily convenience items." },
+  // Backward compatibility aliases/subcategories
   { slug: "snacks", name: "Snacks", description: "Chips, bars, and other snacks", parentSlug: "groceries" },
   { slug: "beverages", name: "Beverages", description: "Drinks, coffee, and tea", parentSlug: "groceries" },
-  { slug: "pharmacy", name: "Pharmacy", description: "Over-the-counter health essentials" },
-  { slug: "electronics", name: "Electronics", description: "Small electronics and accessories" },
+  { slug: "pharmacy", name: "Pharmacy", description: "Over-the-counter health essentials", parentSlug: "medicine" },
 ];
 
-interface DemoVariant {
+interface SeedVariant {
   sku: string;
   name: string;
   priceOverride?: number;
   stock: number;
 }
 
-interface DemoProduct {
+interface SeedProduct {
   slug: string;
   name: string;
   description: string;
   basePrice: number;
+  currency?: string;
   categorySlug: string;
-  variants: DemoVariant[];
+  variants: SeedVariant[];
 }
 
-const DEMO_PRODUCTS: DemoProduct[] = [
+const PRODUCTS: SeedProduct[] = [
+  // ── TARGET 14 Indian Products from shared/contracts/catalog.ts ──
+  {
+    slug: "kovai-crispy-masala-dosa-breakfast-box",
+    name: "Kovai Crispy Masala Dosa & Sambar Breakfast Box",
+    description: "Crisp golden brown dosa filled with spiced potato masala, served steaming hot at 65°C with coconut chutney and piping hot drumstick sambar.",
+    basePrice: 180.0,
+    currency: "INR",
+    categorySlug: "food",
+    variants: [{ sku: "SKU-FOOD-002", name: "Hot In-Flight Pod 65°C (550g)", stock: 50 }],
+  },
+  {
+    slug: "sri-krishna-ghee-roast-plain-dosa-set",
+    name: "Sri Krishna Pure Ghee Roast Plain Dosa & Chutney Set",
+    description: "Paper-thin golden crepe roasted with pure desi cow ghee on cast iron, accompanied by coconut chutney, tomato chutney, and aromatic sambar.",
+    basePrice: 140.0,
+    currency: "INR",
+    categorySlug: "food",
+    variants: [{ sku: "SKU-FOOD-DOSA-PLAIN", name: "Fresh Ghee Roast Set", stock: 45 }],
+  },
+  {
+    slug: "thalappakatti-dindigul-chicken-biryani-mini-bucket",
+    name: "Thalappakatti Dindigul Chicken Biryani Mini Bucket",
+    description: "Authentic Seeraga Samba rice chicken biryani infused with 17 freshly ground hill spices, tender chicken pieces, served with boiled egg and curd raita.",
+    basePrice: 360.0,
+    currency: "INR",
+    categorySlug: "food",
+    variants: [{ sku: "SKU-FOOD-BIRYANI", name: "Single Diner Mini Bucket (650g)", stock: 35 }],
+  },
+  {
+    slug: "annapoorna-steamed-soft-button-idlis",
+    name: "Annapoorna Steamed Soft Button Idlis with 3 Chutneys",
+    description: "14 mini fluffy button idlis immersed in hot signature Kovai tiffin sambar with pure ghee drizzle, accompanied by fresh coconut and coriander chutneys.",
+    basePrice: 120.0,
+    currency: "INR",
+    categorySlug: "food",
+    variants: [{ sku: "SKU-FOOD-001", name: "14 Mini Idlis + 3 Chutneys", stock: 60 }],
+  },
+  {
+    slug: "trauma-first-aid-burn-emergency-flight-kit",
+    name: "Trauma First Aid & Burn Emergency Flight Kit",
+    description: "Hospital-grade sterile emergency kit featuring sterile burn hydrogel dressings, hemostatic gauze, pressure tourniquet, antiseptic wipes, and trauma shears.",
+    basePrice: 650.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    variants: [{ sku: "SKU-MED-001", name: "Complete Drone Trauma Pack (420g)", stock: 40 }],
+  },
+  {
+    slug: "dolo-650-paracetamol-antipyretic-strips",
+    name: "Dolo-650 Paracetamol Antipyretic Strips (15 Tabs)",
+    description: "Fast-acting Paracetamol 650mg tablets for rapid relief of high fever, headaches, body pain, and influenza symptoms.",
+    basePrice: 45.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    variants: [{ sku: "SKU-MED-DOLO", name: "15 Tablets Foil Strip", stock: 100 }],
+  },
+  {
+    slug: "asthalin-100mcg-salbutamol-emergency-rescue-inhaler",
+    name: "Asthalin 100mcg Salbutamol Emergency Rescue Inhaler",
+    description: "Fast-acting bronchodilator inhaler providing urgent relief from bronchospasm in asthma, chronic bronchitis, and respiratory distress.",
+    basePrice: 185.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    variants: [{ sku: "SKU-MED-INHALER", name: "200 Metered Doses", stock: 30 }],
+  },
+  {
+    slug: "electral-who-formula-oral-rehydration-salts",
+    name: "Electral WHO-Formula Oral Rehydration Salts (Pack of 5)",
+    description: "Scientifically formulated oral electrolyte and glucose replacement powder restoring vital salts and fluids lost during dehydration and heat exhaustion.",
+    basePrice: 35.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    variants: [{ sku: "SKU-MED-ORS", name: "5 Sachet Value Pack", stock: 80 }],
+  },
+  {
+    slug: "coimbatore-specialty-fresh-ground-filter-coffee",
+    name: "Coimbatore Specialty Fresh Ground Filter Coffee (500g)",
+    description: "80:20 Arabica-Robusta blend enriched with premium chicory, freshly roasted and micro-ground in Coimbatore for rich aromatic South Indian filter decoction.",
+    basePrice: 240.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    variants: [{ sku: "SKU-GROC-001", name: "500g Vacuum Sealed Pack", stock: 55 }],
+  },
+  {
+    slug: "aavin-daily-farm-fresh-whole-milk",
+    name: "Aavin Daily Farm Fresh Whole Milk (1 Litre Pouch)",
+    description: "Pasteurized homogenized full-cream cow milk delivered fresh chilled under 4°C in insulated cargo bay.",
+    basePrice: 52.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    variants: [{ sku: "SKU-GROC-MILK", name: "1 Litre Chilled Pouch", stock: 75 }],
+  },
+  {
+    slug: "65w-fast-gan-multi-port-quick-charger",
+    name: "65W Fast GaN Multi-Port Drone-Delivered Quick Charger",
+    description: "Compact gallium nitride (GaN) high-efficiency charger with dual USB-C and USB-A ports supporting 65W Power Delivery for laptops, tablets, and phones.",
+    basePrice: 1899.0,
+    currency: "INR",
+    categorySlug: "electronics",
+    variants: [{ sku: "SKU-ELEC-001", name: "Matte Black 65W GaN Pod", stock: 25 }],
+  },
+  {
+    slug: "heavy-duty-20000mah-rapid-charge-power-bank",
+    name: "Heavy-Duty 20000mAh Rapid Charge Power Bank (22.5W)",
+    description: "High-capacity aviation-safe Li-Polymer emergency portable power station with bi-directional fast charging and LED percentage display.",
+    basePrice: 1499.0,
+    currency: "INR",
+    categorySlug: "electronics",
+    variants: [{ sku: "SKU-ELEC-PBANK", name: "20,000mAh Power Reserve", stock: 20 }],
+  },
+  {
+    slug: "biometric-tamper-evident-contract-pouch",
+    name: "Biometric Tamper-Evident High-Priority Contract Pouch",
+    description: "Reinforced water-resistant security pouch with numeric tamper seal, digital tracking tag, and tear-proof ballistic nylon for urgent legal documents.",
+    basePrice: 450.0,
+    currency: "INR",
+    categorySlug: "documents",
+    variants: [{ sku: "SKU-DOC-001", name: "Legal Document Pouch (A4/Legal)", stock: 50 }],
+  },
+  {
+    slug: "cold-pressed-groundnut-cooking-oil",
+    name: "Cold-Pressed Traditional Groundnut Cooking Oil (1 Litre)",
+    description: "100% pure traditional wooden-cold-pressed (Mara Chekku) groundnut oil from Pollachi peanuts. Unrefined, unbleached, retaining natural antioxidants.",
+    basePrice: 320.0,
+    currency: "INR",
+    categorySlug: "daily-essentials",
+    variants: [{ sku: "SKU-OTHER-OIL", name: "1 Litre Glass Bottle", stock: 40 }],
+  },
+  // Reference demo products for test backward compatibility
   {
     slug: "sea-salt-tortilla-chips",
     name: "Sea Salt Tortilla Chips",
@@ -258,7 +383,7 @@ const ROLES: Array<{ name: string; description: string; permissions: string[] }>
   },
   {
     name: "system_service_account",
-    description: "Internal service-to-service calls (e.g. drone simulator)",
+    description: "Internal service-to-service calls (e.g. drone simulator, Gazebo bridge)",
     permissions: ["telemetry.ingest"],
   },
 ];
@@ -297,7 +422,6 @@ async function main() {
 
   const bootstrapEmail = process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL ?? "admin@skynav.local";
   const bootstrapPassword = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD ?? "ChangeMe123!";
-
   console.log(`Ensuring bootstrap Super Admin (${bootstrapEmail})...`);
   const existingAdmin = await prisma.user.findUnique({ where: { email: bootstrapEmail } });
   if (!existingAdmin) {
@@ -315,33 +439,68 @@ async function main() {
       },
     });
     console.log("Bootstrap Super Admin created.");
-  } else {
-    console.log("Bootstrap Super Admin already exists — skipping.");
   }
 
-  console.log("Ensuring demo fulfillment hub...");
-  const hubCode = "HUB-DOWNTOWN";
-  let hub = await prisma.fulfillmentHub.findUnique({ where: { code: hubCode } });
-  if (!hub) {
-    // FulfillmentHub.location is an Unsupported("geography(Point, 4326)")
-    // column — Prisma Client has no field for it, so it's written via raw SQL.
+  const customerEmail = process.env.CUSTOMER_SEED_EMAIL ?? "customer@skynav.local";
+  const customerPassword = process.env.CUSTOMER_SEED_PASSWORD ?? "ChangeMe123!";
+  console.log(`Ensuring bootstrap Customer (${customerEmail})...`);
+  const existingCustomer = await prisma.user.findUnique({ where: { email: customerEmail } });
+  if (!existingCustomer) {
+    const passwordHash = await argon2.hash(customerPassword, { type: argon2.argon2id });
+    const customerRole = await prisma.role.findUniqueOrThrow({ where: { name: "customer" } });
+    await prisma.user.create({
+      data: {
+        email: customerEmail,
+        passwordHash,
+        firstName: "Priya",
+        lastName: "Sundaram",
+        isActive: true,
+        isEmailVerified: true,
+        roles: { create: [{ roleId: customerRole.id }] },
+      },
+    });
+    console.log("Bootstrap Customer created.");
+  }
+
+  console.log("Ensuring fulfillment hubs (SkyHub Kurumbapalayam & Downtown)...");
+  // SkyHub Kurumbapalayam, Coimbatore (11.1132°N, 77.0277°E)
+  const kurumbaCode = "HUB-KURUMBAPALAYAM";
+  let kurumbaHub = await prisma.fulfillmentHub.findUnique({ where: { code: kurumbaCode } });
+  if (!kurumbaHub) {
     await prisma.$executeRaw`
       INSERT INTO fulfillment_hubs (id, name, code, address, location, is_active, created_at, updated_at)
       VALUES (
-        ${randomUUID()}, 'Downtown Hub', ${hubCode}, '100 Main St, Springfield',
+        ${randomUUID()}, 'SkyHub Kurumbapalayam', ${kurumbaCode},
+        'SF No. 120/1, Avinashi Road, Kurumbapalayam, Coimbatore, Tamil Nadu 641107',
+        ST_SetSRID(ST_MakePoint(77.0277, 11.1132), 4326)::geography,
+        true, now(), now()
+      )
+    `;
+    kurumbaHub = await prisma.fulfillmentHub.findUniqueOrThrow({ where: { code: kurumbaCode } });
+    console.log("SkyHub Kurumbapalayam created.");
+  }
+
+  // Downtown Hub alias for backward test compatibility
+  const downtownCode = "HUB-DOWNTOWN";
+  let downtownHub = await prisma.fulfillmentHub.findUnique({ where: { code: downtownCode } });
+  if (!downtownHub) {
+    await prisma.$executeRaw`
+      INSERT INTO fulfillment_hubs (id, name, code, address, location, is_active, created_at, updated_at)
+      VALUES (
+        ${randomUUID()}, 'Downtown Hub', ${downtownCode}, '100 Main St, Springfield',
         ST_SetSRID(ST_MakePoint(-93.2650, 44.9778), 4326)::geography,
         true, now(), now()
       )
     `;
-    hub = await prisma.fulfillmentHub.findUniqueOrThrow({ where: { code: hubCode } });
-    console.log("Demo fulfillment hub created.");
-  } else {
-    console.log("Demo fulfillment hub already exists — skipping.");
+    downtownHub = await prisma.fulfillmentHub.findUniqueOrThrow({ where: { code: downtownCode } });
+    console.log("Downtown Hub created.");
   }
 
-  console.log("Seeding demo catalog (categories, products, variants, stock)...");
+  const primaryHub = kurumbaHub;
+
+  console.log("Seeding catalog (categories, products, variants, stock)...");
   const categoryIdBySlug = new Map<string, string>();
-  for (const category of DEMO_CATEGORIES) {
+  for (const category of CATEGORIES) {
     const parentId = category.parentSlug ? categoryIdBySlug.get(category.parentSlug) : undefined;
     const row = await prisma.category.upsert({
       where: { slug: category.slug },
@@ -351,122 +510,240 @@ async function main() {
     categoryIdBySlug.set(category.slug, row.id);
   }
 
-  for (const demoProduct of DEMO_PRODUCTS) {
-    const categoryId = categoryIdBySlug.get(demoProduct.categorySlug);
+  for (const productData of PRODUCTS) {
+    const categoryId = categoryIdBySlug.get(productData.categorySlug);
     const product = await prisma.product.upsert({
-      where: { slug: demoProduct.slug },
+      where: { slug: productData.slug },
       update: {
-        name: demoProduct.name,
-        description: demoProduct.description,
-        basePrice: demoProduct.basePrice,
+        name: productData.name,
+        description: productData.description,
+        basePrice: productData.basePrice,
+        currency: productData.currency ?? "INR",
         categoryId,
       },
       create: {
-        slug: demoProduct.slug,
-        name: demoProduct.name,
-        description: demoProduct.description,
-        basePrice: demoProduct.basePrice,
+        slug: productData.slug,
+        name: productData.name,
+        description: productData.description,
+        basePrice: productData.basePrice,
+        currency: productData.currency ?? "INR",
         categoryId,
       },
     });
 
-    for (const demoVariant of demoProduct.variants) {
+    for (const variantData of productData.variants) {
       const variant = await prisma.productVariant.upsert({
-        where: { sku: demoVariant.sku },
-        update: { name: demoVariant.name, priceOverride: demoVariant.priceOverride, productId: product.id },
+        where: { sku: variantData.sku },
+        update: { name: variantData.name, priceOverride: variantData.priceOverride, productId: product.id },
         create: {
-          sku: demoVariant.sku,
-          name: demoVariant.name,
-          priceOverride: demoVariant.priceOverride,
+          sku: variantData.sku,
+          name: variantData.name,
+          priceOverride: variantData.priceOverride,
           productId: product.id,
         },
       });
 
+      // Stock at primary hub (Kurumbapalayam)
       await prisma.inventoryItem.upsert({
-        where: { variantId_hubId: { variantId: variant.id, hubId: hub.id } },
-        update: { quantityOnHand: demoVariant.stock },
+        where: { variantId_hubId: { variantId: variant.id, hubId: primaryHub.id } },
+        update: { quantityOnHand: variantData.stock },
         create: {
           variantId: variant.id,
-          hubId: hub.id,
-          quantityOnHand: demoVariant.stock,
+          hubId: primaryHub.id,
+          quantityOnHand: variantData.stock,
+          lowStockThreshold: 5,
+        },
+      });
+
+      // Stock at secondary hub (Downtown)
+      await prisma.inventoryItem.upsert({
+        where: { variantId_hubId: { variantId: variant.id, hubId: downtownHub.id } },
+        update: { quantityOnHand: variantData.stock },
+        create: {
+          variantId: variant.id,
+          hubId: downtownHub.id,
+          quantityOnHand: variantData.stock,
           lowStockThreshold: 5,
         },
       });
     }
   }
 
-  console.log("Seeding demo fleet drones...");
+  console.log("Seeding 40 drones at SkyHub Kurumbapalayam (D-001 through D-040)...");
   const [hubCoords] = await prisma.$queryRaw<Array<{ lat: number; lng: number }>>`
     SELECT ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng
-    FROM fulfillment_hubs WHERE id = ${hub.id}
+    FROM fulfillment_hubs WHERE id = ${primaryHub.id}
   `;
-  const DEMO_DRONES = [
-    { serialNumber: "SKN-DRN-001", name: "Falcon One", model: "SkyNav X1" },
-    { serialNumber: "SKN-DRN-002", name: "Falcon Two", model: "SkyNav X1" },
-  ];
-  for (const demoDrone of DEMO_DRONES) {
+
+  // 40 Drones assigned to SkyHub Kurumbapalayam
+  for (let i = 1; i <= 40; i++) {
+    const pad = i.toString().padStart(3, "0");
+    const droneName = `D-${pad}`;
+    const serialNumber = `SKN-DRN-${pad}`;
+    const isMaintenance = i === 40; // Drone D-040 flagged for maintenance as demo
+
     await prisma.drone.upsert({
-      where: { serialNumber: demoDrone.serialNumber },
-      update: {},
-      create: {
-        serialNumber: demoDrone.serialNumber,
-        name: demoDrone.name,
-        model: demoDrone.model,
-        adapterType: "SIMULATED",
-        status: "IDLE",
-        homeHubId: hub.id,
-        batteryPercent: 100,
+      where: { serialNumber },
+      update: {
+        name: droneName,
         currentLat: hubCoords.lat,
         currentLng: hubCoords.lng,
+        batteryPercent: isMaintenance ? 12 : 100,
+        maxPayloadKg: 5.0,
+        maxSpeedMps: 13.889, // 50 km/h cruise
+        maxAltitudeMeters: 120,
+        maxRangeKm: 25.0,
+        homeHubId: primaryHub.id,
+        status: isMaintenance ? "MAINTENANCE" : "IDLE",
+        isMaintenanceMode: isMaintenance,
+        maintenanceNote: isMaintenance ? "Scheduled 100-cycle motor bearing inspection" : null,
+      },
+      create: {
+        serialNumber,
+        name: droneName,
+        model: "SkyNav X-Hexacopter Pro",
+        adapterType: "SIMULATED",
+        status: isMaintenance ? "MAINTENANCE" : "IDLE",
+        homeHubId: primaryHub.id,
+        batteryPercent: isMaintenance ? 12 : 100,
+        currentLat: hubCoords.lat,
+        currentLng: hubCoords.lng,
+        maxPayloadKg: 5.0,
+        maxSpeedMps: 13.889,
+        maxAltitudeMeters: 120,
+        maxRangeKm: 25.0,
+        isMaintenanceMode: isMaintenance,
+        maintenanceNote: isMaintenance ? "Scheduled 100-cycle motor bearing inspection" : null,
       },
     });
   }
+  console.log("40 Drones seeded successfully at Kurumbapalayam.");
 
-  console.log("Seeding demo geofences...");
-  // Self-contained WKT construction (not imported from `src/modules/geofencing`)
-  // — same "seed.ts stays independent of the Nest app source" convention
-  // `services/drone-simulator`'s duplicated simulation math already
-  // established in Phase 6, so this script keeps running under plain
-  // `ts-node --transpile-only` with no extra path/bundler config.
+  console.log("Seeding Coimbatore DGCA No-Fly Zones & Airspace boundaries...");
+  function circularPolygonWkt(center: { lat: number; lng: number }, radiusMeters: number, points = 24): string {
+    const coords: string[] = [];
+    const latDegPerMeter = 1 / 111320;
+    const lngDegPerMeter = 1 / (111320 * Math.cos((center.lat * Math.PI) / 180));
+    for (let i = 0; i <= points; i++) {
+      const angle = (i * 2 * Math.PI) / points;
+      const dLat = radiusMeters * Math.sin(angle) * latDegPerMeter;
+      const dLng = radiusMeters * Math.cos(angle) * lngDegPerMeter;
+      coords.push(`${(center.lng + dLng).toFixed(6)} ${(center.lat + dLat).toFixed(6)}`);
+    }
+    return `POLYGON((${coords.join(", ")}))`;
+  }
+
   function squareWkt(center: { lat: number; lng: number }, halfWidthDeg: number): string {
     const { lat, lng } = center;
-    const points = [
+    const pts = [
       [lng - halfWidthDeg, lat - halfWidthDeg],
       [lng + halfWidthDeg, lat - halfWidthDeg],
       [lng + halfWidthDeg, lat + halfWidthDeg],
       [lng - halfWidthDeg, lat + halfWidthDeg],
       [lng - halfWidthDeg, lat - halfWidthDeg],
     ];
-    return `POLYGON((${points.map((p) => p.join(" ")).join(", ")}))`;
+    return `POLYGON((${pts.map((p) => p.join(" ")).join(", ")}))`;
   }
 
-  const existingGeofences = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*)::bigint as count FROM geofences`;
-  if (Number(existingGeofences[0]?.count ?? 0) === 0) {
-    // Comfortably contains every demo destination — resolveDeterministicDestination()
-    // (missions/route.util.ts) offsets at most ±0.02 degrees from the hub.
+  // Check if Coimbatore zones exist
+  const existingZ = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT count(*)::bigint as count FROM geofences WHERE name LIKE '%Coimbatore%' OR name LIKE '%Sulur%'
+  `;
+
+  if (Number(existingZ[0]?.count ?? 0) === 0) {
+    // 1. VOCB-RED-RUNWAY: Coimbatore International Airport Runway Security Zone
+    const vocbWkt = "POLYGON((77.0305 11.0385, 77.0560 11.0425, 77.0590 11.0245, 77.0335 11.0205, 77.0305 11.0385))";
     await prisma.$executeRaw`
-      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_by_id, created_at, updated_at)
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
+      VALUES (
+        ${randomUUID()}, 'Coimbatore International Airport Runway Security Zone (VOCB-RED-RUNWAY)',
+        'NO_FLY'::"GeofenceType",
+        'Active commercial runway 05/23 and primary terminal boundary. Prohibited Red Zone under DGCA Drone Rules 2021.',
+        ST_GeomFromText(${vocbWkt}, 4326), true, now(), now()
+      )
+    `;
+
+    // 2. VO47-RED-MIL: Sulur Air Force Station Military Airspace Red Zone
+    const vo47Wkt = "POLYGON((77.1425 11.02528, 77.17222 11.02861, 77.17556 11.00194, 77.14583 10.99861, 77.1425 11.02528))";
+    await prisma.$executeRaw`
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
+      VALUES (
+        ${randomUUID()}, 'Sulur Air Force Station Military Airspace (VO47-RED-MIL)',
+        'NO_FLY'::"GeofenceType",
+        'Indian Air Force Fighter Base & Military Flight Training Area. Red Zone: Strictly prohibited without Ministry of Defence clearance.',
+        ST_GeomFromText(${vo47Wkt}, 4326), true, now(), now()
+      )
+    `;
+
+    // 3. CMCH-HELI-CORR: Coimbatore Medical College Hospital Trauma Heliport Corridor (1200m radius around 10.9996, 76.9664)
+    const cmchWkt = circularPolygonWkt({ lat: 10.9996, lng: 76.9664 }, 1200);
+    await prisma.$executeRaw`
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
+      VALUES (
+        ${randomUUID()}, 'Coimbatore Medical College Hospital Heliport Corridor (CMCH-HELI-CORR)',
+        'RESTRICTED'::"GeofenceType",
+        'Emergency Medevac helicopter transit corridor. Drones must maintain safe lateral separation and max 35m altitude.',
+        ST_GeomFromText(${cmchWkt}, 4326), true, now(), now()
+      )
+    `;
+
+    // 4. CBE-GOV-SEC: Coimbatore District Collectorate Security Enclave (800m radius around 11.0018, 76.9629)
+    const cbeGovWkt = circularPolygonWkt({ lat: 11.0018, lng: 76.9629 }, 800);
+    await prisma.$executeRaw`
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
+      VALUES (
+        ${randomUUID()}, 'Coimbatore District Collectorate & Police Commissionerate (CBE-GOV-SEC)',
+        'RESTRICTED'::"GeofenceType",
+        'Dense municipal government & law enforcement complex. Speed limit 30 km/h mandatory.',
+        ST_GeomFromText(${cbeGovWkt}, 4326), true, now(), now()
+      )
+    `;
+
+    // 5. PSG-MED-CORR: PSG Hospitals Air Corridor (1000m radius around 11.0250, 77.0300)
+    const psgWkt = circularPolygonWkt({ lat: 11.0250, lng: 77.0300 }, 1000);
+    await prisma.$executeRaw`
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
+      VALUES (
+        ${randomUUID()}, 'PSG Hospitals & Health Campus Air Corridor (PSG-MED-CORR)',
+        'RESTRICTED'::"GeofenceType",
+        'Hospital quiet zone & ambulance transit corridor. Acoustic optimization active.',
+        ST_GeomFromText(${psgWkt}, 4326), true, now(), now()
+      )
+    `;
+
+    // 6. Coimbatore Metro & Kurumbapalayam Service Area
+    const serviceAreaWkt = squareWkt({ lat: 11.1132, lng: 77.0277 }, 0.12);
+    await prisma.$executeRaw`
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
+      VALUES (
+        ${randomUUID()}, 'Coimbatore Metro & Kurumbapalayam Air Corridor',
+        'SERVICE_AREA'::"GeofenceType",
+        'Authoritative operational service area for autonomous drone deliveries from SkyHub Kurumbapalayam.',
+        ST_GeomFromText(${serviceAreaWkt}, 4326), true, now(), now()
+      )
+    `;
+
+    // Demo zones for test backward compatibility
+    const demoCenter = { lat: 44.9778, lng: -93.265 };
+    await prisma.$executeRaw`
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
       VALUES (
         ${randomUUID()}, 'Metro Service Area', 'SERVICE_AREA'::"GeofenceType",
-        'The default deliverable area around the downtown hub.',
-        ST_GeomFromText(${squareWkt(hubCoords, 0.05)}, 4326), true, NULL, now(), now()
+        'Demo deliverable area around the downtown hub.',
+        ST_GeomFromText(${squareWkt(demoCenter, 0.05)}, 4326), true, now(), now()
       )
     `;
-    // Offset well outside the ±0.02 degree demo-destination range so it
-    // never blocks the default happy-path demo mission — it exists to
-    // demonstrate the geofence-blocking behavior on request (see
-    // docs/SETUP.md), not to interfere with it.
     await prisma.$executeRaw`
-      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_by_id, created_at, updated_at)
+      INSERT INTO geofences (id, name, type, description, polygon, is_active, created_at, updated_at)
       VALUES (
         ${randomUUID()}, 'North Airfield No-Fly Zone', 'NO_FLY'::"GeofenceType",
-        'Demo no-fly zone — north of the demo delivery range, safe to test geofence blocking against.',
-        ST_GeomFromText(${squareWkt({ lat: hubCoords.lat + 0.08, lng: hubCoords.lng }, 0.01)}, 4326), true, NULL, now(), now()
+        'Demo no-fly zone north of delivery range.',
+        ST_GeomFromText(${squareWkt({ lat: demoCenter.lat + 0.08, lng: demoCenter.lng }, 0.01)}, 4326), true, now(), now()
       )
     `;
-    console.log("Demo geofences created (Metro Service Area, North Airfield No-Fly Zone).");
+    console.log("Coimbatore DGCA no-fly zones and service areas created.");
   } else {
-    console.log("Geofences already exist — skipping.");
+    console.log("Geofences already seeded — skipping.");
   }
 
   console.log("Seed complete.");
