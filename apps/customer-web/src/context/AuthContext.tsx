@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { CustomerUser, LoginPayload, RegisterPayload, ResetPasswordPayload, PendingAction } from '../types/auth';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { storage } from '../services/storage';
 import { api, customerApiClient } from '../services/api';
 
@@ -48,108 +47,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     storage.remove(PENDING_ACTION_KEY);
   };
 
-  // Helper to fetch profile from public.profiles
-  const fetchUserProfile = async (supabaseUser: any): Promise<CustomerUser> => {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', supabaseUser.id)
-        .single();
-
-      const { data: prefs } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', supabaseUser.id)
-        .single();
-
-      return {
-        id: supabaseUser.id,
-        name: profile?.name || supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'Customer',
-        email: supabaseUser.email || '',
-        phone: profile?.phone || supabaseUser.user_metadata?.phone || '+1 (555) 000-0000',
-        avatar: profile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        accountStatus: 'active',
-        isVerified: Boolean(supabaseUser.email_confirmed_at || supabaseUser.confirmed_at),
-        createdAt: supabaseUser.created_at || new Date().toISOString(),
-        updatedAt: profile?.updated_at || new Date().toISOString(),
-        notificationPreferences: {
-          emailUpdates: prefs?.email_updates ?? true,
-          smsAlerts: prefs?.sms_alerts ?? true,
-          droneProximitySound: prefs?.drone_proximity_sound ?? true,
-        },
-      };
-    } catch {
-      return {
-        id: supabaseUser.id,
-        name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'Customer',
-        email: supabaseUser.email || '',
-        phone: '+1 (555) 000-0000',
-        accountStatus: 'active',
-        isVerified: Boolean(supabaseUser.email_confirmed_at || supabaseUser.confirmed_at),
-        createdAt: supabaseUser.created_at || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        notificationPreferences: { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
-      };
-    }
-  };
-
-  // Initialize Supabase Auth & Listen to State Changes
+  // Initialize Auth via unified API refresh cookie (in-memory access token)
   useEffect(() => {
     let mounted = true;
 
     const initAuth = async () => {
-      if (!isSupabaseConfigured()) {
-        try {
-          const authRes = await customerApiClient.refresh();
-          if (authRes && mounted) {
-            const u = authRes.user;
-            const mappedUser: CustomerUser = {
-              id: u.id,
-              name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email.split('@')[0],
-              email: u.email,
-              phone: '+91 98765 43210',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-              accountStatus: 'active',
-              isVerified: u.isEmailVerified,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              notificationPreferences: { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
-            };
-            setUser(mappedUser);
-            setToken(authRes.accessToken);
-            storage.set(storage.keys.AUTH_USER, mappedUser);
-          } else if (mounted) {
-            setUser(null);
-            setToken(null);
-            storage.remove(storage.keys.AUTH_USER);
-            storage.remove(storage.keys.AUTH_TOKEN);
-          }
-        } catch {
-          if (mounted) {
-            setUser(null);
-            setToken(null);
-            storage.remove(storage.keys.AUTH_USER);
-            storage.remove(storage.keys.AUTH_TOKEN);
-          }
-        } finally {
-          if (mounted) setIsLoading(false);
-        }
-        return;
-      }
-
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user && mounted) {
-          const profile = await fetchUserProfile(session.user);
-          setUser(profile);
-          setToken(session.access_token);
+        const authRes = await customerApiClient.refresh();
+        if (authRes && mounted) {
+          const u = authRes.user;
+          const mappedUser: CustomerUser = {
+            id: u.id,
+            name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email.split('@')[0],
+            email: u.email,
+            phone: '+91 98765 43210',
+            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+            accountStatus: 'active',
+            isVerified: u.isEmailVerified,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            notificationPreferences: { emailUpdates: true, smsAlerts: true, droneProximitySound: true },
+          };
+          setUser(mappedUser);
+          setToken(authRes.accessToken);
         } else if (mounted) {
           setUser(null);
           setToken(null);
         }
-      } catch (err) {
-        console.error('Error initializing Supabase session:', err);
+      } catch {
         if (mounted) {
           setUser(null);
           setToken(null);
@@ -161,62 +86,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // Supabase Auth State Change Listener (Only when Supabase is configured)
-    let subscription: any = null;
-    if (isSupabaseConfigured()) {
-      const sub = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user);
-          setUser(profile);
-          setToken(session.access_token);
-        } else {
-          setUser(null);
-          setToken(null);
-        }
-        setIsLoading(false);
-      });
-      subscription = sub.data?.subscription;
-    }
-
     return () => {
       mounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
     };
   }, []);
 
   const login = async (payload: LoginPayload) => {
     setIsLoading(true);
     try {
-      if (isSupabaseConfigured()) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: payload.email.trim(),
-          password: payload.password,
-        });
-
-        if (error) {
-          throw new Error(error.message || 'Invalid email or password.');
-        }
-
-        if (!data.user || !data.session) {
-          throw new Error('Authentication failed. Please try again.');
-        }
-
-        const profile = await fetchUserProfile(data.user);
-        setUser(profile);
-        setToken(data.session.access_token);
-        return { user: profile, token: data.session.access_token };
-      } else {
-        const res = await api.auth.login(payload);
-        setUser(res.user);
-        setToken(res.token);
-        storage.set(storage.keys.AUTH_USER, res.user);
-        if (payload.email?.trim().toLowerCase() === 'customer@skynav') {
-          storage.set('skynav_permanent_delivery_pin', '4827');
-        }
-        return res;
+      const res = await api.auth.login(payload);
+      setUser(res.user);
+      setToken(res.token);
+      if (payload.email?.trim().toLowerCase() === 'customer@skynav') {
+        storage.set('skynav_permanent_delivery_pin', '4827');
       }
+      return res;
     } finally {
       setIsLoading(false);
     }
@@ -225,59 +109,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (payload: RegisterPayload) => {
     setIsLoading(true);
     try {
-      if (isSupabaseConfigured()) {
-        const { data, error } = await supabase.auth.signUp({
-          email: payload.email.trim(),
-          password: payload.password,
-          options: {
-            data: {
-              full_name: payload.name.trim(),
-              phone: payload.phone.trim(),
-            },
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
-        });
-
-        if (error) {
-          throw new Error(error.message || 'Registration failed.');
-        }
-
-        const isConfirmed = Boolean(data.user?.email_confirmed_at || data.user?.confirmed_at);
-        let profile: CustomerUser | null = null;
-
-        if (data.user && isConfirmed) {
-          profile = await fetchUserProfile(data.user);
-          setUser(profile);
-          if (data.session) {
-            setToken(data.session.access_token);
-          }
-        }
-
-        return {
-          user: profile,
-          token: data.session?.access_token,
-          requiresVerification: !isConfirmed,
-          email: payload.email.trim(),
-          message: isConfirmed
-            ? 'Account created successfully!'
-            : 'Registration successful! Please check your email inbox to verify your account.',
-        };
-      } else {
-        const res = await api.auth.register(payload);
-        if (res.user && res.token) {
-          setUser(res.user);
-          setToken(res.token);
-          storage.set(storage.keys.AUTH_USER, res.user);
-          storage.set(storage.keys.AUTH_TOKEN, res.token);
-        }
-        if (res.deliveryPin) {
-          storage.set('skynav_permanent_delivery_pin', res.deliveryPin);
-        }
-        return {
-          ...res,
-          requiresVerification: false,
-        };
+      const res = await api.auth.register(payload);
+      if (res.user && res.token) {
+        setUser(res.user);
+        setToken(res.token);
       }
+      if (res.deliveryPin) {
+        storage.set('skynav_permanent_delivery_pin', res.deliveryPin);
+      }
+      return {
+        ...res,
+        requiresVerification: false,
+      };
     } finally {
       setIsLoading(false);
     }
@@ -288,8 +131,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (res.user && res.token) {
       setUser(res.user);
       setToken(res.token);
-      storage.set(storage.keys.AUTH_USER, res.user);
-      storage.set(storage.keys.AUTH_TOKEN, res.token);
     }
     return res;
   };
@@ -299,44 +140,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const forgotPassword = async (email: string) => {
-    if (isSupabaseConfigured()) {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw new Error(error.message);
-      return 'Password reset link has been dispatched to your email.';
-    } else {
-      const res = await api.auth.forgotPassword(email);
-      return res.message;
-    }
+    const res = await api.auth.forgotPassword(email);
+    return res.message;
   };
 
   const resetPassword = async (payload: ResetPasswordPayload) => {
-    if (isSupabaseConfigured()) {
-      const password = payload.newPassword || payload.password;
-      if (!password) throw new Error('Password is required.');
-      const { error } = await supabase.auth.updateUser({
-        password,
-      });
-      if (error) throw new Error(error.message);
-      return 'Password updated successfully.';
-    } else {
-      const res = await api.auth.resetPassword({
-        email: payload.email || '',
-        code: payload.code || '',
-        password: payload.newPassword || payload.password || '',
-        confirmPassword: payload.confirmPassword || '',
-      });
-      return res.message;
-    }
+    const res = await api.auth.resetPassword({
+      email: payload.email || '',
+      code: payload.code || '',
+      password: payload.newPassword || payload.password || '',
+      confirmPassword: payload.confirmPassword || '',
+    });
+    return res.message;
   };
 
   const logout = async () => {
-    if (isSupabaseConfigured()) {
-      await supabase.auth.signOut();
-    } else {
-      await api.auth.logout();
-    }
+    await api.auth.logout();
     setUser(null);
     setToken(null);
     clearPendingAction();
@@ -344,23 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (updates: Partial<CustomerUser>) => {
     if (!user) throw new Error('Not authenticated');
-
-    if (isSupabaseConfigured()) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: updates.name,
-          phone: updates.phone,
-          avatar_url: updates.avatar,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (error) throw new Error(error.message);
-    } else {
-      await api.customer.updateProfile(updates);
-    }
-
+    await api.customer.updateProfile(updates);
     const updated = { ...user, ...updates };
     setUser(updated);
     return updated;
@@ -393,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
