@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { queryOne } from '../db/database.js';
-import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.js';
+import { authenticateToken, verifyCustomerToken, AuthenticatedRequest } from '../middleware/auth.js';
 import { droneTrackingService } from '../services/droneTrackingService.js';
 
 const router = Router();
@@ -36,10 +36,28 @@ router.get('/:orderId', authenticateToken, (req: AuthenticatedRequest, res: Resp
   }
 });
 
-// 2. REALTIME SERVER-SENT EVENTS (SSE) STREAM FOR LIVE TELEMETRY
+// 2. REALTIME SERVER-SENT EVENTS (SSE) STREAM FOR LIVE TELEMETRY (AUTHENTICATED & ISOLATED)
 router.get('/:orderId/events', (req, res): void => {
   const orderId = req.params.orderId as string;
-  const token = req.query.token as string;
+  const authHeader = req.headers['authorization'];
+  const bearer = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  const token = (req.query.token as string) || bearer;
+
+  const authResult = verifyCustomerToken(token);
+  if (!authResult.user) {
+    res.status(authResult.status || 401).json({ error: authResult.error });
+    return;
+  }
+
+  const order = queryOne<any>('SELECT customer_id FROM orders WHERE id = ?', [orderId]);
+  if (!order) {
+    res.status(404).json({ error: 'Order not found.' });
+    return;
+  }
+  if (order.customer_id !== authResult.user.id) {
+    res.status(403).json({ error: 'Unauthorized: You can only track your own deliveries.' });
+    return;
+  }
 
   // Set SSE Headers
   res.setHeader('Content-Type', 'text/event-stream');

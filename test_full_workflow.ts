@@ -1,8 +1,13 @@
-import { generateHmacSignature } from './shared/contracts/security.js';
+import 'dotenv/config';
 
 const CUSTOMER_API = 'http://127.0.0.1:5000';
 const ADMIN_API = 'http://127.0.0.1:5001';
-const SHARED_SECRET = process.env.SKYNAV_INTERNAL_SERVICE_KEY || 'skynav_secure_internal_service_key_2026';
+const ADMIN_SEED_PASSWORD = process.env.ADMIN_SEED_PASSWORD || process.env.ADMIN_PASSWORD;
+const CUSTOMER_SEED_PASSWORD = process.env.CUSTOMER_SEED_PASSWORD || process.env.CUSTOMER_PASSWORD;
+
+if (!ADMIN_SEED_PASSWORD || !CUSTOMER_SEED_PASSWORD) {
+  throw new Error('Set ADMIN_SEED_PASSWORD and CUSTOMER_SEED_PASSWORD in .env before running test_full_workflow.ts');
+}
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -36,7 +41,7 @@ async function runE2EIntegrationTest() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: 'admin@skynav',
-      password: 'skynav@123',
+      password: ADMIN_SEED_PASSWORD,
     }),
   });
   if (!adminLoginRes.ok) {
@@ -96,7 +101,7 @@ async function runE2EIntegrationTest() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: 'customer@skynav',
-      password: 'skynav@123',
+      password: CUSTOMER_SEED_PASSWORD,
     }),
   });
   if (!loginRes.ok) {
@@ -184,10 +189,12 @@ async function runE2EIntegrationTest() {
   console.log(`  ✔ Secure Handover OTP: ${customerOrder.deliveryOtp}`);
   passedSteps++;
 
+  const adminHeaders = { Authorization: `Bearer ${adminToken}` };
+
   // 6. Verify Admin Backend Received the Order
   console.log('\n▶ Step 6: Verifying Admin Backend Ingested Operational Order...');
   await delay(1200); // Allow async HMAC transmission
-  const adminOrdersRes = await fetch(`${ADMIN_API}/api/admin/orders`);
+  const adminOrdersRes = await fetch(`${ADMIN_API}/api/admin/orders`, { headers: adminHeaders });
   const adminOrders = await adminOrdersRes.json();
   const operationalOrder = adminOrders.find((o: any) => o.customerOrderId === customerOrder.id);
 
@@ -205,7 +212,7 @@ async function runE2EIntegrationTest() {
   // 7a. Accept
   await fetch(`${ADMIN_API}/api/admin/orders/${operationalOrder.id}/status`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({ status: 'accepted', description: 'SkyHub Central accepted order intake.' }),
   });
   await delay(400);
@@ -217,7 +224,7 @@ async function runE2EIntegrationTest() {
   // 7b. Packing
   await fetch(`${ADMIN_API}/api/admin/orders/${operationalOrder.id}/status`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({ status: 'packing', description: 'Packing cargo pod.' }),
   });
   await delay(400);
@@ -229,7 +236,7 @@ async function runE2EIntegrationTest() {
   // 7c. Packed
   await fetch(`${ADMIN_API}/api/admin/orders/${operationalOrder.id}/status`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({ status: 'packed', description: 'Cargo pod sealed.' }),
   });
   await delay(400);
@@ -237,7 +244,7 @@ async function runE2EIntegrationTest() {
   // 7d. Ready for Dispatch
   await fetch(`${ADMIN_API}/api/admin/orders/${operationalOrder.id}/status`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({ status: 'ready_for_dispatch', description: 'Pod on launchpad.' }),
   });
   console.log('  ✔ Admin marked "ready_for_dispatch"');
@@ -245,7 +252,7 @@ async function runE2EIntegrationTest() {
 
   // 8. Admin Assigns Drone
   console.log('\n▶ Step 8: Admin Assigns Autonomous Drone...');
-  const fleetRes = await fetch(`${ADMIN_API}/api/admin/fleet`);
+  const fleetRes = await fetch(`${ADMIN_API}/api/admin/fleet`, { headers: adminHeaders });
   const fleet = await fleetRes.json();
   const availableDrone = fleet.find((d: any) => d.status === 'available');
   if (!availableDrone) {
@@ -254,7 +261,7 @@ async function runE2EIntegrationTest() {
 
   const assignRes = await fetch(`${ADMIN_API}/api/admin/dispatch/orders/${operationalOrder.id}/assign-drone`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({ droneId: availableDrone.id }),
   });
   const assignResult = await assignRes.json();
@@ -277,7 +284,7 @@ async function runE2EIntegrationTest() {
   console.log('\n▶ Step 9: Admin Launches Mission & Starts Authoritative Telemetry Engine...');
   const launchRes = await fetch(`${ADMIN_API}/api/admin/missions/${assignResult.missionId}/launch`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
   });
   const launchResult = await launchRes.json();
   console.log(`  ✔ Mission Launched: Status="${launchResult.status}"`);
@@ -295,7 +302,7 @@ async function runE2EIntegrationTest() {
       headers: { Authorization: `Bearer ${customerToken}` },
     }).then((r) => r.json());
 
-    const fleet = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+    const fleet = await fetch(`${ADMIN_API}/api/admin/fleet`, { headers: adminHeaders }).then((r) => r.json());
     const drone = fleet.find((d: any) => d.id === availableDrone.id);
 
     const cLat = tracking.currentDroneLocation?.latitude || 0;
@@ -353,9 +360,9 @@ async function runE2EIntegrationTest() {
   // 12. Verify Delivery Completion on Admin Side & Return Flight Initiation
   console.log('\n▶ Step 12: Verifying Admin Receives DELIVERY_COMPLETED & Initiates Return Flight...');
   await delay(1200);
-  const updatedAdminOrders = await fetch(`${ADMIN_API}/api/admin/orders`).then((r) => r.json());
+  const updatedAdminOrders = await fetch(`${ADMIN_API}/api/admin/orders`, { headers: adminHeaders }).then((r) => r.json());
   const finalAdminOrder = updatedAdminOrders.find((o: any) => o.id === operationalOrder.id);
-  const updatedFleet = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+  const updatedFleet = await fetch(`${ADMIN_API}/api/admin/fleet`, { headers: adminHeaders }).then((r) => r.json());
   const returningDrone = updatedFleet.find((d: any) => d.id === availableDrone.id);
 
   console.log(`  ✔ Admin Operational Order Status: "${finalAdminOrder.status}"`);
@@ -371,7 +378,7 @@ async function runE2EIntegrationTest() {
 
   for (let tick = 1; tick <= 25; tick++) {
     await delay(1000);
-    const fleetCheck = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+    const fleetCheck = await fetch(`${ADMIN_API}/api/admin/fleet`, { headers: adminHeaders }).then((r) => r.json());
     const droneCheck = fleetCheck.find((d: any) => d.id === availableDrone.id);
 
     console.log(`  [Return Tick ${tick}s] Drone ${droneCheck.id}: [${droneCheck.location.lat.toFixed(5)}, ${droneCheck.location.lng.toFixed(5)}] Alt=${droneCheck.location.altitude}m Spd=${droneCheck.location.speed}km/h Status="${droneCheck.status}" Battery=${droneCheck.battery}%`);
@@ -393,7 +400,7 @@ async function runE2EIntegrationTest() {
   // 14. Verify Charging Cycle
   console.log('\n▶ Step 14: Verifying Charging Cycle at SkyHub Base Dock...');
   await delay(2000);
-  const fleetCharging = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+  const fleetCharging = await fetch(`${ADMIN_API}/api/admin/fleet`, { headers: adminHeaders }).then((r) => r.json());
   const droneCharging = fleetCharging.find((d: any) => d.id === availableDrone.id);
   console.log(`  ✔ Battery Level during recharge: ${droneCharging.battery}% (Status: "${droneCharging.status}")`);
   passedSteps++;
@@ -402,7 +409,7 @@ async function runE2EIntegrationTest() {
   console.log('\n▶ Step 15: Waiting for Battery to Reach Full Charge & Transition to AVAILABLE...');
   let droneFinal: any = null;
   for (let i = 0; i < 20; i++) {
-    const fleetFinal = await fetch(`${ADMIN_API}/api/admin/fleet`).then((r) => r.json());
+    const fleetFinal = await fetch(`${ADMIN_API}/api/admin/fleet`, { headers: adminHeaders }).then((r) => r.json());
     droneFinal = fleetFinal.find((d: any) => d.id === availableDrone.id);
     if (droneFinal.status === 'available' && droneFinal.battery >= 90) {
       break;

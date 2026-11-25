@@ -3,20 +3,21 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { db, queryOne, queryAll, runCommand } from '../db/database.js';
+import { getCustomerEnv } from '../config/env.js';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'skynav_super_secure_jwt_secret_2026_aerodelivery';
 
 // Helper to generate JWT token
 const generateToken = (userId: string, email: string): string => {
+  const { JWT_SECRET } = getCustomerEnv();
   return jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '7d' });
 };
 
 // Generate cryptographically random 6-digit numeric OTP
 const generate6DigitCode = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 };
 
 // Safely parse SQLite datetime strings (stored as UTC without 'Z')
@@ -50,11 +51,11 @@ router.post('/register', async (req, res): Promise<void> => {
       return;
     }
 
-    const userId = `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const userId = `cust_${crypto.randomUUID()}`;
     const passwordHash = await bcrypt.hash(password, 10);
     
     // System automatically generates permanent 4-digit numeric delivery PIN
-    const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
+    const generatedPin = crypto.randomInt(1000, 10000).toString();
     const deliveryPinHash = await bcrypt.hash(generatedPin, 10);
 
     // Transaction to create active user, notification preferences, cart, wishlist, and welcome notification
@@ -134,6 +135,7 @@ router.post('/verify-account', async (req, res): Promise<void> => {
       let authHeader = req.headers.authorization;
       if (authHeader?.startsWith('Bearer ')) {
         try {
+          const { JWT_SECRET } = getCustomerEnv();
           const decoded = jwt.verify(authHeader.substring(7), JWT_SECRET) as any;
           userId = decoded.id;
         } catch {}
@@ -252,6 +254,7 @@ router.post('/resend-verification', async (req, res): Promise<void> => {
       let authHeader = req.headers.authorization;
       if (authHeader?.startsWith('Bearer ')) {
         try {
+          const { JWT_SECRET } = getCustomerEnv();
           const decoded = jwt.verify(authHeader.substring(7), JWT_SECRET) as any;
           user = queryOne<any>('SELECT * FROM users WHERE id = ?', [decoded.id]);
         } catch {}
@@ -290,7 +293,7 @@ router.post('/resend-verification', async (req, res): Promise<void> => {
     // Generate new code
     const newCode = generate6DigitCode();
     const codeHash = await bcrypt.hash(newCode, 8);
-    const tokenId = `tok_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const tokenId = `tok_${crypto.randomUUID()}`;
 
     const emailResult = await sendVerificationEmail(user.email, user.name, newCode);
     if (!emailResult.success) {
@@ -420,7 +423,7 @@ router.post('/forgot-password', async (req, res): Promise<void> => {
     // Generate reset code (15-minute expiry)
     const resetCode = generate6DigitCode();
     const codeHash = await bcrypt.hash(resetCode, 8);
-    const tokenId = `tok_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const tokenId = `tok_${crypto.randomUUID()}`;
 
     runCommand(`
       INSERT INTO verification_tokens (id, user_id, type, code_hash, expires_at, attempt_count, max_attempts)

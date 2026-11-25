@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { queryAll, queryOne, runCommand } from '../db/database.js';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
+router.use(requireAdmin);
 
 // ── GEOFENCE ZONES ──
 router.get('/geofences', (_req: Request, res: Response): void => {

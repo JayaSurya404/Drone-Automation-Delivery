@@ -15,6 +15,7 @@ import {
 } from '../types/skynav';
 
 import { BASE_CENTER } from '../data/mockData';
+import { getAdminAuthHeaders, getAdminAuthToken } from '../utils/adminAuthHeaders';
 
 class MockDataStore {
   private drones: Drone[] = [];
@@ -39,17 +40,41 @@ class MockDataStore {
     this.initDataConnection();
   }
 
-  private async initDataConnection() {
-    // Initial fetch from real Admin Backend
-    await this.fetchOperationalData();
+  public refreshSession() {
+    this.disconnectWebSocket();
+    if (getAdminAuthToken()) {
+      this.fetchOperationalData();
+      this.connectWebSocket();
+    }
+  }
 
-    // Connect to live Admin WebSocket
-    this.connectWebSocket();
+  public clearSession() {
+    this.disconnectWebSocket();
+  }
+
+  private disconnectWebSocket() {
+    if (this.ws) {
+      try {
+        this.ws.onclose = null;
+        this.ws.close();
+      } catch {}
+      this.ws = null;
+    }
+  }
+
+  private async initDataConnection() {
+    if (getAdminAuthToken()) {
+      // Initial fetch from real Admin Backend
+      await this.fetchOperationalData();
+
+      // Connect to live Admin WebSocket
+      this.connectWebSocket();
+    }
 
     // Setup fallback background sync
     if (typeof window !== 'undefined') {
       this.pollInterval = window.setInterval(() => {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (getAdminAuthToken() && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
           this.fetchOperationalData();
         }
       }, 3500);
@@ -57,9 +82,12 @@ class MockDataStore {
   }
 
   public async fetchOperationalData() {
+    const headers = getAdminAuthHeaders();
+    if (!headers.Authorization) return;
+
     try {
       // 1. Fetch real orders from Admin Backend
-      const ordersRes = await fetch('/api/admin/orders');
+      const ordersRes = await fetch('/api/admin/orders', { headers });
       if (ordersRes.ok) {
         const rawOrders = await ordersRes.json();
         if (Array.isArray(rawOrders)) {
@@ -93,7 +121,7 @@ class MockDataStore {
       }
 
       // 2. Fetch real fleet from Admin Backend
-      const fleetRes = await fetch('/api/admin/fleet');
+      const fleetRes = await fetch('/api/admin/fleet', { headers });
       if (fleetRes.ok) {
         const rawFleet = await fleetRes.json();
         if (Array.isArray(rawFleet)) {
@@ -123,7 +151,7 @@ class MockDataStore {
       }
 
       // 3. Fetch missions from Admin Backend
-      const missionsRes = await fetch('/api/admin/missions');
+      const missionsRes = await fetch('/api/admin/missions', { headers });
       if (missionsRes.ok) {
         const rawMissions = await missionsRes.json();
         if (Array.isArray(rawMissions)) {
@@ -152,7 +180,7 @@ class MockDataStore {
       }
 
       // 4. Fetch geofences from Admin Backend
-      const geoRes = await fetch('/api/admin/geofences');
+      const geoRes = await fetch('/api/admin/geofences', { headers });
       if (geoRes.ok) {
         const rawGeo = await geoRes.json();
         if (Array.isArray(rawGeo)) {
@@ -161,7 +189,7 @@ class MockDataStore {
       }
 
       // 5. Fetch emergencies from Admin Backend
-      const emgRes = await fetch('/api/admin/emergencies');
+      const emgRes = await fetch('/api/admin/emergencies', { headers });
       if (emgRes.ok) {
         const rawEmg = await emgRes.json();
         if (Array.isArray(rawEmg)) {
@@ -170,7 +198,7 @@ class MockDataStore {
       }
 
       // 6. Fetch maintenance records from Admin Backend
-      const maintRes = await fetch('/api/admin/maintenance');
+      const maintRes = await fetch('/api/admin/maintenance', { headers });
       if (maintRes.ok) {
         const rawMaint = await maintRes.json();
         if (Array.isArray(rawMaint)) {
@@ -179,7 +207,7 @@ class MockDataStore {
       }
 
       // 7. Fetch audit logs from Admin Backend
-      const auditRes = await fetch('/api/admin/audit-logs');
+      const auditRes = await fetch('/api/admin/audit-logs', { headers });
       if (auditRes.ok) {
         const rawAudit = await auditRes.json();
         if (Array.isArray(rawAudit)) {
@@ -188,7 +216,7 @@ class MockDataStore {
       }
 
       // 8. Fetch system notifications from Admin Backend
-      const notifRes = await fetch('/api/admin/notifications');
+      const notifRes = await fetch('/api/admin/notifications', { headers });
       if (notifRes.ok) {
         const rawNotifs = await notifRes.json();
         if (Array.isArray(rawNotifs)) {
@@ -197,7 +225,7 @@ class MockDataStore {
       }
 
       // 9. Fetch customers from Admin Backend
-      const custRes = await fetch('/api/admin/customers');
+      const custRes = await fetch('/api/admin/customers', { headers });
       if (custRes.ok) {
         const rawCust = await custRes.json();
         if (Array.isArray(rawCust)) {
@@ -206,7 +234,7 @@ class MockDataStore {
       }
 
       // 10. Fetch payments from Admin Backend
-      const payRes = await fetch('/api/admin/payments');
+      const payRes = await fetch('/api/admin/payments', { headers });
       if (payRes.ok) {
         const rawPay = await payRes.json();
         if (Array.isArray(rawPay)) {
@@ -215,7 +243,7 @@ class MockDataStore {
       }
 
       // 11. Fetch merchants from Admin Backend
-      const merRes = await fetch('/api/admin/merchants');
+      const merRes = await fetch('/api/admin/merchants', { headers });
       if (merRes.ok) {
         const rawMer = await merRes.json();
         if (Array.isArray(rawMer)) {
@@ -224,7 +252,7 @@ class MockDataStore {
       }
 
       // 12. Fetch support tickets from Admin Backend
-      const tckRes = await fetch('/api/admin/tickets');
+      const tckRes = await fetch('/api/admin/tickets', { headers });
       if (tckRes.ok) {
         const rawTck = await tckRes.json();
         if (Array.isArray(rawTck)) {
@@ -233,7 +261,7 @@ class MockDataStore {
       }
 
       // 13. Fetch admin users from Admin Backend
-      const admRes = await fetch('/api/admin/admins');
+      const admRes = await fetch('/api/admin/admins', { headers });
       if (admRes.ok) {
         const rawAdm = await admRes.json();
         if (Array.isArray(rawAdm)) {
@@ -249,10 +277,12 @@ class MockDataStore {
 
   private connectWebSocket() {
     if (typeof window === 'undefined') return;
+    const token = getAdminAuthToken();
+    if (!token) return;
 
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/admin`;
+      const wsUrl = `${protocol}//${window.location.host}/ws/admin?token=${encodeURIComponent(token)}`;
 
       this.ws = new WebSocket(wsUrl);
 
@@ -538,7 +568,7 @@ class MockDataStore {
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/status`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ status, description }),
       });
       if (res.ok) {
@@ -559,7 +589,7 @@ class MockDataStore {
     try {
       const res = await fetch(`/api/admin/dispatch/orders/${orderId}/assign-drone`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ droneId }),
       });
       if (res.ok) {
@@ -592,7 +622,7 @@ class MockDataStore {
     try {
       const res = await fetch(`/api/admin/missions/${missionId}/launch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       });
       if (res.ok) {
         const mission = this.missions.find((m) => m.id === missionId);
@@ -616,7 +646,7 @@ class MockDataStore {
     try {
       const res = await fetch('/api/admin/products', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(productData),
       });
       if (res.ok) {
@@ -657,7 +687,7 @@ class MockDataStore {
     // Sync to backend DB
     fetch('/api/admin/emergencies', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ droneId, issueType, message }),
     }).catch(() => {});
 
@@ -694,7 +724,7 @@ class MockDataStore {
     // Sync command to backend DB
     fetch(`/api/admin/emergencies/${emergency?.id || 'EMG-DEFAULT'}/command`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ command, droneId }),
     }).catch(() => {});
 
@@ -715,13 +745,13 @@ class MockDataStore {
   public markNotificationRead(id: string) {
     const notif = this.notifications.find((n) => n.id === id);
     if (notif) notif.read = true;
-    fetch(`/api/admin/notifications/${id}/read`, { method: 'PATCH' }).catch(() => {});
+    fetch(`/api/admin/notifications/${id}/read`, { method: 'PATCH', headers: getAdminAuthHeaders() }).catch(() => {});
     this.notify();
   }
 
   public markAllNotificationsRead() {
     this.notifications.forEach((n) => (n.read = true));
-    fetch('/api/admin/notifications/read-all', { method: 'PATCH' }).catch(() => {});
+    fetch('/api/admin/notifications/read-all', { method: 'PATCH', headers: getAdminAuthHeaders() }).catch(() => {});
     this.notify();
   }
 
@@ -740,7 +770,7 @@ class MockDataStore {
 
     fetch('/api/admin/audit-logs', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ adminName, adminRole, action, entity, entityId, severity, details }),
     }).catch(() => {});
   }
@@ -752,7 +782,7 @@ class MockDataStore {
       this.addAuditLog('Rajesh Sharma', 'Super Admin', 'UPDATE_STATUS', 'Merchants', merchantId, 'Info', `Set merchant status to ${status}`);
       fetch(`/api/admin/merchants/${merchantId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ status }),
       }).catch(() => {});
       this.notify();
@@ -794,7 +824,7 @@ class MockDataStore {
 
     fetch('/api/admin/geofences', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(geofence),
     }).catch(() => {});
 

@@ -1,10 +1,13 @@
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { db, queryOne, runCommand } from '../db/database.js';
+import { requireAdmin } from '../middleware/auth.js';
 import { customerIntegrationClient } from '../services/customerIntegrationClient.js';
 import { telemetryEngine } from '../services/telemetryEngine.js';
 import { corridorRoutePlanner } from '../services/corridorRoutePlanner.js';
 
 const router = Router();
+router.use(requireAdmin);
 
 // ASSIGN DRONE TO ORDER & CREATE MISSION
 router.post('/orders/:id/assign-drone', async (req: Request, res: Response): Promise<void> => {
@@ -29,12 +32,12 @@ router.post('/orders/:id/assign-drone', async (req: Request, res: Response): Pro
       return;
     }
 
-    if (drone.status !== 'available' && !req.body.force && droneId !== 'D-001') {
-      res.status(400).json({ error: `Drone ${drone.name} is currently ${drone.status}. Choose an available drone.` });
+    if (drone.status !== 'available') {
+      res.status(409).json({ error: `Drone ${drone.name} is currently ${drone.status}. Choose an available drone.` });
       return;
     }
 
-    const missionId = `MS-${Math.floor(10000 + Math.random() * 90000)}`;
+    const missionId = `MS-${crypto.randomInt(10000, 100000)}`;
     const routeResult = corridorRoutePlanner.planRoute(
       order.pickup_lat,
       order.pickup_lng,
@@ -82,8 +85,8 @@ router.post('/orders/:id/assign-drone', async (req: Request, res: Response): Pro
         WHERE id = ?
       `, [drone.id, missionId, order.id]);
 
-      // 3. Update Drone
-      runCommand(`
+      // 3. Update Drone atomically (compare-and-swap on available status)
+      const droneUpdate = runCommand(`
         UPDATE drones SET
           status = 'assigned',
           current_mission_id = ?,
@@ -92,8 +95,12 @@ router.post('/orders/:id/assign-drone', async (req: Request, res: Response): Pro
           altitude = 0,
           speed = 0,
           updated_at = datetime('now')
-        WHERE id = ?
+        WHERE id = ? AND status = 'available'
       `, [missionId, drone.id]);
+
+      if (droneUpdate.changes === 0) {
+        throw new Error(`Drone ${drone.id} is no longer available.`);
+      }
 
       // 4. Audit Log
       runCommand(`

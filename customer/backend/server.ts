@@ -1,9 +1,12 @@
+import { getCustomerEnv } from './config/env.js';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { initDb } from './db/database.js';
+import { initDb, queryOne } from './db/database.js';
+import { verifyCustomerToken } from './middleware/auth.js';
 import { droneTrackingService } from './services/droneTrackingService.js';
 
 // Route imports
@@ -30,24 +33,67 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from workspace root and local directory
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-dotenv.config({ path: path.resolve(__dirname, '.env') });
-dotenv.config();
+const env = getCustomerEnv();
 
 // Initialize database
 initDb();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = env.PORT;
 
 // Middleware
-app.use(cors({
-  origin: true, // Allow configured or proxied origins
-  credentials: true,
-}));
-app.use(express.json());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || env.CORS_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS policy.`));
+      }
+    },
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '2mb' }));
 app.use('/images', express.static(path.resolve(__dirname, 'public/images')));
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' },
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path.startsWith('/internal/'),
+  message: { error: 'Rate limit exceeded. Please slow down.' },
+});
+
+const internalTelemetryLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 2000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+app.use('/api/auth/verify-account', authLimiter);
+app.use('/api/auth/resend-verification', authLimiter);
+app.use('/api/internal', internalTelemetryLimiter);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -89,8 +135,50 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Create HTTP Server
 const server = http.createServer(app);
 
-// WebSocket Server for Realtime Drone Telemetry
-const wss = new WebSocketServer({ server, path: '/ws' });
+// WebSocket Server for Realtime Drone Telemetry (with CORS Origin enforcement)
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  const host = req.headers.host || 'localhost';
+  const parsedUrl = new URL(req.url || '', `http://${host}`);
+
+  if (parsedUrl.pathname !== '/ws') {
+    socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
+  const origin = req.headers.origin;
+  if (origin && !env.CORS_ORIGINS.includes(origin)) {
+    socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
+  const authHeader = req.headers['authorization'];
+  const bearer = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  const token = parsedUrl.searchParams.get('token') || bearer;
+  const authResult = verifyCustomerToken(token);
+  if (!authResult.user) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
+  const orderId = parsedUrl.searchParams.get('orderId');
+  if (orderId) {
+    const order = queryOne<any>('SELECT customer_id FROM orders WHERE id = ?', [orderId]);
+    if (!order || order.customer_id !== authResult.user.id) {
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+  }
+
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit('connection', ws, req);
+  });
+});
 
 wss.on('connection', (ws: WebSocket, req) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);

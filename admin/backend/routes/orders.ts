@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { queryAll, queryOne, runCommand } from '../db/database.js';
+import { requireAdmin } from '../middleware/auth.js';
 import { customerIntegrationClient } from '../services/customerIntegrationClient.js';
 import { mapAdminStatusToCustomer, AdminOrderStatus } from '../../../shared/contracts/types.js';
 
 const router = Router();
+router.use(requireAdmin);
 
 // GET all operational orders
 router.get('/', (req: Request, res: Response) => {

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AdminUser, AdminRole } from '../types/skynav';
+import { mockStore } from '../services/mockDataStore';
 
 interface AuthContextType {
   user: AdminUser | null;
@@ -128,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       storage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
       otherStorage.removeItem(TOKEN_KEY);
       otherStorage.removeItem(STORAGE_KEY);
+      mockStore.refreshSession();
 
       return { success: true };
     } catch (err: any) {
@@ -141,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
+    mockStore.clearSession();
   };
 
   const switchRole = (_role: AdminRole) => {

@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { queryAll, queryOne } from '../db/database.js';
+import { requireAdmin } from '../middleware/auth.js';
 import { telemetryEngine } from '../services/telemetryEngine.js';
 
 const router = Router();
+router.use(requireAdmin);
 
 // GET all missions
 router.get('/', (req: Request, res: Response) => {

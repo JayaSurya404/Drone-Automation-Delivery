@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db, queryOne, runCommand } from '../db/database.js';
+import { getCustomerEnv } from '../config/env.js';
 import { verifyHmacSignature } from '../../../shared/contracts/security.js';
 import {
   BaseEvent,
@@ -13,10 +14,10 @@ import {
 import { droneTrackingService } from '../services/droneTrackingService.js';
 
 const router = Router();
-const SHARED_SECRET = process.env.SKYNAV_INTERNAL_SERVICE_KEY || 'skynav_secure_internal_service_key_2026';
 
 // HMAC Verification Middleware
 const verifyServiceAuth = (req: Request, res: Response, next: () => void): void => {
+  const { SKYNAV_INTERNAL_SERVICE_KEY } = getCustomerEnv();
   const timestamp = req.headers['x-skynav-timestamp'] as string;
   const signature = req.headers['x-skynav-signature'] as string;
 
@@ -25,7 +26,7 @@ const verifyServiceAuth = (req: Request, res: Response, next: () => void): void 
     return;
   }
 
-  const isValid = verifyHmacSignature(req.body, signature, SHARED_SECRET, timestamp);
+  const isValid = verifyHmacSignature(req.body, signature, SKYNAV_INTERNAL_SERVICE_KEY, timestamp);
   if (!isValid) {
     res.status(403).json({ error: 'Invalid HMAC signature.' });
     return;

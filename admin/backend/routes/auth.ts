@@ -2,9 +2,10 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { queryOne } from '../db/database.js';
+import { getAdminEnv } from '../config/env.js';
+import { requireAdmin, AuthenticatedAdminRequest } from '../middleware/auth.js';
 
 const router = Router();
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'skynav_admin_jwt_secret_2026';
 
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -30,9 +31,10 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const { ADMIN_JWT_SECRET } = getAdminEnv();
     const token = jwt.sign(
       { id: admin.id, email: admin.email, role: admin.role },
-      JWT_SECRET,
+      ADMIN_JWT_SECRET,
       { expiresIn: '12h' }
     );
 
@@ -54,26 +56,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.get('/me', (req: Request, res: Response): void => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
-
-  if (!token) {
-    res.status(401).json({ error: 'No token provided.' });
-    return;
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const admin = queryOne<any>('SELECT id, name, email, role, phone, avatar, status FROM admin_users WHERE id = ?', [decoded.id]);
-    if (!admin) {
-      res.status(404).json({ error: 'Operator not found.' });
-      return;
-    }
-    res.json({ user: admin });
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token.' });
-  }
+router.get('/me', requireAdmin, (req: AuthenticatedAdminRequest, res: Response): void => {
+  res.json({ user: req.admin });
 });
 
 export default router;

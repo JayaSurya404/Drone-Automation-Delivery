@@ -1,6 +1,13 @@
+import 'dotenv/config';
 import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+
+const CUSTOMER_SEED_PASSWORD = process.env.CUSTOMER_SEED_PASSWORD || process.env.CUSTOMER_PASSWORD || '';
+const ADMIN_SEED_PASSWORD = process.env.ADMIN_SEED_PASSWORD || process.env.ADMIN_PASSWORD || '';
+if (!CUSTOMER_SEED_PASSWORD || !ADMIN_SEED_PASSWORD) {
+  throw new Error('Set CUSTOMER_SEED_PASSWORD and ADMIN_SEED_PASSWORD in .env before running test_browser_telemetry_sync.ts');
+}
 
 const ARTIFACT_DIR = 'C:\\Users\\chitr\\.gemini\\antigravity-ide\\brain\\7eb30bb3-94cd-49a5-bc00-ed5724e46082';
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
@@ -112,7 +119,7 @@ async function runBrowserTelemetryVerification() {
     const custLoginRes = await fetch('http://127.0.0.1:5000/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'customer@skynav', password: 'skynav@123' }),
+      body: JSON.stringify({ email: 'customer@skynav', password: CUSTOMER_SEED_PASSWORD }),
     }).then((r) => r.json());
     const custToken = custLoginRes.token;
     const custUser = custLoginRes.user;
@@ -120,9 +127,10 @@ async function runBrowserTelemetryVerification() {
     const adminLoginRes = await fetch('http://127.0.0.1:5001/api/admin/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@skynav', password: 'skynav@123' }),
+      body: JSON.stringify({ email: 'admin@skynav', password: ADMIN_SEED_PASSWORD }),
     }).then((r) => r.json());
     const adminToken = adminLoginRes.token;
+    const adminHeaders = { Authorization: `Bearer ${adminToken}` };
 
     console.log(`  ✔ Customer authenticated: ${custUser.email}`);
     console.log(`  ✔ Admin authenticated: ${adminLoginRes.user.email}`);
@@ -190,7 +198,7 @@ async function runBrowserTelemetryVerification() {
     console.log(`  ✔ Handover OTP: ${handoverOtp}`);
 
     await delay(600);
-    const adminOrders = await fetch('http://127.0.0.1:5001/api/admin/orders').then((r) => r.json());
+    const adminOrders = await fetch('http://127.0.0.1:5001/api/admin/orders', { headers: adminHeaders }).then((r) => r.json());
     const operationalOrder = adminOrders.find((o: any) => o.customerOrderId === customerOrderId);
     if (!operationalOrder) throw new Error('Operational order not found in Admin database!');
     console.log(`  ✔ Operational Order Ingested: #${operationalOrder.id}`);
@@ -198,22 +206,22 @@ async function runBrowserTelemetryVerification() {
     // Progress Order to Ready For Dispatch
     await fetch(`http://127.0.0.1:5001/api/admin/orders/${operationalOrder.id}/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...adminHeaders },
       body: JSON.stringify({ status: 'accepted' }),
     });
     await fetch(`http://127.0.0.1:5001/api/admin/orders/${operationalOrder.id}/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...adminHeaders },
       body: JSON.stringify({ status: 'packing' }),
     });
     await fetch(`http://127.0.0.1:5001/api/admin/orders/${operationalOrder.id}/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...adminHeaders },
       body: JSON.stringify({ status: 'ready_for_dispatch' }),
     });
 
     // Ensure D-001 is ready for dispatch at SkyHub Kurumbapalayam
-    const fleetCheck = await fetch('http://127.0.0.1:5001/api/admin/fleet').then((r) => r.json());
+    const fleetCheck = await fetch('http://127.0.0.1:5001/api/admin/fleet', { headers: adminHeaders }).then((r) => r.json());
     const d001 = fleetCheck.find((d: any) => d.id === 'D-001');
     if (d001 && d001.status !== 'available') {
       console.log(`  ℹ Resetting D-001 from "${d001.status}" to "available" at SkyHub Kurumbapalayam...`);
@@ -227,7 +235,7 @@ async function runBrowserTelemetryVerification() {
     // Assign Drone Unit 1 (D-001)
     const assignRes = await fetch(`http://127.0.0.1:5001/api/admin/dispatch/orders/${operationalOrder.id}/assign-drone`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...adminHeaders },
       body: JSON.stringify({ droneId: 'D-001' }),
     }).then((r) => r.json());
     console.log(`  ✔ Drone Assigned: ${assignRes.droneId} (${assignRes.droneName})`);
@@ -309,7 +317,7 @@ async function runBrowserTelemetryVerification() {
     console.log(`\n▶ Step 5: Launching Authoritative Mission (${assignRes.missionId})...`);
     const launchRes = await fetch(`http://127.0.0.1:5001/api/admin/missions/${assignRes.missionId}/launch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...adminHeaders },
     }).then((r) => r.json());
     console.log(`  ✔ Mission Engine Status: "${launchRes.status}"`);
 
@@ -330,7 +338,7 @@ async function runBrowserTelemetryVerification() {
       flightTick++;
 
       // 1. Backend Telemetry
-      const fleet = await fetch('http://127.0.0.1:5001/api/admin/fleet').then((r) => r.json());
+      const fleet = await fetch('http://127.0.0.1:5001/api/admin/fleet', { headers: adminHeaders }).then((r) => r.json());
       const targetDroneId = assignRes.droneId || 'D-001';
       const bDrone = fleet.find((d: any) => d.id === targetDroneId);
 

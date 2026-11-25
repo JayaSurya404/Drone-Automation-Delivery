@@ -3,6 +3,7 @@ import { DataTable, Column } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
+import { getAdminAuthHeaders } from '../../utils/adminAuthHeaders';
 import {
   Package,
   Plus,
@@ -80,9 +81,10 @@ export const ProductsPage: React.FC = () => {
   const fetchCatalog = useCallback(async () => {
     setIsLoading(true);
     try {
+      const headers = getAdminAuthHeaders();
       const [prodsRes, catsRes] = await Promise.all([
-        fetch('/api/admin/products'),
-        fetch('/api/admin/products/categories'),
+        fetch('/api/admin/products', { headers }),
+        fetch('/api/admin/products/categories', { headers }),
       ]);
 
       if (prodsRes.ok) {
@@ -175,7 +177,7 @@ export const ProductsPage: React.FC = () => {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
 
@@ -203,7 +205,10 @@ export const ProductsPage: React.FC = () => {
     if (!window.confirm(`Archive and deactivate "${name}" from customer catalog?`)) return;
 
     try {
-      const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders(),
+      });
       if (!res.ok) throw new Error('Failed to archive product.');
       addToast('success', `Product "${name}" archived from active catalog.`);
       fetchCatalog();

@@ -1,14 +1,16 @@
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { db, queryOne, runCommand } from '../db/database.js';
+import { getAdminEnv } from '../config/env.js';
 import { verifyHmacSignature } from '../../../shared/contracts/security.js';
 import { BaseEvent, OrderCreatedPayload, DeliveryCompletedPayload } from '../../../shared/contracts/events.js';
 import { telemetryEngine } from '../services/telemetryEngine.js';
 
 const router = Router();
-const SHARED_SECRET = process.env.SKYNAV_INTERNAL_SERVICE_KEY || 'skynav_secure_internal_service_key_2026';
 
 // Middleware to verify HMAC signature
 const verifyServiceAuth = (req: Request, res: Response, next: () => void): void => {
+  const { SKYNAV_INTERNAL_SERVICE_KEY } = getAdminEnv();
   const timestamp = req.headers['x-skynav-timestamp'] as string;
   const signature = req.headers['x-skynav-signature'] as string;
 
@@ -17,7 +19,7 @@ const verifyServiceAuth = (req: Request, res: Response, next: () => void): void 
     return;
   }
 
-  const isValid = verifyHmacSignature(req.body, signature, SHARED_SECRET, timestamp);
+  const isValid = verifyHmacSignature(req.body, signature, SKYNAV_INTERNAL_SERVICE_KEY, timestamp);
   if (!isValid) {
     res.status(403).json({ error: 'Invalid HMAC signature. Unauthorized internal request.' });
     return;
@@ -41,7 +43,7 @@ router.post('/orders', (req: Request, res: Response): void => {
       return;
     }
 
-    const operationalOrderId = `A-ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+    const operationalOrderId = `A-ORD-${crypto.randomInt(1000, 10000)}`;
 
     const packageName = payload.items && payload.items.length > 0
       ? payload.items.map((i) => `${i.quantity}x ${i.productName}`).join(', ')

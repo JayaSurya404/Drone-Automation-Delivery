@@ -1,8 +1,13 @@
-import { queryOne, queryAll, runCommand } from './customer/backend/db/database.js';
-import { queryOne as queryAdminOne, queryAll as queryAdminAll } from './admin/backend/db/database.js';
+import 'dotenv/config';
+import { queryOne, runCommand } from './customer/backend/db/database.js';
 
 const CUSTOMER_API = 'http://127.0.0.1:5000';
 const ADMIN_API = 'http://127.0.0.1:5001';
+const ADMIN_SEED_PASSWORD = process.env.ADMIN_SEED_PASSWORD || process.env.ADMIN_PASSWORD || '';
+
+if (!ADMIN_SEED_PASSWORD) {
+  throw new Error('Set ADMIN_SEED_PASSWORD in .env before running test_auth_and_data.ts');
+}
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -135,7 +140,7 @@ async function runAuthAndDataTest() {
     const adminLoginRes = await fetch(`${ADMIN_API}/api/admin/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: 'admin123' }),
+      body: JSON.stringify({ email, password: ADMIN_SEED_PASSWORD }),
     });
     if (!adminLoginRes.ok) {
       throw new Error(`Failed to login as admin role ${expectedRole} (${email})`);
@@ -165,10 +170,11 @@ async function runAuthAndDataTest() {
 
   // 8. Admin Operations APIs (Geofences, Maintenance, Alerts, Logs, Analytics)
   console.log('\n▶ Test 8: Admin Operations Endpoints (Geofences, Maintenance, Audit Logs)...');
-  const geofences = await fetch(`${ADMIN_API}/api/admin/geofences`).then((r) => r.json());
-  const maintenance = await fetch(`${ADMIN_API}/api/admin/maintenance`).then((r) => r.json());
-  const notifications = await fetch(`${ADMIN_API}/api/admin/notifications`).then((r) => r.json());
-  const analytics = await fetch(`${ADMIN_API}/api/admin/analytics`).then((r) => r.json());
+  const adminHeaders = { Authorization: `Bearer ${adminToken}` };
+  const geofences = await fetch(`${ADMIN_API}/api/admin/geofences`, { headers: adminHeaders }).then((r) => r.json());
+  const maintenance = await fetch(`${ADMIN_API}/api/admin/maintenance`, { headers: adminHeaders }).then((r) => r.json());
+  const notifications = await fetch(`${ADMIN_API}/api/admin/notifications`, { headers: adminHeaders }).then((r) => r.json());
+  const analytics = await fetch(`${ADMIN_API}/api/admin/analytics`, { headers: adminHeaders }).then((r) => r.json());
 
   console.log(`  ✔ Geofences retrieved from Admin DB: ${geofences.length} zones`);
   console.log(`  ✔ Maintenance records from Admin DB: ${maintenance.length} records`);
@@ -191,7 +197,7 @@ async function runAuthAndDataTest() {
 
   const createRes = await fetch(`${ADMIN_API}/api/admin/products`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify(prodPayload),
   });
   const created = await createRes.json();
@@ -209,7 +215,7 @@ async function runAuthAndDataTest() {
   console.log('  ▶ Admin updates price to $39.99 and stock to 20...');
   const updateRes = await fetch(`${ADMIN_API}/api/admin/products/${created.id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({ price: 39.99, stockCount: 20 }),
   });
   if (!updateRes.ok) {
@@ -228,6 +234,7 @@ async function runAuthAndDataTest() {
   console.log('\n▶ Test 10: Product Archive / Deactivation Propagation...');
   const deleteRes = await fetch(`${ADMIN_API}/api/admin/products/${created.id}`, {
     method: 'DELETE',
+    headers: adminHeaders,
   });
   if (!deleteRes.ok) {
     throw new Error('Admin product delete failed!');

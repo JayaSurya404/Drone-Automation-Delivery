@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { queryOne } from '../db/database.js';
+import { getCustomerEnv } from '../config/env.js';
 
 export interface AuthenticatedUser {
   id: string;
@@ -15,41 +16,46 @@ export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'skynav_super_secure_jwt_secret_2026_aerodelivery';
-
-export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
-
+export const verifyCustomerToken = (token: string | null | undefined): { user?: AuthenticatedUser; error?: string; status?: number } => {
   if (!token) {
-    res.status(401).json({ error: 'Access token required. Please login.' });
-    return;
+    return { error: 'Access token required. Please login.', status: 401 };
   }
 
   try {
+    const { JWT_SECRET } = getCustomerEnv();
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
-    
-    // Query user from database to ensure active status
+
     const user = queryOne<any>(
       'SELECT id, name, email, phone, is_verified as isVerified, account_status as accountStatus FROM users WHERE id = ?',
       [decoded.id]
     );
 
     if (!user) {
-      res.status(401).json({ error: 'User account does not exist or has been removed.' });
-      return;
+      return { error: 'User account does not exist or has been removed.', status: 401 };
     }
 
     if (user.accountStatus === 'disabled') {
-      res.status(403).json({ error: 'Your customer account has been suspended.' });
-      return;
+      return { error: 'Your customer account has been suspended.', status: 403 };
     }
 
-    req.user = user;
-    next();
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid or expired access token. Please log in again.' });
+    return { user };
+  } catch {
+    return { error: 'Invalid or expired access token. Please log in again.', status: 401 };
   }
+};
+
+export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  const result = verifyCustomerToken(token);
+
+  if (!result.user) {
+    res.status(result.status || 401).json({ error: result.error });
+    return;
+  }
+
+  req.user = result.user;
+  next();
 };
 
 // Middleware to enforce customer data isolation

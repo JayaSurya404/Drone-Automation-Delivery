@@ -1,6 +1,7 @@
 import { CustomerOrder, CustomerOrderStatus } from '../types/order';
 import { HubLocation, LiveTrackingState, RealtimeCustomerEvent } from '../types/tracking';
 import { api } from './api';
+import { storage } from './storage';
 
 type EventListener = (event: RealtimeCustomerEvent) => void;
 
@@ -108,10 +109,15 @@ class RealtimeDeliveryService {
     this.lastTelemetryReceivedTime = Date.now();
     this.lastSampleId = -1;
 
+    const rawToken = storage.get<string | null>(storage.keys.AUTH_TOKEN, null);
+    const tokenParam = rawToken ? `token=${encodeURIComponent(rawToken)}` : '';
+
     // 1. PRIMARY TRANSPORT: Server-Sent Events (SSE) via standard HTTP proxy (/api)
     if (typeof EventSource !== 'undefined') {
       try {
-        const sseUrl = `/api/tracking/${orderId}/events`;
+        const sseUrl = tokenParam
+          ? `/api/tracking/${orderId}/events?${tokenParam}`
+          : `/api/tracking/${orderId}/events`;
         const es = new EventSource(sseUrl);
         this.activeSse = es;
 
@@ -143,7 +149,9 @@ class RealtimeDeliveryService {
     // 2. SECONDARY TRANSPORT: WebSocket connection
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
-    const wsUrl = `${protocol}//${wsHost}/ws?orderId=${orderId}`;
+    const wsUrl = tokenParam
+      ? `${protocol}//${wsHost}/ws?orderId=${encodeURIComponent(orderId)}&${tokenParam}`
+      : `${protocol}//${wsHost}/ws?orderId=${encodeURIComponent(orderId)}`;
 
     try {
       const socket = new WebSocket(wsUrl);

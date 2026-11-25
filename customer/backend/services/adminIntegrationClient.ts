@@ -1,12 +1,13 @@
+import { getCustomerEnv } from '../config/env.js';
 import { generateHmacSignature } from '../../../shared/contracts/security.js';
 import { BaseEvent, OrderCreatedPayload, DeliveryCompletedPayload } from '../../../shared/contracts/events.js';
 
 const ADMIN_API_BASE = process.env.ADMIN_API_BASE_URL || 'http://localhost:5001';
-const SHARED_SECRET = process.env.SKYNAV_INTERNAL_SERVICE_KEY || 'skynav_secure_internal_service_key_2026';
 
 async function sendEvent<T>(endpoint: string, event: BaseEvent<T>, retries = 3): Promise<any> {
+  const { SKYNAV_INTERNAL_SERVICE_KEY } = getCustomerEnv();
   const timestamp = new Date().toISOString();
-  const signature = generateHmacSignature(event, SHARED_SECRET, timestamp);
+  const signature = generateHmacSignature(event, SKYNAV_INTERNAL_SERVICE_KEY, timestamp);
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {

@@ -1,8 +1,14 @@
+import 'dotenv/config';
 import Database from 'better-sqlite3';
 import path from 'path';
 
 const CUST_API = 'http://localhost:5000/api';
 const ADMIN_API = 'http://localhost:5001/api/admin';
+const ADMIN_SEED_PASSWORD = process.env.ADMIN_SEED_PASSWORD || process.env.ADMIN_PASSWORD || '';
+
+if (!ADMIN_SEED_PASSWORD) {
+  throw new Error('Set ADMIN_SEED_PASSWORD in .env before running scripts/test_auth_and_data.ts');
+}
 
 const custDb = new Database(path.resolve('customer/backend/data/skynav.db'));
 const adminDb = new Database(path.resolve('admin/backend/data/admin.db'));
@@ -86,14 +92,14 @@ async function runAuthAndDataAuditTest() {
   console.log('✅ Wrong password correctly rejected with 401 Unauthorized');
 
   console.log('\n[TEST 4b] Testing Admin login with seeded single admin DB credentials');
-  console.log('Credentials: admin@skynav.com / admin123');
+  console.log('Credentials: admin@skynav.com / <from env>');
 
   const adminLoginRes = await fetch(`${ADMIN_API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: 'admin@skynav.com',
-      password: 'admin123',
+      password: ADMIN_SEED_PASSWORD,
     }),
   });
 
@@ -131,8 +137,9 @@ async function runAuthAndDataAuditTest() {
   // ──────────────────────────────────────────
   // TEST 6: ADMIN OPERATIONAL DATA AUDIT
   // ──────────────────────────────────────────
+  const adminHeaders = { Authorization: `Bearer ${adminToken}` };
   console.log('\n[TEST 6] Verifying Admin operational orders endpoint (GET /api/admin/orders)');
-  const adminOrdersRes = await fetch(`${ADMIN_API}/orders`);
+  const adminOrdersRes = await fetch(`${ADMIN_API}/orders`, { headers: adminHeaders });
   const adminOrders = await adminOrdersRes.json();
   console.log('Operational orders in queue:', adminOrders.length);
   if (!Array.isArray(adminOrders) || adminOrders.length === 0) {
@@ -142,7 +149,7 @@ async function runAuthAndDataAuditTest() {
   console.log('✅ Admin operational orders strictly sourced from admin.db');
 
   console.log('\n[TEST 7] Verifying Admin payments ledger endpoint (GET /api/admin/payments)');
-  const adminPayRes = await fetch(`${ADMIN_API}/payments`);
+  const adminPayRes = await fetch(`${ADMIN_API}/payments`, { headers: adminHeaders });
   const adminPay = await adminPayRes.json();
   console.log('Payment transactions count:', adminPay.length);
   if (!Array.isArray(adminPay) || adminPay.length === 0) {
@@ -152,7 +159,7 @@ async function runAuthAndDataAuditTest() {
   console.log('✅ Admin payments ledger strictly backed by operational orders in database');
 
   console.log('\n[TEST 8] Verifying Admin fleet endpoint (GET /api/admin/fleet)');
-  const adminFleetRes = await fetch(`${ADMIN_API}/fleet`);
+  const adminFleetRes = await fetch(`${ADMIN_API}/fleet`, { headers: adminHeaders });
   const adminFleet = await adminFleetRes.json();
   console.log('Fleet drones count:', adminFleet.length);
   if (!Array.isArray(adminFleet) || adminFleet.length !== 40) {
@@ -170,7 +177,7 @@ async function runAuthAndDataAuditTest() {
   console.log(`1. Admin creates product #${syncTestId}`);
   const createProdRes = await fetch(`${ADMIN_API}/products`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({
       id: syncTestId,
       name: syncName,
@@ -217,7 +224,7 @@ async function runAuthAndDataAuditTest() {
   console.log('\n2. Admin updates product price to $129.99 and stock to 25');
   const updateProdRes = await fetch(`${ADMIN_API}/products/${createdId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders },
     body: JSON.stringify({
       price: 129.99,
       stockCount: 25,
@@ -238,6 +245,7 @@ async function runAuthAndDataAuditTest() {
   console.log('\n3. Admin archives/deletes product');
   const archiveRes = await fetch(`${ADMIN_API}/products/${createdId}`, {
     method: 'DELETE',
+    headers: adminHeaders,
   });
   console.log('Admin archive status:', archiveRes.status);
 

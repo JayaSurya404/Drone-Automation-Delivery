@@ -6,8 +6,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure data directory exists
-const dataDir = path.resolve(__dirname, '../data');
+// Ensure data directory exists in admin backend
+const dataDir = path.resolve(process.cwd(), 'admin/backend/data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
@@ -24,7 +24,9 @@ db.pragma('foreign_keys = ON');
 
 // Initialize schema
 export const initDb = () => {
-  const schemaPath = path.join(__dirname, 'schema.sql');
+  const schemaPath = fs.existsSync(path.join(__dirname, 'schema.sql'))
+    ? path.join(__dirname, 'schema.sql')
+    : path.resolve(process.cwd(), 'admin/backend/db/schema.sql');
   const schemaSql = fs.readFileSync(schemaPath, 'utf8');
 
   // Ensure admin_users table schema supports 'admin' role

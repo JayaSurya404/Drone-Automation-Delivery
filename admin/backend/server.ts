@@ -1,9 +1,12 @@
+import { getAdminEnv } from './config/env.js';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import http from 'http';
 import { WebSocketServer } from 'ws';
 import { initDb } from './db/database.js';
+import { requireAdmin, verifyAdminJwt } from './middleware/auth.js';
 import { telemetryEngine } from './services/telemetryEngine.js';
 
 import authRoutes from './routes/auth.js';
@@ -21,20 +24,53 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from workspace root and local directory
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-dotenv.config({ path: path.resolve(__dirname, '.env') });
-dotenv.config();
+const env = getAdminEnv();
 
 // Initialize SQLite database schema
 initDb();
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = env.PORT;
 
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || env.CORS_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS policy.`));
+      }
+    },
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '2mb' }));
 app.use('/images', express.static(path.resolve(__dirname, 'public/images')));
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' },
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path === '/api/health',
+  message: { error: 'Rate limit exceeded. Please slow down.' },
+});
+
+app.use('/api', apiLimiter);
+app.use('/api/admin/auth/login', authLimiter);
 
 // Request logger
 app.use((req, res, next) => {
@@ -47,14 +83,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Admin REST API Routes
+// Admin REST API Routes (/login is public, all other /api/admin/* enforce requireAdmin)
 app.use('/api/admin/auth', authRoutes);
-app.use('/api/admin/products', productsRoutes);
-app.use('/api/admin/orders', ordersRoutes);
-app.use('/api/admin/dispatch', dispatchRoutes);
-app.use('/api/admin/missions', missionsRoutes);
-app.use('/api/admin/fleet', fleetRoutes);
-app.use('/api/admin', operationsRoutes);
+app.use('/api/admin/products', requireAdmin, productsRoutes);
+app.use('/api/admin/orders', requireAdmin, ordersRoutes);
+app.use('/api/admin/dispatch', requireAdmin, dispatchRoutes);
+app.use('/api/admin/missions', requireAdmin, missionsRoutes);
+app.use('/api/admin/fleet', requireAdmin, fleetRoutes);
+app.use('/api/admin', requireAdmin, operationsRoutes);
 app.use('/api/internal', internalRoutes);
 
 // Health check
@@ -70,10 +106,47 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const server = http.createServer(app);
 
-// Fleet Realtime Telemetry WebSocket
-const wss = new WebSocketServer({ server, path: '/ws/admin' });
+// Fleet Realtime Telemetry WebSocket (JWT-authenticated via Authorization header or ?token= query param)
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  const host = req.headers.host || 'localhost';
+  const parsedUrl = new URL(req.url || '', `http://${host}`);
+
+  if (parsedUrl.pathname !== '/ws/admin') {
+    socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
+  const origin = req.headers.origin;
+  if (origin && !env.CORS_ORIGINS.includes(origin)) {
+    socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
+  const authHeader = req.headers.authorization;
+  const bearerToken =
+    typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7).trim()
+      : null;
+  const queryToken = parsedUrl.searchParams.get('token');
+  const admin = verifyAdminJwt(bearerToken || queryToken);
+
+  if (!admin) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit('connection', ws, req, admin);
+  });
+});
+
 wss.on('connection', (ws) => {
-  console.log('📡 [ADMIN-WS] Cockpit connected to fleet telemetry stream');
+  console.log('📡 [ADMIN-WS] Authenticated cockpit connected to fleet telemetry stream');
   telemetryEngine.registerAdminWs(ws);
 });
 

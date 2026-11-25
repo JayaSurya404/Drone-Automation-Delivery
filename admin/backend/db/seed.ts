@@ -33,7 +33,10 @@ export const seedAdminDatabase = async () => {
 
   // 1. SINGLE FULL-ACCESS ADMIN ACCOUNT
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@skynav').trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD || 'skynav@123';
+  const adminPassword = (process.env.ADMIN_SEED_PASSWORD || process.env.ADMIN_PASSWORD || '').trim();
+  if (!adminPassword || adminPassword === 'skynav@123' || adminPassword === 'admin123' || adminPassword.length < 10) {
+    throw new Error('ADMIN_SEED_PASSWORD (or ADMIN_PASSWORD) must be set to a strong non-default password (>= 10 chars).');
+  }
   const passwordHash = await bcrypt.hash(adminPassword, 10);
   const adminStmt = db.prepare(`
     INSERT INTO admin_users (id, name, email, password_hash, role, phone, avatar, status)

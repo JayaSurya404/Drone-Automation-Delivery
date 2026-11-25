@@ -40,8 +40,12 @@ export const seedDatabase = async () => {
     DELETE FROM faqs;
   `);
 
-  // 1. SEED SINGLE DEVELOPMENT CUSTOMER (Jaya / customer@skynav / skynav@123 / PIN: 4827)
-  const passwordHash = await bcrypt.hash('skynav@123', 10);
+  // 1. SEED DEVELOPMENT CUSTOMER (Jaya / customer@skynav — password from CUSTOMER_SEED_PASSWORD)
+  const customerPassword = (process.env.CUSTOMER_SEED_PASSWORD || process.env.CUSTOMER_PASSWORD || '').trim();
+  if (!customerPassword || customerPassword === 'skynav@123' || customerPassword.length < 10) {
+    throw new Error('CUSTOMER_SEED_PASSWORD (or CUSTOMER_PASSWORD) must be set to a strong non-default password (>= 10 chars).');
+  }
+  const passwordHash = await bcrypt.hash(customerPassword, 10);
   const deliveryPinHash = await bcrypt.hash('4827', 10);
   const userId = 'cust_skynav_dev';
 
