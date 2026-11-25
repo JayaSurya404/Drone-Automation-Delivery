@@ -69,7 +69,7 @@ flowchart TD
 4. **Autonomous Kurumbapalayam Fleet**:
    40 autonomous drones (`D-001` through `D-040`) stationed at SkyHub Kurumbapalayam with real-time battery drain, waypoint tracking, and charging cycles.
 5. **Gazebo & ROS 2 Telemetry Bridge**:
-   Direct integration with Gazebo simulation on port 8085 authenticated via `x-service-key` headers.
+   Direct integration with Gazebo simulation on port 8085 authenticated via `x-service-key` headers (gated by `GAZEBO_BRIDGE_ENABLED=true`, disabled by default).
 6. **Advanced Simulation Intelligence**:
    - **Computer Vision**: Synthetic optical frame obstacle analysis and landing zone candidate detection.
    - **Landing Zone Evaluation**: Downward sensor suitability scoring (size, obstruction, proximity, safety).
@@ -94,6 +94,22 @@ flowchart TD
 
 ---
 
+## Continuous Integration (CI)
+
+The GitHub Actions CI pipeline (`.github/workflows/ci.yml`) runs on every push and pull request to `main` and `feature/claude-stack-upgrade`:
+
+1. **Dependency Audit**: `pnpm audit --audit-level=high --prod` fails the build on any high or critical vulnerability.
+2. **Secret Scanning**: Automated Gitleaks analysis.
+3. **Linting**: ESLint flat config with `typescript-eslint` and `eslint-plugin-react-hooks` across all workspace projects.
+4. **Typechecking**: Strict TypeScript validation across all 7 workspace packages.
+5. **Unit Tests**: Full Jest test suite (61 test suites, 430 unit tests).
+6. **Integration Tests**: Tests against real PostgreSQL, Redis, and MinIO services, including cross-app cookie session isolation.
+7. **Monorepo Build**: Full production compilation (`pnpm build`).
+8. **End-to-End Workflow Verification**: Starts the built API in the background, waits for `/health` readiness, and runs `test_full_workflow.ts` (16 validation checkpoints).
+9. **Playwright E2E**: Installs Chromium browser dependencies and runs Playwright end-to-end tests against customer and admin preview servers (`pnpm test:e2e`).
+
+---
+
 ## Quick Start
 
 ### 1. Prerequisites
@@ -105,6 +121,7 @@ flowchart TD
 ```bash
 cp .env.example .env
 ```
+> **Security Notice**: Local development `.env.example` includes development defaults for rapid local startup. For production deployments (`docker-compose.prod.yml`), all passwords and keys must be supplied via environment variables (`${VAR:?error}`) with zero fallback defaults.
 
 ### 3. Start Infrastructure
 ```bash
@@ -117,7 +134,16 @@ pnpm db:migrate:deploy
 pnpm db:seed
 ```
 
-### 5. Launch Development Servers
+### 5. Local Development Seed Accounts (Dev Only)
+> [!NOTE]
+> These credentials are generated solely by `pnpm db:seed` for local offline development and automated testing. Never deploy or expose these accounts to public production environments.
+
+| Portal | Email | Password | Role |
+|---|---|---|---|
+| **Admin Console** | `admin@skynav.local` | `ChangeMe123!` | Super Administrator |
+| **Customer Portal**| `customer@skynav.local`| `ChangeMe123!` | Customer |
+
+### 6. Launch Development Servers
 ```bash
 pnpm dev
 ```
@@ -125,19 +151,13 @@ pnpm dev
 - **Customer Web**: [http://localhost:5173](http://localhost:5173)
 - **Admin Console**: [http://localhost:5174](http://localhost:5174)
 
-### 6. Run Quality & Test Suite
+### 7. Run Quality & Test Suite
 ```bash
-pnpm typecheck   # Typecheck all 7 packages
-pnpm lint        # ESLint across monorepo
-pnpm test        # Run all 61 Jest test suites (430 unit tests)
-npx tsx test_full_workflow.ts # Run full 16-step E2E integration test
+pnpm typecheck                    # Typecheck all packages
+pnpm lint                         # Real ESLint across monorepo
+pnpm audit --audit-level=high --prod # Dependency security audit
+pnpm test                         # 61 Jest test suites (430 unit tests)
+pnpm test:integration             # Integration tests including session isolation
+npx tsx test_full_workflow.ts      # 16-step E2E integration test
+pnpm test:e2e                     # Playwright E2E test suite
 ```
-
----
-
-## Seed Accounts
-
-| Portal | Email | Password | Role |
-|---|---|---|---|
-| **Admin Console** | `admin@skynav.local` | `ChangeMe123!` | Super Administrator |
-| **Customer Portal**| `customer@skynav.local`| `ChangeMe123!` | Customer |

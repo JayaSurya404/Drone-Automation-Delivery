@@ -86,13 +86,16 @@ Expected running containers:
    ```bash
    pnpm db:seed
    ```
-   The seed script populates:
-   - **Super Admin**: `admin@skynav.local` / `ChangeMe123!`
-   - **Customer User**: `customer@skynav.local` / `ChangeMe123!`
-   - **SkyHub Kurumbapalayam Base** (`11.1132°N, 77.0277°E`)
-   - **40 Autonomous UAVs** (`D-001` through `D-040`)
-   - **Coimbatore DGCA No-Fly Zones** (Sulur Air Force Station, Airport, Prison, INS Agrani)
-   - **Indian Product Catalog** (5 categories, 8 products, 10 inventory variants)
+   > [!NOTE]
+   > **Local Development Seed Accounts (Offline Testing Only)**:
+   > - **Super Admin**: `admin@skynav.local` / `ChangeMe123!` (Super Administrator)
+   > - **Customer User**: `customer@skynav.local` / `ChangeMe123!` (Customer)
+   >
+   > The seed script also provisions:
+   > - **SkyHub Kurumbapalayam Base** (`11.1132°N, 77.0277°E`)
+   > - **40 Autonomous UAVs** (`D-001` through `D-040`)
+   > - **Coimbatore DGCA No-Fly Zones** (Sulur Air Force Station, Airport, Prison, INS Agrani)
+   > - **Indian Product Catalog** (5 categories, 8 products, 10 inventory variants)
 
 ---
 
