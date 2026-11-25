@@ -295,6 +295,9 @@ importers:
         specifier: ^7.18.2
         version: 7.18.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18
@@ -303,13 +306,13 @@ importers:
         version: 19.2.5(@types/react@19.2.18)
       '@vitejs/plugin-react':
         specifier: ^6.1.0
-        version: 6.3.0(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12))
+        version: 6.3.0(vite@8.3.8(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12))
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
       vite:
         specifier: ^8.2.2
-        version: 8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12)
+        version: 8.3.8(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12)
 
   packages/api-client:
     dependencies:
@@ -6860,10 +6863,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vitejs/plugin-react@6.3.0(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12))':
+  '@vitejs/plugin-react@6.3.0(vite@8.3.8(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12)
+      vite: 8.3.8(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12)
 
   '@webassemblyjs/ast@1.14.1':
     dependencies:
@@ -10038,7 +10041,7 @@ snapshots:
       lightningcss: 1.33.0
       terser: 5.51.2
 
-  vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12):
+  vite@8.3.8(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.12):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -10046,7 +10049,7 @@ snapshots:
       rolldown: 1.2.19
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 24.19.2
+      '@types/node': 22.20.1
       esbuild: 0.28.2
       fsevents: 2.3.3
       jiti: 2.7.0
