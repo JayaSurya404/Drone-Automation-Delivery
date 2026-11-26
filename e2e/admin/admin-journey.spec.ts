@@ -10,7 +10,7 @@ const ADMIN_PASSWORD = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD ?? 'ChangeMe12
 test.describe('admin operator journey', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    const emailInput = page.locator('input[placeholder="admin@skynav"], input[type="text"]').first();
+    const emailInput = page.locator('input[placeholder*="admin@skynav"], input[type="text"]').first();
     const passwordInput = page.locator('input[type="password"]').first();
 
     await emailInput.fill(ADMIN_EMAIL);

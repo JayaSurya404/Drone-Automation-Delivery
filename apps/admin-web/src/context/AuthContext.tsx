@@ -61,14 +61,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then(async (authRes) => {
         if (authRes && isMounted) {
           const u = authRes.user;
-          const role: AdminRole = (u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole) || 'super_admin';
+          const staffRole = u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole | undefined;
+          if (!staffRole) {
+            setUser(null);
+            adminApiClient.logout().catch(() => {});
+            return;
+          }
           const decoded = decodeJwtPayload<{ permissions?: string[]; roles?: string[] }>(authRes.accessToken);
           const permissions = decoded?.permissions || [];
           const fullUser: AdminUser = {
             id: u.id,
             name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'Admin User',
             email: u.email,
-            role,
+            role: staffRole,
             avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
             status: 'Active',
             lastLogin: 'Active Session',
@@ -117,14 +122,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       const u = authRes.user;
-      const primaryRole: AdminRole = (u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole) || role || 'super_admin';
+      const staffRole = u.roles?.find((r) => r !== 'customer' && r !== 'guest') as AdminRole | undefined;
+      if (!staffRole) {
+        adminApiClient.logout().catch(() => {});
+        return {
+          success: false,
+          error: 'Access denied: account does not have administrator privileges.',
+        };
+      }
       const decoded = decodeJwtPayload<{ permissions?: string[]; roles?: string[] }>(authRes.accessToken);
       const permissions = decoded?.permissions || [];
       const authenticatedUser: AdminUser = {
         id: u.id,
         name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'Admin User',
         email: u.email,
-        role: primaryRole,
+        role: staffRole,
         avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
         status: 'Active',
         lastLogin: 'Active Session',

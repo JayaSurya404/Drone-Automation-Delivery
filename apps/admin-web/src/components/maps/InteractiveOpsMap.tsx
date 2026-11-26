@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Drone, GeofenceZone, Order, Mission } from '../../types/skynav';
 import { TelemetryFloatingCard } from './TelemetryFloatingCard';
+
+// Lazy-load CesiumJS 3D Ops Map to keep the initial application bundle lean
+const CesiumOpsMap3D = React.lazy(() => import('./CesiumOpsMap3D'));
 import {
   Layers,
   ZoomIn,
@@ -58,6 +61,8 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
   const geofencesGroupRef = useRef<L.LayerGroup | null>(null);
 
   const [mapType, setMapType] = useState<'satellite' | 'roadmap' | 'hybrid'>('satellite');
+  const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D');
+  const hasIonToken = Boolean((import.meta as any).env?.VITE_CESIUM_ION_TOKEN);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedDrone, setSelectedDrone] = useState<Drone | null>(null);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
@@ -505,41 +510,79 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
         </div>
       </div>
 
-      {/* Top Right Controls: [Map] [Satellite] [Hybrid] [Fullscreen] [Fit Fleet] [Layers] */}
+      {/* Top Right Controls: [2D/3D Toggle] [Map] [Satellite] [Hybrid] [Fullscreen] [Fit Fleet] [Layers] */}
       <div className="absolute right-4 top-4 z-[400] flex items-center gap-2">
-        {/* Map Type Mode Switcher */}
+        {/* 2D / 3D Photorealistic Mode Toggle */}
         <div className="flex items-center rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 p-1 backdrop-blur-xl shadow-2xl text-xs font-bold">
           <button
-            onClick={() => setMapType('roadmap')}
+            onClick={() => setViewMode('2D')}
             className={`px-3 py-1.5 rounded-xl transition-all ${
-              mapType === 'roadmap'
+              viewMode === '2D'
                 ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            Map
+            2D Map
           </button>
           <button
-            onClick={() => setMapType('satellite')}
-            className={`px-3 py-1.5 rounded-xl transition-all ${
-              mapType === 'satellite'
-                ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            onClick={() => {
+              if (!hasIonToken) {
+                alert('To enable CesiumJS 3D Photorealistic terrain and building view, set VITE_CESIUM_ION_TOKEN in your .env configuration.');
+                return;
+              }
+              setViewMode('3D');
+            }}
+            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+              viewMode === '3D'
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md font-black'
+                : 'text-slate-600 dark:text-slate-400 hover:text-cyan-400'
             }`}
+            title={hasIonToken ? 'Switch to CesiumJS 3D View' : 'Requires VITE_CESIUM_ION_TOKEN in .env'}
           >
-            Satellite
-          </button>
-          <button
-            onClick={() => setMapType('hybrid')}
-            className={`px-3 py-1.5 rounded-xl transition-all ${
-              mapType === 'hybrid'
-                ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            Hybrid
+            <span>3D Photorealistic</span>
+            {!hasIonToken && (
+              <span className="text-[9px] bg-slate-800 text-amber-400 px-1 py-0.5 rounded font-mono font-normal">
+                Token Req
+              </span>
+            )}
           </button>
         </div>
+
+        {/* Map Type Mode Switcher (2D Mode) */}
+        {viewMode === '2D' && (
+          <div className="flex items-center rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 p-1 backdrop-blur-xl shadow-2xl text-xs font-bold">
+            <button
+              onClick={() => setMapType('roadmap')}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                mapType === 'roadmap'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Map
+            </button>
+            <button
+              onClick={() => setMapType('satellite')}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                mapType === 'satellite'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Satellite
+            </button>
+            <button
+              onClick={() => setMapType('hybrid')}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                mapType === 'hybrid'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Hybrid
+            </button>
+          </div>
+        )}
 
         {/* Layer Controls Dropdown Toggle */}
         <div className="relative">
@@ -634,8 +677,29 @@ export const InteractiveOpsMap: React.FC<InteractiveOpsMapProps> = ({
         </button>
       </div>
 
-      {/* Main Leaflet Map Canvas */}
-      <div ref={mapContainerRef} className="w-full h-full" />
+      {/* Main Map Canvas (2D Leaflet or 3D Cesium) */}
+      {viewMode === '3D' && hasIonToken ? (
+        <React.Suspense
+          fallback={
+            <div className={`w-full ${heightClass} flex flex-col items-center justify-center bg-slate-950 text-cyan-400 font-mono text-xs gap-3`}>
+              <div className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
+              <span>Initializing Cesium 3D Photorealistic View...</span>
+            </div>
+          }
+        >
+          <CesiumOpsMap3D
+            drones={drones}
+            geofences={geofences}
+            orders={orders}
+            missions={missions}
+            selectedDroneId={selectedDroneId}
+            onSelectDrone={onSelectDrone}
+            heightClass={heightClass}
+          />
+        </React.Suspense>
+      ) : (
+        <div ref={mapContainerRef} className="w-full h-full" />
+      )}
 
       {/* Visual Route Deviation Banner (Section 12) if D-024 is flying */}
       {selectedDrone?.id === 'D-024' && (

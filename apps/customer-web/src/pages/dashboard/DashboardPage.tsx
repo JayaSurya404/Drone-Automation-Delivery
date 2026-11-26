@@ -152,10 +152,11 @@ export const DashboardPage: React.FC = () => {
     let isMounted = true;
     api.products.getAll().then((data) => {
       if (!isMounted) return;
-      setAllProducts(data);
+      const productList = Array.isArray(data) ? data : (data as any)?.products || [];
+      setAllProducts(productList);
       const viewedIds = storage.get<string[]>(RECENTLY_VIEWED_KEY, []);
       if (viewedIds.length > 0) {
-        const prods = data.filter(p => viewedIds.includes(p.id));
+        const prods = productList.filter((p: any) => viewedIds.includes(p.id));
         setRecentlyViewed(prods.slice(0, 4));
       }
     }).catch(err => console.error('Failed to load dashboard products:', err));
@@ -166,10 +167,11 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   // Products subsets based on actual live database data
-  const newArrivals = allProducts.slice(0, 4);
-  const bestSellers = allProducts.slice(2, 6);
-  const dealsProducts = allProducts.filter(p => p.discountPercent && p.discountPercent >= 20).slice(0, 4);
-  const speedFilteredProducts = allProducts.filter(p =>
+  const safeProducts = Array.isArray(allProducts) ? allProducts : [];
+  const newArrivals = safeProducts.slice(0, 4);
+  const bestSellers = safeProducts.slice(2, 6);
+  const dealsProducts = safeProducts.filter(p => p.discountPercent && p.discountPercent >= 20).slice(0, 4);
+  const speedFilteredProducts = safeProducts.filter(p =>
     selectedSpeed === 0 ? true : p.estimatedDeliveryMins <= selectedSpeed
   ).slice(0, 4);
 

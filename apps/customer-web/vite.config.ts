@@ -1,5 +1,8 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import cesiumPlugin from 'vite-plugin-cesium'
+
+const cesium = (cesiumPlugin as any).default || cesiumPlugin;
 
 // https://vite.dev/config/
 const proxyConfig = {
@@ -15,7 +18,7 @@ const proxyConfig = {
 };
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cesium()],
   server: {
     port: 5173,
     host: true,

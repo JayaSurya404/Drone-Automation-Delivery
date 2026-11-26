@@ -162,32 +162,35 @@ export class AuthController {
     };
   }
 
-  private getRefreshCookieNames(): { defaultCookie: string; adminCookie: string; customerCookie: string } {
-    const defaultCookie = this.configService.get("REFRESH_COOKIE_NAME", { infer: true }) ?? "skynav_refresh_token";
+  private getRefreshCookieNames(): { adminCookie: string; customerCookie: string } {
     const adminCookie = process.env.ADMIN_REFRESH_COOKIE_NAME ?? "skynav_admin_refresh_token";
     const customerCookie = process.env.CUSTOMER_REFRESH_COOKIE_NAME ?? "skynav_customer_refresh_token";
-    return { defaultCookie, adminCookie, customerCookie };
+    return { adminCookie, customerCookie };
   }
 
   private resolveIncomingCookie(req: Request): { name: string; token: string } | null {
-    const { defaultCookie, adminCookie, customerCookie } = this.getRefreshCookieNames();
+    const { adminCookie, customerCookie } = this.getRefreshCookieNames();
     const clientApp = req.headers["x-client-app"] as string | undefined;
 
-    if (clientApp === "admin" && req.cookies?.[adminCookie]) {
-      return { name: adminCookie, token: req.cookies[adminCookie] };
+    // Strict cookie isolation:
+    // When x-client-app=admin, read ONLY admin cookie (no fallthrough to customer cookie)
+    if (clientApp === "admin") {
+      return req.cookies?.[adminCookie] ? { name: adminCookie, token: req.cookies[adminCookie] } : null;
     }
-    if (clientApp === "customer" && req.cookies?.[customerCookie]) {
-      return { name: customerCookie, token: req.cookies[customerCookie] };
+
+    // When x-client-app=customer, read ONLY customer cookie (no fallthrough to admin cookie)
+    if (clientApp === "customer") {
+      return req.cookies?.[customerCookie] ? { name: customerCookie, token: req.cookies[customerCookie] } : null;
+    }
+
+    // When x-client-app is not specified, resolve from dedicated cookies (no legacy default cookie fallback)
+    if (req.cookies?.[adminCookie]) {
+      return { name: adminCookie, token: req.cookies[adminCookie] };
     }
     if (req.cookies?.[customerCookie]) {
       return { name: customerCookie, token: req.cookies[customerCookie] };
     }
-    if (req.cookies?.[adminCookie]) {
-      return { name: adminCookie, token: req.cookies[adminCookie] };
-    }
-    if (req.cookies?.[defaultCookie]) {
-      return { name: defaultCookie, token: req.cookies[defaultCookie] };
-    }
+
     return null;
   }
 
@@ -198,10 +201,10 @@ export class AuthController {
     user?: PublicUser,
     explicitCookieName?: string,
   ): void {
-    const { defaultCookie, adminCookie, customerCookie } = this.getRefreshCookieNames();
-    let cookieName = explicitCookieName ?? defaultCookie;
+    const { adminCookie, customerCookie } = this.getRefreshCookieNames();
+    let cookieName = explicitCookieName;
 
-    if (!explicitCookieName) {
+    if (!cookieName) {
       const clientApp = req?.headers["x-client-app"] as string | undefined;
       const isStaffUser = user?.roles ? user.roles.some((r) => r !== "customer" && r !== "guest") : false;
 
@@ -209,6 +212,8 @@ export class AuthController {
         cookieName = adminCookie;
       } else if (clientApp === "customer" || user) {
         cookieName = customerCookie;
+      } else {
+        return;
       }
     }
 
@@ -222,9 +227,8 @@ export class AuthController {
   }
 
   private clearAllRefreshCookies(res: Response): void {
-    const { defaultCookie, adminCookie, customerCookie } = this.getRefreshCookieNames();
+    const { adminCookie, customerCookie } = this.getRefreshCookieNames();
     const cookieOptions = { path: "/api/v1/auth" };
-    res.clearCookie(defaultCookie, cookieOptions);
     res.clearCookie(adminCookie, cookieOptions);
     res.clearCookie(customerCookie, cookieOptions);
   }

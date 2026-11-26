@@ -228,7 +228,11 @@ export const api = {
       if (params?.sort) query.set('sort', params.sort);
 
       const qs = query.toString();
-      return request<Product[]>(`/products${qs ? `?${qs}` : ''}`);
+      const res = await request<any>(`/products${qs ? `?${qs}` : ''}`);
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.products)) return res.products;
+      if (res && Array.isArray(res.items)) return res.items;
+      return [];
     },
 
     getById: async (id: string): Promise<Product> => {
@@ -240,11 +244,17 @@ export const api = {
     },
 
     getFeatured: async (): Promise<Product[]> => {
-      return request<Product[]>('/products?sort=popular&limit=6');
+      const res = await request<any>('/products?sort=popular&limit=6');
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.products)) return res.products;
+      return [];
     },
 
     getDeals: async (): Promise<Product[]> => {
-      return request<Product[]>('/products?deals=true');
+      const res = await request<any>('/products?deals=true');
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.products)) return res.products;
+      return [];
     },
 
     getReviews: async (productId: string): Promise<ProductReview[]> => {
@@ -417,7 +427,33 @@ export const api = {
   // ── SUPPORT & FAQS ──
   support: {
     getFaqs: async (): Promise<FAQItem[]> => {
-      return request<FAQItem[]>('/support/faqs');
+      try {
+        const res = await request<any>('/support/faqs');
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray(res.faqs)) return res.faqs;
+        return [];
+      } catch {
+        return [
+          {
+            id: 'faq-1',
+            question: 'How fast is autonomous drone delivery?',
+            answer: 'Deliveries within Coimbatore hub operational corridors typically arrive within 10 to 25 minutes of order dispatch.',
+            category: 'Drone Delivery',
+          },
+          {
+            id: 'faq-2',
+            question: 'What is the return-home battery safety margin?',
+            answer: 'Every SkyNav drone enforces a mandatory 20% battery reserve returning to base. Missions are evaluated before takeoff.',
+            category: 'Safety & Drop-off',
+          },
+          {
+            id: 'faq-3',
+            question: 'How do I accept delivery of my package?',
+            answer: 'When the drone reaches your designated drop zone, provide your 6-digit delivery OTP or scan the secure delivery QR code.',
+            category: 'Orders & Tracking',
+          },
+        ];
+      }
     },
 
     getTickets: async (): Promise<SupportTicket[]> => {

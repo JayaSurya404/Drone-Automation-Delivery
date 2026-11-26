@@ -102,4 +102,32 @@ describe("Tab Session Isolation (E2E Integration)", () => {
     expect(custStillLoggedInRes.status).toBe(200);
     expect(custStillLoggedInRes.body.data.user.email).toBe(customerEmail);
   });
+
+  it("proves customer session cannot refresh in admin app (x-client-app=admin rejects customer cookie)", async () => {
+    const server = app.getHttpServer();
+    const crossCustomerEmail = `cust-cross-${Date.now()}@example.com`;
+
+    try {
+      // 1. Customer registers and gets a customer refresh cookie
+      const custRegisterRes = await request(server)
+        .post("/api/v1/auth/register")
+        .set("x-client-app", "customer")
+        .send({ email: crossCustomerEmail, password: "Password123", firstName: "CustomerCross" });
+
+      expect(custRegisterRes.status).toBe(201);
+      const customerCookie = extractCookie(custRegisterRes, "skynav_customer_refresh_token");
+
+      // 2. Client sends the customer refresh cookie to the admin app (x-client-app=admin)
+      const crossAppRefreshRes = await request(server)
+        .post("/api/v1/auth/refresh")
+        .set("x-client-app", "admin")
+        .set("Cookie", customerCookie);
+
+      // 3. Must fail with 400 Bad Request — admin app reads ONLY skynav_admin_refresh_token
+      expect(crossAppRefreshRes.status).toBe(400);
+      expect(crossAppRefreshRes.body.error?.message || crossAppRefreshRes.body.message).toContain("No refresh session found");
+    } finally {
+      await prisma.user.deleteMany({ where: { email: crossCustomerEmail } });
+    }
+  });
 });

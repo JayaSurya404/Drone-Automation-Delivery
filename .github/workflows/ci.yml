@@ -57,9 +57,11 @@ jobs:
 
       - name: Start MinIO Object Storage
         run: |
+          docker pull quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z
+          docker tag quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
           docker run -d --name minio -p 9000:9000 -p 9001:9001 \
             -e MINIO_ROOT_USER=skynav -e MINIO_ROOT_PASSWORD=skynav123 \
-            minio/minio:latest server /data --console-address ":9001"
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data --console-address ":9001"
           for i in $(seq 1 20); do
             curl -sf http://localhost:9000/minio/health/live && break
             sleep 2

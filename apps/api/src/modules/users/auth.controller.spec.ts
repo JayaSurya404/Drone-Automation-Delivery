@@ -156,4 +156,26 @@ describe("AuthController — Refresh Cookie Isolation & Header Resolution", () =
     expect(res.cookie).toHaveBeenCalledTimes(1);
     expect(res.cookie).not.toHaveBeenCalledWith("skynav_refresh_token", expect.anything(), expect.anything());
   });
+
+  it("throws BadRequestException on refresh when x-client-app is admin but only customer cookie is present", async () => {
+    const req = {
+      headers: { "x-client-app": "admin" },
+      cookies: { skynav_customer_refresh_token: "cust.refresh.token" },
+    } as unknown as Request;
+    const res = { cookie: jest.fn() } as unknown as Response;
+
+    await expect(controller.refresh(req, "127.0.0.1", res)).rejects.toThrow("No refresh session found");
+    expect(authService.refresh).not.toHaveBeenCalled();
+  });
+
+  it("throws BadRequestException on refresh when x-client-app is customer but only admin cookie is present", async () => {
+    const req = {
+      headers: { "x-client-app": "customer" },
+      cookies: { skynav_admin_refresh_token: "admin.refresh.token" },
+    } as unknown as Request;
+    const res = { cookie: jest.fn() } as unknown as Response;
+
+    await expect(controller.refresh(req, "127.0.0.1", res)).rejects.toThrow("No refresh session found");
+    expect(authService.refresh).not.toHaveBeenCalled();
+  });
 });

@@ -57,15 +57,14 @@ export const LoginScreen: React.FC = () => {
     if (e) e.preventDefault();
     if (isLoading) return;
 
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
-      setEmailError('Please enter your admin identifier or email.');
+      setEmailError('Please enter your admin email address.');
       return;
     }
-    const isDevAdmin = cleanEmail.toLowerCase() === 'admin@skynav';
-    const emailRegex = /^[^\s@]+@[^\s@]+(\.[^\s@]+)?$/;
-    if (!isDevAdmin && !emailRegex.test(cleanEmail)) {
-      setEmailError('Please enter a valid identifier (e.g. admin@skynav).');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setEmailError('Please enter a valid email address (e.g. admin@skynav.local).');
       return;
     }
     setEmailError('');
@@ -87,11 +86,18 @@ export const LoginScreen: React.FC = () => {
           navigate('/dashboard');
         }, 500);
       } else {
-        setGeneralError(res.error || 'Authentication failed. Please verify credentials.');
+        const errorMsg = res.error || 'Authentication failed. Please verify credentials.';
+        setGeneralError(errorMsg);
+        if (errorMsg.toLowerCase().includes('email') || errorMsg.toLowerCase().includes('user')) {
+          setEmailError(errorMsg);
+        } else if (errorMsg.toLowerCase().includes('password')) {
+          setPasswordError(errorMsg);
+        }
         setIsLoading(false);
       }
-    } catch {
-      setGeneralError('Unable to connect to SKYNAV services. Please try again.');
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Unable to connect to SKYNAV services. Please try again.';
+      setGeneralError(errorMsg);
       setIsLoading(false);
     }
   };
@@ -156,7 +162,7 @@ export const LoginScreen: React.FC = () => {
             </div>
             <h2 className="text-2xl font-black text-slate-100 tracking-tight">Sign In To SkyNav</h2>
             <p className="text-xs text-slate-400">
-              Enter authorized administrator credentials.
+              Enter authorized administrator credentials (e.g. admin@skynav.local).
             </p>
           </div>
 
@@ -182,7 +188,7 @@ export const LoginScreen: React.FC = () => {
                     setGeneralError('');
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                  placeholder="admin@skynav"
+                  placeholder="admin@skynav.local"
                   className={`w-full bg-slate-950 border ${
                     emailError ? 'border-red-500 focus:ring-red-500' : 'border-slate-800 focus:ring-cyan-500'
                   } rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:ring-2`}

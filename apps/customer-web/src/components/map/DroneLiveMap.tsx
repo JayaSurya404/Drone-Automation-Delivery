@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LeafletMapProvider } from '../../services/mapProvider';
 import { DroneLocation, HubLocation } from '../../types/tracking';
 import { api } from '../../services/api';
-import { Maximize2, ShieldAlert, Navigation } from 'lucide-react';
+import { Maximize2, ShieldAlert, Navigation, Compass } from 'lucide-react';
+
+// Lazy-load CesiumJS 3D Customer Delivery Map
+const CesiumLiveMap3D = React.lazy(() => import('./CesiumLiveMap3D'));
 
 interface DroneLiveMapProps {
   droneLocation: DroneLocation;
@@ -29,6 +32,8 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
   const [isAirspaceVisible, setIsAirspaceVisible] = useState<boolean>(true);
   const [isAutoFollow, setIsAutoFollow] = useState<boolean>(false);
   const [isUserInteracted, setIsUserInteracted] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D');
+  const hasIonToken = Boolean(import.meta.env.VITE_CESIUM_ION_TOKEN);
 
   const hasInitialFitRef = useRef<boolean>(false);
   const lastCameraUpdateRef = useRef<{ timestamp: number; band: number }>({ timestamp: 0, band: -1 });
@@ -257,7 +262,44 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
 
   return (
     <div className="map-wrapper" style={{ height }}>
-      <div ref={containerRef} className="map-container" style={{ height: '100%' }} />
+      {viewMode === '3D' && hasIonToken ? (
+        <React.Suspense
+          fallback={
+            <div style={{
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#090d16',
+              color: '#22d3ee',
+              gap: '12px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+            }}>
+              <div style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                border: '2px solid #06b6d4',
+                borderTopColor: 'transparent',
+                animation: 'spin 1s linear infinite',
+              }} />
+              <span>Streaming Cesium 3D Airspace & Terrain...</span>
+            </div>
+          }
+        >
+          <CesiumLiveMap3D
+            droneLocation={droneLocation}
+            hubLocation={hubLocation}
+            destinationLocation={destinationLocation}
+            flightRoute={flightRoute}
+            height="100%"
+          />
+        </React.Suspense>
+      ) : (
+        <div ref={containerRef} className="map-container" style={{ height: '100%' }} />
+      )}
 
       {/* Floating Status Badge */}
       <div className="map-overlay-badge">
@@ -267,15 +309,34 @@ export const DroneLiveMap: React.FC<DroneLiveMapProps> = ({
 
       {/* Floating Airspace Radar Controls */}
       <div className="airspace-map-toolbar">
+        {/* 2D / 3D Photorealistic Mode Toggle */}
         <button
           type="button"
-          onClick={handleToggleAirspace}
-          className={`airspace-toggle-btn ${isAirspaceVisible ? 'active' : ''}`}
-          title="Toggle No-Fly Zone Radar Layer"
+          onClick={() => {
+            if (!hasIonToken) {
+              alert('To enable CesiumJS 3D Photorealistic live flight tracking, configure VITE_CESIUM_ION_TOKEN in .env');
+              return;
+            }
+            setViewMode((prev) => (prev === '2D' ? '3D' : '2D'));
+          }}
+          className={`airspace-toggle-btn ${viewMode === '3D' ? 'active' : ''}`}
+          title={hasIonToken ? 'Toggle CesiumJS 3D Live View' : 'Requires VITE_CESIUM_ION_TOKEN in .env'}
         >
-          <ShieldAlert size={14} color={isAirspaceVisible ? '#ef4444' : 'var(--text-tertiary)'} />
-          <span>Airspace NFZ: {isAirspaceVisible ? 'ON' : 'OFF'}</span>
+          <Compass size={14} color={viewMode === '3D' ? '#06b6d4' : 'var(--text-tertiary)'} />
+          <span>{viewMode === '3D' ? '3D Live Map' : '2D Map'}</span>
         </button>
+
+        {viewMode === '2D' && (
+          <button
+            type="button"
+            onClick={handleToggleAirspace}
+            className={`airspace-toggle-btn ${isAirspaceVisible ? 'active' : ''}`}
+            title="Toggle No-Fly Zone Radar Layer"
+          >
+            <ShieldAlert size={14} color={isAirspaceVisible ? '#ef4444' : 'var(--text-tertiary)'} />
+            <span>Airspace NFZ: {isAirspaceVisible ? 'ON' : 'OFF'}</span>
+          </button>
+        )}
       </div>
 
       {/* Floating Controls */}
