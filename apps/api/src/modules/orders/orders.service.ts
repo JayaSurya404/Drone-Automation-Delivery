@@ -90,7 +90,7 @@ export class OrdersService {
     }
 
     const address = await this.addressesService.getOwnedOrThrow(userId, dto.addressId);
-    await this.serviceAreaChecker.check(address);
+    await this.serviceAreaChecker.check(address, dto);
 
     const pricing = this.calculatePricing(cart.subtotal);
     const orderId = randomUUID();

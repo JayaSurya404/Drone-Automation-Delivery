@@ -220,7 +220,7 @@ export const CartPage: React.FC = () => {
                       <div className="cart-stepper">
                         <button
                           type="button"
-                          onClick={() => updateQuantity(product.id, quantity - 1)}
+                          onClick={() => updateQuantity(prod.id, quantity - 1)}
                           className="cart-stepper-btn"
                           aria-label="Decrease quantity"
                         >
@@ -229,9 +229,9 @@ export const CartPage: React.FC = () => {
                         <span className="cart-stepper-val">{quantity}</span>
                         <button
                           type="button"
-                          onClick={() => updateQuantity(product.id, quantity + 1)}
+                          onClick={() => updateQuantity(prod.id, quantity + 1)}
                           className="cart-stepper-btn"
-                          disabled={quantity >= product.stockCount}
+                          disabled={quantity >= (prod.stockCount ?? 99)}
                           aria-label="Increase quantity"
                         >
                           <Plus size={13} />

@@ -87,18 +87,36 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateQuantity = async (productId: string, quantity: number) => {
+  const updateQuantity = async (productIdOrItemId: string, quantity: number) => {
     try {
-      const data = await api.cart.updateQuantity(productId, quantity);
+      if (quantity < 1) {
+        await removeFromCart(productIdOrItemId);
+        return;
+      }
+      const cartItem = items.find(
+        (i: any) =>
+          i.product?.id === productIdOrItemId ||
+          i.id === productIdOrItemId ||
+          i.productId === productIdOrItemId
+      );
+      const targetId = (cartItem as any)?.id || productIdOrItemId;
+      const data = await api.cart.updateQuantity(targetId, quantity);
       applyCartResponse(data);
     } catch (err) {
       console.error('Failed to update quantity:', err);
     }
   };
 
-  const removeFromCart = async (productId: string) => {
+  const removeFromCart = async (productIdOrItemId: string) => {
     try {
-      const data = await api.cart.removeItem(productId);
+      const cartItem = items.find(
+        (i: any) =>
+          i.product?.id === productIdOrItemId ||
+          i.id === productIdOrItemId ||
+          i.productId === productIdOrItemId
+      );
+      const targetId = (cartItem as any)?.id || productIdOrItemId;
+      const data = await api.cart.removeItem(targetId);
       applyCartResponse(data);
     } catch (err) {
       console.error('Failed to remove item from cart:', err);

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+  <defs>
+    <linearGradient id="grad-sambar_powder.svg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7f1d1d" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="600" height="450" fill="url(#grad-sambar_powder.svg)" />
+
+  <!-- Subtle background grid pattern -->
+  <g opacity="0.08" stroke="#ffffff" stroke-width="1.5">
+    <line x1="0" y1="90" x2="600" y2="90" />
+    <line x1="0" y1="180" x2="600" y2="180" />
+    <line x1="0" y1="270" x2="600" y2="270" />
+    <line x1="0" y1="360" x2="600" y2="360" />
+    <line x1="120" y1="0" x2="120" y2="450" />
+    <line x1="240" y1="0" x2="240" y2="450" />
+    <line x1="360" y1="0" x2="360" y2="450" />
+    <line x1="480" y1="0" x2="480" y2="450" />
+  </g>
+
+  <!-- Central Card -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="55" width="460" height="340" rx="20" fill="rgba(15, 23, 42, 0.72)" stroke="rgba(255, 255, 255, 0.2)" stroke-width="1.5" />
+  </g>
+
+  <!-- Category Badge -->
+  <g>
+    <rect x="95" y="80" width="160" height="30" rx="8" fill="#fecaca" />
+    <text x="175" y="100" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" fill="#0f172a" text-anchor="middle" letter-spacing="1.2">
+      GROCERIES
+    </text>
+  </g>
+
+  <!-- Drone Delivery Badge -->
+  <g>
+    <rect x="360" y="80" width="145" height="30" rx="8" fill="rgba(255, 255, 255, 0.12)" stroke="rgba(255, 255, 255, 0.3)" />
+    <text x="432" y="100" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">
+      ⚡ DRONE READY
+    </text>
+  </g>
+
+  <!-- Center Emoji / Icon -->
+  <text x="300" y="225" font-size="76" text-anchor="middle" dominant-baseline="middle">
+    🌶️
+  </text>
+
+  <!-- Title -->
+  <text x="300" y="305" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="800" fill="#ffffff" text-anchor="middle">
+    Madras Sambar Podi
+  </text>
+
+  <!-- Subtitle -->
+  <text x="300" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="500" fill="rgba(255, 255, 255, 0.75)" text-anchor="middle">
+    Aromatic Spice Blend (200g)
+  </text>
+
+  <!-- Verified Safe Stamp -->
+  <text x="300" y="372" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#fecaca" text-anchor="middle">
+    ★ SkyNav Coimbatore Air-Corridor Certified
+  </text>
+</svg>

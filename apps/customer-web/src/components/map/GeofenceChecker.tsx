@@ -138,6 +138,19 @@ export const GeofenceChecker: React.FC<GeofenceCheckerProps> = ({
     );
   }
 
+  // Temporarily Unavailable (service unreachable / gateway offline)
+  if (result.status === 'Temporarily Unavailable') {
+    return (
+      <div className="geofence-status-box" style={{ background: '#fffbeb', border: '1.5px solid #f59e0b' }}>
+        <AlertTriangle size={22} color="#d97706" style={{ flexShrink: 0 }} />
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '0.925rem', color: '#92400e' }}>Airspace Verification Service Unreachable</div>
+          <div style={{ fontSize: '0.825rem', marginTop: '0.15rem', color: '#78350f' }}>{result.message}</div>
+        </div>
+      </div>
+    );
+  }
+
   // Out of Range
   return (
     <div className="geofence-status-box ineligible">

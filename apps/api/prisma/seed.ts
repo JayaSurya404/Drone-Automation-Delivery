@@ -93,11 +93,12 @@ interface SeedProduct {
   basePrice: number;
   currency?: string;
   categorySlug: string;
+  imageUrl?: string;
   variants: SeedVariant[];
 }
 
 const PRODUCTS: SeedProduct[] = [
-  // ── TARGET 14 Indian Products from shared/contracts/catalog.ts ──
+  // ── 1. FOOD & HOT MEALS (South Indian Specialties in thermal pods) ──
   {
     slug: "kovai-crispy-masala-dosa-breakfast-box",
     name: "Kovai Crispy Masala Dosa & Sambar Breakfast Box",
@@ -105,6 +106,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 180.0,
     currency: "INR",
     categorySlug: "food",
+    imageUrl: "/images/products/masala_dosa.jpg",
     variants: [{ sku: "SKU-FOOD-002", name: "Hot In-Flight Pod 65°C (550g)", stock: 50 }],
   },
   {
@@ -114,6 +116,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 140.0,
     currency: "INR",
     categorySlug: "food",
+    imageUrl: "/images/products/plain_dosa.jpg",
     variants: [{ sku: "SKU-FOOD-DOSA-PLAIN", name: "Fresh Ghee Roast Set", stock: 45 }],
   },
   {
@@ -123,6 +126,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 360.0,
     currency: "INR",
     categorySlug: "food",
+    imageUrl: "/images/products/dindigul_biryani.svg",
     variants: [{ sku: "SKU-FOOD-BIRYANI", name: "Single Diner Mini Bucket (650g)", stock: 35 }],
   },
   {
@@ -132,8 +136,71 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 120.0,
     currency: "INR",
     categorySlug: "food",
+    imageUrl: "/images/products/steamed_idli.jpg",
     variants: [{ sku: "SKU-FOOD-001", name: "14 Mini Idlis + 3 Chutneys", stock: 60 }],
   },
+  {
+    slug: "crispy-golden-medu-vada-4-pack",
+    name: "Crispy Golden Medu Vada (4-Pack with Sambar & Chutney)",
+    description: "Deep-golden crispy black gram lentil donuts flavored with crushed peppercorns, curry leaves, and ginger. Served piping hot.",
+    basePrice: 130.0,
+    currency: "INR",
+    categorySlug: "food",
+    imageUrl: "/images/products/medu_vada.jpg",
+    variants: [{ sku: "SKU-FOOD-VADA-4", name: "4 Vadas + Podi & Sambar (400g)", stock: 40 }],
+  },
+  {
+    slug: "kovai-traditional-sambar-pot-1-litre",
+    name: "Kovai Traditional Sambar Pot (1 Litre Thermal Pack)",
+    description: "Slow-cooked lentil stew simmered with shallots, drumsticks, and freshly roasted Coimbatore coriander-cumin masala in an insulated flask.",
+    basePrice: 160.0,
+    currency: "INR",
+    categorySlug: "food",
+    imageUrl: "/images/products/sambar_pot.jpg",
+    variants: [{ sku: "SKU-FOOD-SAMBAR-POT", name: "1L Thermal Flask (1.1kg)", stock: 30 }],
+  },
+  {
+    slug: "royal-south-indian-meals-thali-box",
+    name: "Royal South Indian Meals Thali Box",
+    description: "Full traditional lunch with ponni rice, sambar, rasam, kootu, poriyal, curd, papad, and payasam packed in sealed partitioned tray.",
+    basePrice: 220.0,
+    currency: "INR",
+    categorySlug: "food",
+    imageUrl: "/images/products/south_indian_thali.jpg",
+    variants: [{ sku: "SKU-FOOD-THALI", name: "Complete Executive Meal Box (850g)", stock: 25 }],
+  },
+  {
+    slug: "ambur-mutton-dum-biryani-portion",
+    name: "Ambur Mutton Dum Biryani (Single Portion)",
+    description: "Arcot-style wood-fired mutton dum biryani made with fragrant Seeraga Samba rice and tender goat meat, served with brinjal dalcha.",
+    basePrice: 420.0,
+    currency: "INR",
+    categorySlug: "food",
+    imageUrl: "/images/products/ambur_biryani.svg",
+    variants: [{ sku: "SKU-FOOD-AMBUR-MUTTON", name: "Single Portion with Dalcha (600g)", stock: 25 }],
+  },
+  {
+    slug: "chettinad-pepper-chicken-gravy",
+    name: "Chettinad Pepper Chicken Gravy with Malabar Parotta",
+    description: "Fiery Karaikudi black pepper and shallot chicken curry served with two layered flaky Kerala parottas.",
+    basePrice: 290.0,
+    currency: "INR",
+    categorySlug: "food",
+    imageUrl: "/images/products/chettinad_chicken.svg",
+    variants: [{ sku: "SKU-FOOD-CHETTINAD", name: "Curry + 2 Flaky Parottas (620g)", stock: 30 }],
+  },
+  {
+    slug: "paneer-butter-masala-parotta-combo",
+    name: "Paneer Butter Masala & Malabar Parotta Set",
+    description: "Rich creamy cashew-tomato makhani gravy with tender fresh paneer cubes, served with 3 soft wheat parottas.",
+    basePrice: 260.0,
+    currency: "INR",
+    categorySlug: "food",
+    imageUrl: "/images/products/paneer_parotta.svg",
+    variants: [{ sku: "SKU-FOOD-PANEER-PAROTTA", name: "Paneer Gravy + 3 Parottas (580g)", stock: 35 }],
+  },
+
+  // ── 2. MEDICINE & EMERGENCY HEALTH (Urgent first-aid, analgesics, diagnostic) ──
   {
     slug: "trauma-first-aid-burn-emergency-flight-kit",
     name: "Trauma First Aid & Burn Emergency Flight Kit",
@@ -141,6 +208,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 650.0,
     currency: "INR",
     categorySlug: "medicine",
+    imageUrl: "/images/products/first_aid_kit.jpg",
     variants: [{ sku: "SKU-MED-001", name: "Complete Drone Trauma Pack (420g)", stock: 40 }],
   },
   {
@@ -150,6 +218,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 45.0,
     currency: "INR",
     categorySlug: "medicine",
+    imageUrl: "/images/products/dolo_650.svg",
     variants: [{ sku: "SKU-MED-DOLO", name: "15 Tablets Foil Strip", stock: 100 }],
   },
   {
@@ -159,6 +228,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 185.0,
     currency: "INR",
     categorySlug: "medicine",
+    imageUrl: "/images/products/asthalin_inhaler.svg",
     variants: [{ sku: "SKU-MED-INHALER", name: "200 Metered Doses", stock: 30 }],
   },
   {
@@ -168,8 +238,71 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 35.0,
     currency: "INR",
     categorySlug: "medicine",
+    imageUrl: "/images/products/electral_ors.svg",
     variants: [{ sku: "SKU-MED-ORS", name: "5 Sachet Value Pack", stock: 80 }],
   },
+  {
+    slug: "amrutanjan-fast-acting-headache-pain-balm",
+    name: "Amrutanjan Fast-Acting Headache & Cold Pain Balm (50g)",
+    description: "Ayurvedic pain-relieving formulation containing wintergreen oil, menthol, and eucalyptus for rapid relief of severe tension headaches and nasal congestion.",
+    basePrice: 110.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    imageUrl: "/images/products/pain_relief_balm.jpg",
+    variants: [{ sku: "SKU-MED-BALM", name: "50g Glass Jar", stock: 60 }],
+  },
+  {
+    slug: "betadine-10-percent-antiseptic-ointment",
+    name: "Betadine 10% Antiseptic Ointment (20g Tube)",
+    description: "Microbicidal water-soluble iodine ointment for prompt prevention and treatment of surface wound, cut, scrape, and burn infections.",
+    basePrice: 78.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    imageUrl: "/images/products/betadine_ointment.svg",
+    variants: [{ sku: "SKU-MED-BETADINE", name: "20g Sterile Tube", stock: 55 }],
+  },
+  {
+    slug: "volini-rapid-pain-relief-spray-100g",
+    name: "Volini Rapid Pain Relief Spray (100g Can)",
+    description: "Quick-absorbing micro-droplet analgesic spray with diclofenac, methyl salicylate, and menthol for fast musculoskeletal and joint pain relief.",
+    basePrice: 195.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    imageUrl: "/images/products/volini_spray.svg",
+    variants: [{ sku: "SKU-MED-VOLINI", name: "100g Aerosol Can", stock: 45 }],
+  },
+  {
+    slug: "omeprazole-20mg-delayed-release-capsules",
+    name: "Omeprazole 20mg Delayed-Release Antacid Capsules (14 Caps)",
+    description: "Proton pump inhibitor (PPI) capsules providing 24-hour relief from severe heartburn, acid reflux, and hyperacidity.",
+    basePrice: 65.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    imageUrl: "/images/products/omeprazole_capsules.svg",
+    variants: [{ sku: "SKU-MED-OMEPRAZOLE", name: "14 Capsules Strip", stock: 70 }],
+  },
+  {
+    slug: "accu-chek-instant-glucose-strips-25s",
+    name: "Accu-Chek Instant Blood Glucose Monitoring Strips (25 Strips)",
+    description: "High-accuracy diagnostic test strips requiring just 0.6 micro-litres of capillary whole blood for 4-second instant glucose reading.",
+    basePrice: 720.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    imageUrl: "/images/products/glucose_strips.svg",
+    variants: [{ sku: "SKU-MED-ACCUCHEK", name: "25 Test Strips Vial", stock: 35 }],
+  },
+  {
+    slug: "n95-certified-surgical-respirator-masks-5s",
+    name: "N95 Certified Surgical Respirator Masks (Pack of 5)",
+    description: "5-layer electrostatically charged meltblown filter respirators filtering >= 95% particulate matter, aerosols, and airborne pathogens.",
+    basePrice: 175.0,
+    currency: "INR",
+    categorySlug: "medicine",
+    imageUrl: "/images/products/n95_masks.svg",
+    variants: [{ sku: "SKU-MED-N95-5PK", name: "5 Sealed Respirator Masks", stock: 90 }],
+  },
+
+  // ── 3. GROCERIES & PANTRY ESSENTIALS ──
   {
     slug: "coimbatore-specialty-fresh-ground-filter-coffee",
     name: "Coimbatore Specialty Fresh Ground Filter Coffee (500g)",
@@ -177,6 +310,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 240.0,
     currency: "INR",
     categorySlug: "groceries",
+    imageUrl: "/images/products/filter_coffee.jpg",
     variants: [{ sku: "SKU-GROC-001", name: "500g Vacuum Sealed Pack", stock: 55 }],
   },
   {
@@ -186,8 +320,111 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 52.0,
     currency: "INR",
     categorySlug: "groceries",
+    imageUrl: "/images/products/aavin_milk.jpg",
     variants: [{ sku: "SKU-GROC-MILK", name: "1 Litre Chilled Pouch", stock: 75 }],
   },
+  {
+    slug: "crispy-handmade-kovai-butter-murukku",
+    name: "Crispy Handmade Kovai Butter Murukku (250g)",
+    description: "Mouth-watering spiral snack handcrafted using roasted rice flour, fragrant white butter, sesame seeds, and asafetida. Crispy and light.",
+    basePrice: 95.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/butter_murukku.jpg",
+    variants: [{ sku: "SKU-GROC-MURUKKU", name: "250g Nitrogen Flush Pouch", stock: 65 }],
+  },
+  {
+    slug: "sri-krishna-ghee-mysore-pak-box",
+    name: "Sri Krishna Sweets Ghee Mysore Pak (500g Box)",
+    description: "Legendary melt-in-mouth golden sweet crafted with slow-simmered pure desi ghee, gram flour, and fine sugar crystals from RS Puram.",
+    basePrice: 380.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/ghee_mysore_pak.jpg",
+    variants: [{ sku: "SKU-GROC-MYSOREPAK", name: "500g Gift Box", stock: 40 }],
+  },
+  {
+    slug: "cold-pressed-groundnut-cooking-oil",
+    name: "Cold-Pressed Traditional Groundnut Cooking Oil (1 Litre)",
+    description: "100% pure traditional wooden-cold-pressed (Mara Chekku) groundnut oil from Pollachi peanuts. Unrefined, unbleached, retaining natural antioxidants.",
+    basePrice: 320.0,
+    currency: "INR",
+    categorySlug: "daily-essentials",
+    imageUrl: "/images/products/cold_pressed_oil.jpg",
+    variants: [{ sku: "SKU-OTHER-OIL", name: "1 Litre Glass Bottle", stock: 40 }],
+  },
+  {
+    slug: "organic-ponni-boiled-rice-2kg",
+    name: "Organic Ponni Boiled Rice (2kg Bag)",
+    description: "Premium aged Thanjavur delta Ponni boiled rice, naturally rich in dietary fibre, non-sticky, perfect for daily meals.",
+    basePrice: 145.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/ponni_rice.svg",
+    variants: [{ sku: "SKU-GROC-PONNI-2KG", name: "2kg Sealed Bag", stock: 50 }],
+  },
+  {
+    slug: "royal-organic-unpolished-toor-dal-1kg",
+    name: "Royal Organic Unpolished Toor Dal (1kg Pack)",
+    description: "Naturally farm-grown unpolished pigeon pea lentils rich in vegetable protein, ideal for South Indian sambar and kootu.",
+    basePrice: 175.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/toor_dal.svg",
+    variants: [{ sku: "SKU-GROC-TOORDAL-1KG", name: "1kg Vacuum Pack", stock: 60 }],
+  },
+  {
+    slug: "aachi-madras-sambar-powder-200g",
+    name: "Aachi Madras Sambar Powder (200g Pouch)",
+    description: "Traditional spice blend roasted with red chilies, coriander, fenugreek, cumin, and curry leaves for genuine home-style sambar aroma.",
+    basePrice: 58.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/sambar_powder.svg",
+    variants: [{ sku: "SKU-GROC-SAMBARPODI", name: "200g Pouch", stock: 80 }],
+  },
+  {
+    slug: "nilgiri-tea-fresh-garden-dust-250g",
+    name: "Nilgiri Tea Fresh Garden Dust (250g Pouch)",
+    description: "High-grown Nilgiri blue mountain black tea dust offering strong brisk liquor and refreshing floral notes.",
+    basePrice: 125.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/nilgiri_tea.svg",
+    variants: [{ sku: "SKU-GROC-NILGIRITEA", name: "250g Foil Pouch", stock: 70 }],
+  },
+  {
+    slug: "haldirams-nagpur-bhujia-sev-400g",
+    name: "Haldiram's Nagpur Bhujia Sev (400g Pack)",
+    description: "Classic spicy crispy snack made from moth bean and gram flour seasoned with red chili, black pepper, and clove oil.",
+    basePrice: 110.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/bhujia_sev.svg",
+    variants: [{ sku: "SKU-GROC-BHUJIA", name: "400g Value Pack", stock: 55 }],
+  },
+  {
+    slug: "tirunelveli-ghee-wheat-halwa-250g",
+    name: "Tirunelveli Desi Ghee Wheat Halwa (250g Pack)",
+    description: "Authentic dark caramel Thamirabarani river wheat milk halwa cooked with pure cow ghee and crushed cashews.",
+    basePrice: 190.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/tirunelveli_halwa.svg",
+    variants: [{ sku: "SKU-GROC-HALWA", name: "250g Sealed Tray", stock: 45 }],
+  },
+  {
+    slug: "kerala-nendran-spicy-banana-chips-200g",
+    name: "Kerala Nendran Spicy Banana Chips (200g Pouch)",
+    description: "Wafer-thin raw Nendran bananas kettle-fried in pure coconut oil and tossed with rock salt and Kashmiri chili powder.",
+    basePrice: 85.0,
+    currency: "INR",
+    categorySlug: "groceries",
+    imageUrl: "/images/products/banana_chips.svg",
+    variants: [{ sku: "SKU-GROC-BANANACHIPS", name: "200g Stand-up Pouch", stock: 65 }],
+  },
+
+  // ── 4. TECH & ELECTRONICS ACCESSORIES ──
   {
     slug: "65w-fast-gan-multi-port-quick-charger",
     name: "65W Fast GaN Multi-Port Drone-Delivered Quick Charger",
@@ -195,6 +432,7 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 1899.0,
     currency: "INR",
     categorySlug: "electronics",
+    imageUrl: "/images/products/gan_charger.jpg",
     variants: [{ sku: "SKU-ELEC-001", name: "Matte Black 65W GaN Pod", stock: 25 }],
   },
   {
@@ -204,8 +442,51 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 1499.0,
     currency: "INR",
     categorySlug: "electronics",
+    imageUrl: "/images/products/power_bank.jpg",
     variants: [{ sku: "SKU-ELEC-PBANK", name: "20,000mAh Power Reserve", stock: 20 }],
   },
+  {
+    slug: "braided-100w-usb-c-to-usb-c-charging-cable",
+    name: "Braided 100W USB-C to USB-C Fast-Charging Cable (2m)",
+    description: "Heavy-duty ballistic nylon braided fast-charging cable with reinforced strain relief and 5A E-Marker smart chip.",
+    basePrice: 399.0,
+    currency: "INR",
+    categorySlug: "electronics",
+    imageUrl: "/images/products/usbc_cable.svg",
+    variants: [{ sku: "SKU-ELEC-USBC-2M", name: "2 Metre Space Gray Cable", stock: 60 }],
+  },
+  {
+    slug: "lightning-to-usb-c-apple-fast-charging-cable",
+    name: "Lightning to USB-C Fast Charging Apple Cable (1.2m)",
+    description: "Apple MFi certified high-speed sync and PD fast-charging cable for iPhone, iPad, and AirPods.",
+    basePrice: 499.0,
+    currency: "INR",
+    categorySlug: "electronics",
+    imageUrl: "/images/products/lightning_cable.svg",
+    variants: [{ sku: "SKU-ELEC-LIGHTNING-1M", name: "1.2m White Shielded Cable", stock: 50 }],
+  },
+  {
+    slug: "bluetooth-5-3-low-latency-wireless-earbuds",
+    name: "Bluetooth 5.3 Low-Latency True Wireless Earbuds",
+    description: "Ultra-compact IPX5 water-resistant wireless earbuds with environmental noise cancellation (ENC) and 28-hour playback case.",
+    basePrice: 1299.0,
+    currency: "INR",
+    categorySlug: "electronics",
+    imageUrl: "/images/products/tws_earbuds.svg",
+    variants: [{ sku: "SKU-ELEC-TWS-BLK", name: "Matte Black Earbuds with Charging Case", stock: 30 }],
+  },
+  {
+    slug: "sandisk-ultra-128gb-microsdxc-high-speed-card",
+    name: "SanDisk Ultra 128GB MicroSDXC High-Speed Memory Card",
+    description: "Class 10 A1 rated 140MB/s micro SD card suitable for action cameras, drones, smartphones, and surveillance cams.",
+    basePrice: 849.0,
+    currency: "INR",
+    categorySlug: "electronics",
+    imageUrl: "/images/products/microsd_card.svg",
+    variants: [{ sku: "SKU-ELEC-SD128", name: "128GB Card + SD Adapter", stock: 45 }],
+  },
+
+  // ── 5. DAILY ESSENTIALS & EMERGENCY DOCUMENTS ──
   {
     slug: "biometric-tamper-evident-contract-pouch",
     name: "Biometric Tamper-Evident High-Priority Contract Pouch",
@@ -213,87 +494,38 @@ const PRODUCTS: SeedProduct[] = [
     basePrice: 450.0,
     currency: "INR",
     categorySlug: "documents",
+    imageUrl: "/images/products/legal_document_pouch.jpg",
     variants: [{ sku: "SKU-DOC-001", name: "Legal Document Pouch (A4/Legal)", stock: 50 }],
   },
   {
-    slug: "cold-pressed-groundnut-cooking-oil",
-    name: "Cold-Pressed Traditional Groundnut Cooking Oil (1 Litre)",
-    description: "100% pure traditional wooden-cold-pressed (Mara Chekku) groundnut oil from Pollachi peanuts. Unrefined, unbleached, retaining natural antioxidants.",
-    basePrice: 320.0,
+    slug: "dettol-germ-protection-antiseptic-liquid-250ml",
+    name: "Dettol Germ Protection Antiseptic Liquid (250ml Bottle)",
+    description: "Household disinfectant and personal hygiene antiseptic liquid for first aid, cuts, insect bites, and bathing.",
+    basePrice: 135.0,
     currency: "INR",
     categorySlug: "daily-essentials",
-    variants: [{ sku: "SKU-OTHER-OIL", name: "1 Litre Glass Bottle", stock: 40 }],
-  },
-  // Reference demo products for test backward compatibility
-  {
-    slug: "sea-salt-tortilla-chips",
-    name: "Sea Salt Tortilla Chips",
-    description: "Crunchy corn tortilla chips, lightly salted. Family size bag.",
-    basePrice: 3.49,
-    categorySlug: "snacks",
-    variants: [{ sku: "SNK-CHIP-001", name: "12 oz bag", stock: 42 }],
+    imageUrl: "/images/products/dettol_liquid.svg",
+    variants: [{ sku: "SKU-ESS-DETTOL", name: "250ml Antiseptic Bottle", stock: 65 }],
   },
   {
-    slug: "classic-trail-mix",
-    name: "Classic Trail Mix",
-    description: "Peanuts, raisins, and chocolate chips — a classic on-the-go mix.",
-    basePrice: 4.29,
-    categorySlug: "snacks",
-    variants: [{ sku: "SNK-TRAIL-001", name: "16 oz bag", stock: 25 }],
+    slug: "himalaya-purifying-neem-face-wash-150ml",
+    name: "Himalaya Purifying Neem Face Wash (150ml Tube)",
+    description: "Soap-free herbal formulation that clears impurities, controls acne and pimples with neem and turmeric.",
+    basePrice: 165.0,
+    currency: "INR",
+    categorySlug: "daily-essentials",
+    imageUrl: "/images/products/neem_facewash.svg",
+    variants: [{ sku: "SKU-ESS-NEEMWASH", name: "150ml Tube", stock: 55 }],
   },
   {
-    slug: "dark-roast-coffee-beans",
-    name: "Dark Roast Coffee Beans",
-    description: "Whole bean dark roast with notes of cocoa and toasted almond.",
-    basePrice: 11.99,
-    categorySlug: "beverages",
-    variants: [
-      { sku: "BEV-COFF-12", name: "12 oz bag", stock: 30 },
-      { sku: "BEV-COFF-32", name: "32 oz bag", priceOverride: 24.99, stock: 12 },
-    ],
-  },
-  {
-    slug: "sparkling-water-lime",
-    name: "Sparkling Water — Lime",
-    description: "Zero-sugar sparkling water with natural lime flavor. 8-pack cans.",
-    basePrice: 5.99,
-    categorySlug: "beverages",
-    variants: [{ sku: "BEV-SPKL-LIME", name: "8-pack, 12 oz cans", stock: 60 }],
-  },
-  {
-    slug: "ibuprofen-pain-reliever",
-    name: "Ibuprofen Pain Reliever, 200mg",
-    description: "Fast-acting pain reliever and fever reducer. 100 coated tablets.",
-    basePrice: 8.49,
-    categorySlug: "pharmacy",
-    variants: [{ sku: "PHM-IBU-100", name: "100 tablets", stock: 50 }],
-  },
-  {
-    slug: "digital-thermometer",
-    name: "Digital Thermometer",
-    description: "Fast 10-second oral/underarm digital thermometer with fever alert.",
-    basePrice: 12.99,
-    categorySlug: "pharmacy",
-    variants: [{ sku: "PHM-THERM-01", name: "Standard", stock: 18 }],
-  },
-  {
-    slug: "wireless-earbuds",
-    name: "Wireless Earbuds",
-    description: "Bluetooth 5.3 earbuds with charging case. 24-hour battery life.",
-    basePrice: 39.99,
-    categorySlug: "electronics",
-    variants: [
-      { sku: "ELC-EARBUD-BLK", name: "Black", stock: 20 },
-      { sku: "ELC-EARBUD-WHT", name: "White", stock: 0 },
-    ],
-  },
-  {
-    slug: "usb-c-charging-cable",
-    name: "USB-C Charging Cable",
-    description: "Braided 6ft USB-C to USB-C fast-charging cable.",
-    basePrice: 9.99,
-    categorySlug: "electronics",
-    variants: [{ sku: "ELC-CABLE-6FT", name: "6 ft", stock: 75 }],
+    slug: "gillette-fusion5-cartridge-blades-4-pack",
+    name: "Gillette Fusion5 Precision Cartridge Razor Blades (Pack of 4)",
+    description: "5 anti-friction blades with precision trimmer on back and lubrication strip for closest comfortable shave.",
+    basePrice: 699.0,
+    currency: "INR",
+    categorySlug: "daily-essentials",
+    imageUrl: "/images/products/gillette_blades.svg",
+    variants: [{ sku: "SKU-ESS-GILLETTE-4", name: "4 Replacement Cartridges", stock: 40 }],
   },
 ];
 
@@ -450,11 +682,11 @@ async function main() {
   const customerEmail = process.env.CUSTOMER_SEED_EMAIL ?? "customer@skynav.local";
   const customerPassword = process.env.CUSTOMER_SEED_PASSWORD ?? "ChangeMe123!";
   console.log(`Ensuring bootstrap Customer (${customerEmail})...`);
-  const existingCustomer = await prisma.user.findUnique({ where: { email: customerEmail } });
+  let customerUser = await prisma.user.findUnique({ where: { email: customerEmail } });
   const customerPasswordHash = await argon2.hash(customerPassword, { type: argon2.argon2id });
-  if (!existingCustomer) {
+  if (!customerUser) {
     const customerRole = await prisma.role.findUniqueOrThrow({ where: { name: "customer" } });
-    await prisma.user.create({
+    customerUser = await prisma.user.create({
       data: {
         email: customerEmail,
         passwordHash: customerPasswordHash,
@@ -467,11 +699,40 @@ async function main() {
     });
     console.log("Bootstrap Customer created.");
   } else {
-    await prisma.user.update({
+    customerUser = await prisma.user.update({
       where: { email: customerEmail },
       data: { passwordHash: customerPasswordHash },
     });
     console.log("Bootstrap Customer password verified/updated.");
+  }
+
+  // Ensure Coimbatore default delivery address for bootstrap customer
+  const existingAddress = await prisma.customerAddress.findFirst({
+    where: { userId: customerUser.id },
+  });
+  if (!existingAddress) {
+    await prisma.customerAddress.create({
+      data: {
+        userId: customerUser.id,
+        recipientName: "Priya Sundaram",
+        label: "Home",
+        line1: "SF No. 120/1, Avinashi Road, Kurumbapalayam",
+        line2: "Near SkyHub Operational Corridor",
+        city: "Coimbatore",
+        state: "Tamil Nadu",
+        postalCode: "641107",
+        country: "IN",
+        phone: "+91 98765 43210",
+        isDefault: true,
+      },
+    });
+    console.log("Bootstrap Customer Coimbatore address created.");
+  } else {
+    await prisma.customerAddress.update({
+      where: { id: existingAddress.id },
+      data: { isDefault: true },
+    });
+    console.log("Bootstrap Customer default address verified.");
   }
 
   console.log("Ensuring fulfillment hubs (SkyHub Kurumbapalayam & Downtown)...");
@@ -542,6 +803,18 @@ async function main() {
         categoryId,
       },
     });
+
+    if (productData.imageUrl) {
+      await prisma.productImage.deleteMany({ where: { productId: product.id } });
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          storageKey: productData.imageUrl,
+          altText: productData.name,
+          position: 0,
+        },
+      });
+    }
 
     for (const variantData of productData.variants) {
       const variant = await prisma.productVariant.upsert({

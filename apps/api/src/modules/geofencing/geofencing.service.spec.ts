@@ -118,6 +118,64 @@ describe("GeofencingService", () => {
     });
   });
 
+  describe("checkEligibility", () => {
+    it("flags PROHIBITED_NFZ when drop point intersects a prohibited no-fly zone", async () => {
+      // Nearest hub
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: "hub-1", name: "SkyHub Kurumbapalayam", distanceKm: 1.5 }]);
+      // Intersecting zones (conflict found)
+      prisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: "vocb-1",
+          name: "Coimbatore International Airport Runway Security Zone (VOCB-RED-RUNWAY)",
+          type: "NO_FLY",
+          description: "Active runway",
+        },
+      ]);
+      // Service area check
+      prisma.$queryRaw.mockResolvedValueOnce([{ count: BigInt(1) }]).mockResolvedValueOnce([{ name: "Coimbatore Metro" }]);
+
+      const result = await service.checkEligibility(11.03, 77.04, 3.5);
+
+      expect(result.isEligible).toBe(false);
+      expect(result.airspaceStatus).toBe("PROHIBITED_NFZ");
+      expect(result.conflictingZones?.length).toBe(1);
+      expect(result.conflictingZones[0]?.code).toBe("VOCB-RED-RUNWAY");
+    });
+
+    it("flags OUT_OF_SERVICE_RADIUS when drop point is outside operational service area", async () => {
+      // Nearest hub
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: "hub-1", name: "SkyHub Kurumbapalayam", distanceKm: 450.0 }]);
+      // Intersecting zones (none)
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+      // Service area check: no containing zone
+      prisma.$queryRaw.mockResolvedValueOnce([{ count: BigInt(1) }]).mockResolvedValueOnce([]);
+
+      const result = await service.checkEligibility(13.0827, 80.2707, 3.5);
+
+      expect(result.isEligible).toBe(false);
+      expect(result.airspaceStatus).toBe("OUT_OF_SERVICE_RADIUS");
+      expect(result.message).toContain("outside the authorized SkyNav");
+    });
+
+    it("approves delivery with CLEAR status and ETA when airspace is clear inside service corridor", async () => {
+      // Nearest hub
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: "hub-1", name: "SkyHub Kurumbapalayam", distanceKm: 2.2 }]);
+      // Intersecting zones (none)
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+      // Service area check: inside
+      prisma.$queryRaw.mockResolvedValueOnce([{ count: BigInt(1) }]).mockResolvedValueOnce([{ name: "Coimbatore Metro" }]);
+
+      const result = await service.checkEligibility(11.11, 77.025, 3.5);
+
+      expect(result.isEligible).toBe(true);
+      expect(result.airspaceStatus).toBe("CLEAR");
+      expect(result.distanceFromHubKm).toBe(2.2);
+      expect(result.estimatedFlightMinutes).toBeGreaterThan(0);
+      expect(result.safetyScorePercent).toBeGreaterThanOrEqual(95);
+      expect(result.message.toLowerCase()).toContain("airspace clear");
+    });
+  });
+
   describe("update", () => {
     it("audit-logs which fields changed", async () => {
       prisma.$queryRawUnsafe.mockResolvedValue([rawRow()]);

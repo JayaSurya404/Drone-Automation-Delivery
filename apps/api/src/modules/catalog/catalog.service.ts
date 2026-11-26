@@ -424,6 +424,9 @@ export class CatalogService {
   }
 
   private toMediaUrl(storageKey: string): string {
+    if (storageKey.startsWith("http://") || storageKey.startsWith("https://") || storageKey.startsWith("/")) {
+      return storageKey;
+    }
     return `/api/v1/media/${storageKey}`;
   }
 

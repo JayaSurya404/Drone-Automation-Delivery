@@ -5,6 +5,7 @@ import {
   normalizeProduct,
   normalizeOrder,
   normalizeAddress,
+  normalizeCart,
   mapOrderStatus,
   ApiDownError,
 } from './api';
@@ -209,6 +210,71 @@ describe('API Response Unwrapping & Normalization', () => {
       assert.equal(err.isApiDown, true);
       assert.equal(err.statusCode, 502);
       assert.equal(err.message, 'Gateway failure');
+    });
+  });
+
+  describe('normalizeCart', () => {
+    it('normalizes empty or null cart response gracefully', () => {
+      const cart = normalizeCart(null);
+      assert.equal(cart.id, 'cart-current');
+      assert.deepEqual(cart.items, []);
+      assert.equal(cart.itemCount, 0);
+      assert.equal(cart.total, 0);
+    });
+
+    it('unwraps NestJS Cart response and builds item ID mapping for cart operations', () => {
+      const cachedMap = new Map<string, string>();
+      const nestJsCart = {
+        cart: {
+          id: 'cart-uuid-001',
+          items: [
+            {
+              id: 'cart-item-1',
+              productId: 'prod-dosa-1',
+              quantity: 2,
+              unitPrice: 180,
+              product: {
+                id: 'prod-dosa-1',
+                name: 'Kovai Masala Dosa',
+                price: 180,
+                primaryImageUrl: '/images/products/masala_dosa.jpg',
+                isInStock: true,
+              },
+            },
+            {
+              id: 'cart-item-2',
+              productId: 'prod-coffee-1',
+              quantity: 1,
+              unitPrice: 240,
+              product: {
+                id: 'prod-coffee-1',
+                name: 'Filter Coffee 500g',
+                price: 240,
+                primaryImageUrl: '/images/products/filter_coffee.jpg',
+                isInStock: true,
+              },
+            },
+          ],
+          itemCount: 3,
+          subtotal: 600,
+          deliveryFee: 49,
+          tax: 30,
+          total: 679,
+        },
+      };
+
+      const cart = normalizeCart(nestJsCart, cachedMap);
+
+      assert.equal(cart.id, 'cart-uuid-001');
+      assert.equal(cart.items.length, 2);
+      assert.equal(cart.itemCount, 3);
+      assert.equal(cart.total, 679);
+
+      // Verify mapping: both cartItem.id and productId map to cartItem.id
+      assert.equal(cachedMap.get('cart-item-1'), 'cart-item-1');
+      assert.equal(cachedMap.get('prod-dosa-1'), 'cart-item-1');
+      assert.equal(cachedMap.get('cart-item-2'), 'cart-item-2');
+      assert.equal(cachedMap.get('prod-coffee-1'), 'cart-item-2');
     });
   });
 

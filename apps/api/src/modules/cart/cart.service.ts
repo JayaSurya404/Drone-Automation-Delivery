@@ -29,6 +29,7 @@ export interface CartView {
 
 const cartInclude = {
   items: {
+    orderBy: { createdAt: "asc" },
     include: {
       variant: true,
       product: { include: { images: { orderBy: { position: "asc" }, take: 1 } } },
@@ -116,7 +117,19 @@ export class CartService {
   }
 
   private async getOwnedItem(userId: string, itemId: string) {
-    const item = await this.prisma.cartItem.findUnique({ where: { id: itemId }, include: { cart: true } });
+    let item = await this.prisma.cartItem.findUnique({ where: { id: itemId }, include: { cart: true } });
+    if (!item || item.cart.userId !== userId) {
+      const cart = await this.prisma.cart.findUnique({ where: { userId } });
+      if (cart) {
+        item = await this.prisma.cartItem.findFirst({
+          where: {
+            cartId: cart.id,
+            OR: [{ id: itemId }, { productId: itemId }, { variantId: itemId }],
+          },
+          include: { cart: true },
+        });
+      }
+    }
     if (!item || item.cart.userId !== userId) {
       throw new NotFoundException("Cart item not found");
     }
@@ -140,7 +153,11 @@ export class CartService {
         unitPrice,
         quantity: item.quantity,
         lineTotal: unitPrice * item.quantity,
-        imageUrl: primaryImage ? `/api/v1/media/${primaryImage.storageKey}` : null,
+        imageUrl: primaryImage
+          ? primaryImage.storageKey.startsWith("/") || primaryImage.storageKey.startsWith("http")
+            ? primaryImage.storageKey
+            : `/api/v1/media/${primaryImage.storageKey}`
+          : null,
         isInStock: (stockByVariantId.get(item.variantId) ?? 0) > 0,
       };
     });

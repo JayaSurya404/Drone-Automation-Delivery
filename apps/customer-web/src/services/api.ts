@@ -475,6 +475,55 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return data as T;
 }
 
+export function normalizeCart(res: any, itemMap?: Map<string, string>): any {
+  const cart = res?.cart ?? res ?? {};
+
+  if (Array.isArray(cart.items) && itemMap) {
+    for (const it of cart.items) {
+      if (it.id) {
+        itemMap.set(it.id, it.id);
+        if (it.productId) itemMap.set(it.productId, it.id);
+        if (it.product?.id) itemMap.set(it.product.id, it.id);
+      }
+    }
+  }
+
+  return {
+    id: cart.id || 'cart-current',
+    items: Array.isArray(cart.items)
+      ? cart.items.map((it: any) => {
+          const product = it.product
+            ? normalizeProduct(it.product)
+            : normalizeProduct({
+                id: it.productId || it.id,
+                name: it.productName || 'Cart Item',
+                price: Number(it.unitPrice ?? it.price ?? 0),
+                image: it.imageUrl || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=150',
+                inStock: it.isInStock ?? true,
+              });
+          return {
+            ...it,
+            id: it.id,
+            product,
+            quantity: Number(it.quantity || 1),
+          };
+        })
+      : [],
+    itemCount: Number(
+      cart.itemCount ??
+        (Array.isArray(cart.items)
+          ? cart.items.reduce((s: number, i: any) => s + (i.quantity || 1), 0)
+          : 0)
+    ),
+    subtotal: Number(cart.subtotal ?? 0),
+    deliveryFee: Number(cart.deliveryFee ?? 0),
+    tax: Number(cart.tax ?? cart.taxAmount ?? 0),
+    discount: Number(cart.discount ?? cart.discountAmount ?? 0),
+    total: Number(cart.total ?? cart.totalAmount ?? 0),
+    appliedPromo: cart.appliedPromo ?? null,
+  };
+}
+
 export const api = {
   // ── AUTHENTICATION ──
   auth: {
@@ -723,86 +772,73 @@ export const api = {
   },
 
   // ── CART ──
-  cart: {
-    get: async (promoCode?: string | null, speed?: string) => {
-      const query = new URLSearchParams();
-      if (promoCode) query.set('promo', promoCode);
-      if (speed) query.set('speed', speed);
-      const qs = query.toString();
-      const res = await request<any>(`/cart${qs ? `?${qs}` : ''}`);
-      const cart = res?.cart ?? res ?? {};
-      return {
-        id: cart.id || 'cart-current',
-        items: Array.isArray(cart.items)
-          ? cart.items.map((it: any) => {
-              const product = it.product
-                ? normalizeProduct(it.product)
-                : normalizeProduct({
-                    id: it.productId || it.id,
-                    name: it.productName || 'Cart Item',
-                    price: Number(it.unitPrice ?? it.price ?? 0),
-                    image: it.imageUrl || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=150',
-                    inStock: it.isInStock ?? true,
-                  });
-              return {
-                ...it,
-                product,
-                quantity: Number(it.quantity || 1),
-              };
-            })
-          : [],
-        itemCount: Number(
-          cart.itemCount ??
-            (Array.isArray(cart.items)
-              ? cart.items.reduce((s: number, i: any) => s + (i.quantity || 1), 0)
-              : 0)
-        ),
-        subtotal: Number(cart.subtotal ?? 0),
-        deliveryFee: Number(cart.deliveryFee ?? 0),
-        tax: Number(cart.tax ?? cart.taxAmount ?? 0),
-        discount: Number(cart.discount ?? cart.discountAmount ?? 0),
-        total: Number(cart.total ?? cart.totalAmount ?? 0),
-        appliedPromo: cart.appliedPromo ?? null,
-      };
-    },
+  cart: (() => {
+    const cachedCartItemMap = new Map<string, string>();
 
-    addItem: async (productId: string, quantity: number = 1) => {
-      const res = await request<any>('/cart/items', {
-        method: 'POST',
-        body: JSON.stringify({ productId, quantity }),
-      });
-      return api.cart.get();
-    },
+    return {
+      get: async (promoCode?: string | null, speed?: string) => {
+        const query = new URLSearchParams();
+        if (promoCode) query.set('promo', promoCode);
+        if (speed) query.set('speed', speed);
+        const qs = query.toString();
+        const res = await request<any>(`/cart${qs ? `?${qs}` : ''}`);
+        return normalizeCart(res, cachedCartItemMap);
+      },
 
-    updateQuantity: async (productId: string, quantity: number) => {
-      await request<any>(`/cart/items/${productId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ quantity }),
-      });
-      return api.cart.get();
-    },
+      addItem: async (productId: string, quantity: number = 1) => {
+        await request<any>('/cart/items', {
+          method: 'POST',
+          body: JSON.stringify({ productId, quantity }),
+        });
+        return api.cart.get();
+      },
 
-    removeItem: async (productId: string) => {
-      await request<any>(`/cart/items/${productId}`, {
-        method: 'DELETE',
-      });
-      return api.cart.get();
-    },
+      updateQuantity: async (itemIdOrProductId: string, quantity: number) => {
+        if (quantity < 1) {
+          return api.cart.removeItem(itemIdOrProductId);
+        }
+        let resolvedItemId = cachedCartItemMap.get(itemIdOrProductId) || itemIdOrProductId;
+        if (!cachedCartItemMap.has(itemIdOrProductId)) {
+          await api.cart.get();
+          resolvedItemId = cachedCartItemMap.get(itemIdOrProductId) || itemIdOrProductId;
+        }
+        await request<any>(`/cart/items/${resolvedItemId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ quantity }),
+        });
+        return api.cart.get();
+      },
 
-    clear: async () => {
-      await request<any>('/cart', {
-        method: 'DELETE',
-      });
-      return api.cart.get();
-    },
+      removeItem: async (itemIdOrProductId: string) => {
+        let resolvedItemId = cachedCartItemMap.get(itemIdOrProductId) || itemIdOrProductId;
+        if (!cachedCartItemMap.has(itemIdOrProductId)) {
+          await api.cart.get();
+          resolvedItemId = cachedCartItemMap.get(itemIdOrProductId) || itemIdOrProductId;
+        }
+        await request<any>(`/cart/items/${resolvedItemId}`, {
+          method: 'DELETE',
+        });
+        cachedCartItemMap.delete(itemIdOrProductId);
+        cachedCartItemMap.delete(resolvedItemId);
+        return api.cart.get();
+      },
 
-    applyPromo: async (code: string) => {
-      return request<{ success: boolean; message: string; cart: any }>('/cart/promo', {
-        method: 'POST',
-        body: JSON.stringify({ code }),
-      });
-    },
-  },
+      clear: async () => {
+        await request<any>('/cart', {
+          method: 'DELETE',
+        });
+        cachedCartItemMap.clear();
+        return api.cart.get();
+      },
+
+      applyPromo: async (code: string) => {
+        return request<{ success: boolean; message: string; cart: any }>('/cart/promo', {
+          method: 'POST',
+          body: JSON.stringify({ code }),
+        });
+      },
+    };
+  })(),
 
   // ── WISHLIST ──
   wishlist: {
@@ -848,6 +884,9 @@ export const api = {
           typeof payload.paymentMethod === 'object' && payload.paymentMethod?.type
             ? payload.paymentMethod
             : { type: 'SIMULATED' },
+        latitude: payload.deliveryAddress?.latitude ?? payload.latitude,
+        longitude: payload.deliveryAddress?.longitude ?? payload.longitude,
+        clearanceRadiusMeters: payload.deliveryAddress?.clearanceRadiusMeters ?? payload.clearanceRadiusMeters,
       };
       const res = await request<any>('/checkout/orders', {
         method: 'POST',
@@ -1034,3 +1073,7 @@ export const api = {
     },
   },
 };
+
+if (typeof window !== 'undefined') {
+  (window as any).api = api;
+}

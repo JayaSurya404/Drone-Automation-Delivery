@@ -48,7 +48,11 @@ export class WishlistService {
         name: item.product.name,
         slug: item.product.slug,
         price,
-        imageUrl: primaryImage ? `/api/v1/media/${primaryImage.storageKey}` : null,
+        imageUrl: primaryImage
+          ? primaryImage.storageKey.startsWith("/") || primaryImage.storageKey.startsWith("http")
+            ? primaryImage.storageKey
+            : `/api/v1/media/${primaryImage.storageKey}`
+          : null,
         isInStock,
         createdAt: item.createdAt.toISOString(),
       };
