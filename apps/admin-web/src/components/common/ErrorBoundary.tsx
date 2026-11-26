@@ -34,22 +34,36 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render(): ReactNode {
     if (this.state.hasError) {
+      const isApiDown =
+        (this.state.error as any)?.isApiDown ||
+        this.state.error?.message?.includes('502') ||
+        this.state.error?.message?.includes('503') ||
+        this.state.error?.message?.includes('504') ||
+        this.state.error?.message?.includes('unavailable') ||
+        this.state.error?.message?.includes('Failed to fetch') ||
+        this.state.error?.message?.includes('NetworkError');
+
+      const title = isApiDown ? 'SkyNav API Gateway Offline (502)' : 'Operations Console Error';
+      const description = isApiDown
+        ? 'The backend API services are temporarily offline or undergoing restart. Telemetry bridge and core systems will reconnect once available.'
+        : 'An unexpected runtime error occurred in the administrator dashboard. Flight operations telemetry continues securely.';
+
       return (
         <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950">
           <div className="max-w-lg w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur-xl text-center space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/10">
+            <div className={`w-16 h-16 rounded-2xl ${isApiDown ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'} border flex items-center justify-center mx-auto shadow-lg`}>
               <AlertCircle className="w-8 h-8" />
             </div>
 
             <div className="space-y-2">
               <div className="text-[10px] font-mono font-bold tracking-widest text-cyan-400 uppercase">
-                COMMAND CENTER EXCEPTION
+                {isApiDown ? 'SERVICE GATEWAY NOTICE' : 'COMMAND CENTER EXCEPTION'}
               </div>
               <h1 className="text-2xl font-black text-slate-100 tracking-tight">
-                Operations Console Error
+                {title}
               </h1>
               <p className="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
-                An unexpected runtime error occurred in the administrator dashboard. Flight operations telemetry continues securely.
+                {description}
               </p>
             </div>
 

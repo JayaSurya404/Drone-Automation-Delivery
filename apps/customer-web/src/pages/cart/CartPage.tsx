@@ -8,6 +8,7 @@ import { Button } from '../../components/common/Button';
 import { EmptyState } from '../../components/common/EmptyState';
 import { Product } from '../../types/product';
 import { storage } from '../../services/storage';
+import { normalizeProduct } from '../../services/api';
 import {
   ShoppingBag,
   Trash2,
@@ -180,33 +181,39 @@ export const CartPage: React.FC = () => {
           {/* Cart Item Cards */}
           {items.length > 0 ? (
             <div className="cart-items-list">
-              {items.map(({ product, quantity }) => (
-                <div key={product.id} className="cart-item-card">
-                  {/* Image */}
-                  <Link to={`/products/${product.id}`} className="cart-item-img-link">
-                    <img src={product.image} alt={product.name} className="cart-item-img" />
-                  </Link>
-
-                  {/* Details */}
-                  <div className="cart-item-info">
-                    <div className="item-category-row">
-                      <span className="item-cat-badge">{product.brand || product.category}</span>
-                      <span className="item-eta-pill">
-                        <Zap size={11} fill="#0ea5e9" color="#0ea5e9" /> ~{product.estimatedDeliveryMins}m by Air
-                      </span>
-                    </div>
-
-                    <Link to={`/products/${product.id}`} className="item-title-link">
-                      <h3 className="item-title">{product.name}</h3>
+              {items.map(({ product, quantity }, idx) => {
+                const prod: Product = product || normalizeProduct({
+                  id: `prod-${idx}`,
+                  name: 'Express Drone Item',
+                  price: 0,
+                });
+                return (
+                  <div key={prod.id || idx} className="cart-item-card">
+                    {/* Image */}
+                    <Link to={`/products/${prod.id}`} className="cart-item-img-link">
+                      <img src={prod.image} alt={prod.name} className="cart-item-img" />
                     </Link>
 
-                    <div className="item-price-row">
-                      <span className="item-unit-price">₹{product.price.toLocaleString('en-IN')}</span>
-                      {product.originalPrice && (
-                        <span className="item-mrp">₹{product.originalPrice.toLocaleString('en-IN')}</span>
-                      )}
-                      <span className="item-weight-tag">{product.weightGrams * quantity}g payload</span>
-                    </div>
+                    {/* Details */}
+                    <div className="cart-item-info">
+                      <div className="item-category-row">
+                        <span className="item-cat-badge">{prod.brand || prod.category}</span>
+                        <span className="item-eta-pill">
+                          <Zap size={11} fill="#0ea5e9" color="#0ea5e9" /> ~{prod.estimatedDeliveryMins || 10}m by Air
+                        </span>
+                      </div>
+
+                      <Link to={`/products/${prod.id}`} className="item-title-link">
+                        <h3 className="item-title">{prod.name}</h3>
+                      </Link>
+
+                      <div className="item-price-row">
+                        <span className="item-unit-price">₹{(prod.price || 0).toLocaleString('en-IN')}</span>
+                        {prod.originalPrice && (
+                          <span className="item-mrp">₹{prod.originalPrice.toLocaleString('en-IN')}</span>
+                        )}
+                        <span className="item-weight-tag">{(prod.weightGrams || 200) * quantity}g payload</span>
+                      </div>
 
                     {/* Stepper + Actions */}
                     <div className="item-actions-row">
@@ -234,7 +241,7 @@ export const CartPage: React.FC = () => {
                       <div className="item-link-actions">
                         <button
                           type="button"
-                          onClick={() => handleSaveForLater(product)}
+                          onClick={() => handleSaveForLater(prod)}
                           className="cart-link-btn"
                         >
                           <Heart size={14} /> Save for later
@@ -242,7 +249,7 @@ export const CartPage: React.FC = () => {
                         <span className="action-sep">|</span>
                         <button
                           type="button"
-                          onClick={() => removeFromCart(product.id)}
+                          onClick={() => removeFromCart(prod.id)}
                           className="cart-link-btn danger"
                         >
                           <Trash2 size={14} /> Remove
@@ -253,10 +260,11 @@ export const CartPage: React.FC = () => {
 
                   {/* Item Subtotal Right */}
                   <div className="item-total-col">
-                    <span className="item-subtotal-price">₹{(product.price * quantity).toLocaleString('en-IN')}</span>
+                    <span className="item-subtotal-price">₹{((prod.price || 0) * quantity).toLocaleString('en-IN')}</span>
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           ) : (
             <div style={{ padding: '2.5rem', background: '#ffffff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-default)', textAlign: 'center', marginBottom: '2rem' }}>

@@ -67,7 +67,7 @@ import { StorageModule } from "./storage/storage.module";
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (_configService: ConfigService<EnvConfig, true>) => ({
-        throttlers: [{ ttl: 60_000, limit: 100 }],
+        throttlers: [{ ttl: 60_000, limit: 300 }],
       }),
     }),
     PrismaModule,

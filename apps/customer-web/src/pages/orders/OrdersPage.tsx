@@ -11,8 +11,12 @@ import { Input } from '../../components/common/Input';
 import { Package, Search, Filter, Star, Sparkles } from 'lucide-react';
 
 export const OrdersPage: React.FC = () => {
-  const { orders, rateOrder } = useOrders();
+  const { orders, rateOrder, error, isLoading, fetchOrders } = useOrders();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const [activeTab, setActiveTab] = useState<'All' | 'Active' | 'Pending' | 'Delivered' | 'Cancelled'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -40,8 +44,61 @@ export const OrdersPage: React.FC = () => {
     }
   };
 
+  if (error) {
+    const is502 =
+      (error as any)?.isApiDown ||
+      (error as any)?.statusCode === 502 ||
+      error.message?.includes('502') ||
+      error.message?.includes('temporarily unavailable') ||
+      error.message?.includes('Failed to fetch');
+
+    return (
+      <div className="main-content orders-page" style={{ padding: '3rem 1.5rem', textAlign: 'center' }}>
+        <div style={{
+          maxWidth: '520px',
+          margin: '0 auto',
+          background: 'var(--surface-color, #1e293b)',
+          borderRadius: '16px',
+          padding: '2.5rem',
+          border: '1px solid var(--border-color, #334155)',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1.5rem auto'
+          }}>
+            <Package size={32} style={{ color: '#ef4444' }} />
+          </div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.75rem', color: '#f8fafc' }}>
+            {is502 ? 'SkyNav Service Temporarily Unavailable (502)' : 'Unable to Load Orders'}
+          </h2>
+          <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '1.75rem' }}>
+            {is502
+              ? 'Our flight operational API gateway is temporarily unavailable. We are reconnecting your drone delivery pipeline.'
+              : 'An unexpected network error occurred while retrieving your order history.'}
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <Button variant="primary" onClick={() => fetchOrders()}>
+              Retry Connection
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/products')}>
+              Browse Catalog
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Filter orders
-  const filteredOrders = orders.filter((order) => {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const filteredOrders = safeOrders.filter((order) => {
     // Tab filtering
     if (activeTab === 'Active') {
       const isAct =
@@ -61,8 +118,8 @@ export const OrdersPage: React.FC = () => {
     // Search query filtering (by Order ID or item title)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      const matchesId = order.id.toLowerCase().includes(q);
-      const matchesItem = order.items.some((i) => i.product.name.toLowerCase().includes(q));
+      const matchesId = (order.id || '').toLowerCase().includes(q);
+      const matchesItem = Array.isArray(order.items) && order.items.some((i) => (i?.product?.name || '').toLowerCase().includes(q));
       if (!matchesId && !matchesItem) return false;
     }
 

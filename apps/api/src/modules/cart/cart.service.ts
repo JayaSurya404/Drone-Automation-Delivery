@@ -51,17 +51,28 @@ export class CartService {
   }
 
   async addItem(userId: string, dto: AddCartItemDto): Promise<CartView> {
-    const variant = await this.prisma.productVariant.findUnique({
-      where: { id: dto.variantId },
-      include: { product: true },
-    });
+    const variant = dto.variantId
+      ? await this.prisma.productVariant.findUnique({
+          where: { id: dto.variantId },
+          include: { product: true },
+        })
+      : dto.productId
+      ? await this.prisma.productVariant.findFirst({
+          where: { productId: dto.productId, isActive: true },
+          include: { product: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : null;
+
     if (!variant || !variant.isActive || !variant.product.isActive) {
       throw new NotFoundException("Product variant not found");
     }
 
+    const resolvedVariantId = variant.id;
+
     const cart = await this.ensureCart(userId);
     const existing = await this.prisma.cartItem.findUnique({
-      where: { cartId_variantId: { cartId: cart.id, variantId: dto.variantId } },
+      where: { cartId_variantId: { cartId: cart.id, variantId: resolvedVariantId } },
     });
 
     if (existing) {
@@ -71,7 +82,7 @@ export class CartService {
       });
     } else {
       await this.prisma.cartItem.create({
-        data: { cartId: cart.id, productId: variant.productId, variantId: dto.variantId, quantity: dto.quantity },
+        data: { cartId: cart.id, productId: variant.productId, variantId: resolvedVariantId, quantity: dto.quantity },
       });
     }
 

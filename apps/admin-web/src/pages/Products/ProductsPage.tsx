@@ -83,19 +83,19 @@ export const ProductsPage: React.FC = () => {
     try {
       const headers = getAdminAuthHeaders();
       const [prodsRes, catsRes] = await Promise.all([
-        fetch('/api/admin/products', { headers }),
-        fetch('/api/admin/products/categories', { headers }),
+        fetch('/api/v1/products', { headers }),
+        fetch('/api/v1/categories', { headers }),
       ]);
 
       if (prodsRes.ok) {
         const prodsJson = await prodsRes.json();
-        const prods = prodsJson?.data?.items ?? prodsJson?.data ?? prodsJson;
+        const prods = prodsJson?.data?.products ?? prodsJson?.data?.items ?? prodsJson?.data ?? prodsJson;
         setProducts(Array.isArray(prods) ? prods : []);
       }
 
       if (catsRes.ok) {
         const catsJson = await catsRes.json();
-        const cats = catsJson?.data?.items ?? catsJson?.data ?? catsJson;
+        const cats = catsJson?.data?.categories ?? catsJson?.data?.items ?? catsJson?.data ?? catsJson;
         setCategories(Array.isArray(cats) ? cats : []);
       }
     } catch (err) {
@@ -174,7 +174,7 @@ export const ProductsPage: React.FC = () => {
         badge: formData.badge.trim() || null,
       };
 
-      const url = isEditing && currentId ? `/api/admin/products/${currentId}` : '/api/admin/products';
+      const url = isEditing && currentId ? `/api/v1/products/${currentId}` : '/api/v1/products';
       const method = isEditing ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -207,7 +207,7 @@ export const ProductsPage: React.FC = () => {
     if (!window.confirm(`Archive and deactivate "${name}" from customer catalog?`)) return;
 
     try {
-      const res = await fetch(`/api/admin/products/${id}`, {
+      const res = await fetch(`/api/v1/products/${id}`, {
         method: 'DELETE',
         headers: getAdminAuthHeaders(),
       });
@@ -303,9 +303,8 @@ export const ProductsPage: React.FC = () => {
       accessor: (p) => (
         <div>
           <span
-            className={`font-mono text-xs font-bold ${
-              p.stock_count <= 10 ? 'text-rose-400' : 'text-slate-200'
-            }`}
+            className={`font-mono text-xs font-bold ${p.stock_count <= 10 ? 'text-rose-400' : 'text-slate-200'
+              }`}
           >
             {p.stock_count} units
           </span>
@@ -320,11 +319,10 @@ export const ProductsPage: React.FC = () => {
       header: 'Catalog Status',
       accessor: (p) => (
         <span
-          className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
-            p.is_active
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-              : 'bg-slate-800 text-slate-400 border-slate-700'
-          }`}
+          className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${p.is_active
+            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+            : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}
         >
           {p.is_active ? 'Active' : 'Archived'}
         </span>

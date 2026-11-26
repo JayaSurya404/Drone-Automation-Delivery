@@ -34,6 +34,20 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render(): ReactNode {
     if (this.state.hasError) {
+      const isApiDown =
+        (this.state.error as any)?.isApiDown ||
+        this.state.error?.message?.includes('502') ||
+        this.state.error?.message?.includes('503') ||
+        this.state.error?.message?.includes('504') ||
+        this.state.error?.message?.includes('temporarily unavailable') ||
+        this.state.error?.message?.includes('Failed to fetch') ||
+        this.state.error?.message?.includes('NetworkError');
+
+      const title = isApiDown ? 'SkyNav Service Temporarily Unavailable' : 'Something went wrong';
+      const description = isApiDown
+        ? 'The autonomous delivery API gateway is currently offline (502 / network). Please verify the backend service or click Retry to reconnect.'
+        : 'An unexpected error occurred while rendering the customer portal. Our autonomous flight platform logged the issue.';
+
       return (
         <div style={{
           minHeight: '100vh',
@@ -49,7 +63,7 @@ export class ErrorBoundary extends Component<Props, State> {
             maxWidth: '520px',
             width: '100%',
             background: 'rgba(15, 23, 42, 0.85)',
-            border: '1px solid rgba(51, 65, 85, 0.6)',
+            border: isApiDown ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid rgba(51, 65, 85, 0.6)',
             borderRadius: '24px',
             padding: '36px',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
@@ -59,9 +73,9 @@ export class ErrorBoundary extends Component<Props, State> {
               width: '64px',
               height: '64px',
               borderRadius: '20px',
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#ef4444',
+              background: isApiDown ? 'rgba(14, 165, 233, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+              border: isApiDown ? '1px solid rgba(14, 165, 233, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+              color: isApiDown ? '#38bdf8' : '#ef4444',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -71,10 +85,10 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             <h1 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 10px', color: '#f8fafc' }}>
-              Something went wrong
+              {title}
             </h1>
             <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.6, margin: '0 0 24px' }}>
-              An unexpected error occurred while rendering the customer portal. Our autonomous flight platform logged the issue.
+              {description}
             </p>
 
             {this.state.error?.message && (

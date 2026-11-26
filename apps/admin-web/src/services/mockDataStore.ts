@@ -17,16 +17,42 @@ import {
 import { BASE_CENTER } from '../data/mockData';
 import { getAdminAuthHeaders, getAdminAuthToken } from '../utils/adminAuthHeaders';
 
-function extractData<T>(raw: any): T {
+export function extractData<T>(raw: any, preferredKey?: string): T {
   if (raw && typeof raw === 'object') {
-    if (raw.data !== undefined) {
-      if (raw.data && typeof raw.data === 'object' && Array.isArray(raw.data.items)) {
-        return raw.data.items as T;
-      }
-      return raw.data as T;
+    const target = raw.success === true && raw.data !== undefined ? raw.data : raw;
+    if (Array.isArray(target)) {
+      return target as T;
     }
-    if (Array.isArray(raw.items)) {
-      return raw.items as T;
+    if (target && typeof target === 'object') {
+      if (preferredKey && Array.isArray(target[preferredKey])) {
+        return target[preferredKey] as T;
+      }
+      const candidates = [
+        'items',
+        'orders',
+        'drones',
+        'missions',
+        'users',
+        'deliveries',
+        'products',
+        'categories',
+        'geofences',
+        'emergencies',
+        'maintenance',
+        'auditLogs',
+        'notifications',
+        'customers',
+        'payments',
+        'merchants',
+        'tickets',
+        'admins',
+      ];
+      for (const key of candidates) {
+        if (Array.isArray(target[key])) {
+          return target[key] as T;
+        }
+      }
+      return target as T;
     }
   }
   return raw as T;
@@ -104,29 +130,29 @@ class MockDataStore {
 
     try {
       // 1. Fetch real orders from Admin Backend
-      const ordersRes = await fetch('/api/admin/orders', { headers });
+      const ordersRes = await fetch('/api/v1/orders', { headers });
       if (ordersRes.ok) {
-        const rawOrders = extractData<any[]>(await ordersRes.json());
+        const rawOrders = extractData<any[]>(await ordersRes.json(), 'orders');
         if (Array.isArray(rawOrders)) {
           this.orders = rawOrders.map((o: any) => ({
             id: o.id,
-            customerId: o.customerOrderId || 'C-1001',
+            customerId: o.customerOrderId || o.userId || 'C-1001',
             customerName: o.customerName || 'Customer',
-            customerEmail: 'customer@skynav',
-            merchantId: 'M-01',
+            customerEmail: o.customerEmail || 'customer@skynav.local',
+            merchantId: o.merchantId || 'M-01',
             merchantName: o.merchantName || 'SkyHub Kurumbapalayam',
             packageId: `PKG-${o.id}`,
-            packageName: o.packageName || 'Package Pod',
+            packageName: o.packageName || o.items?.[0]?.productName || 'Package Pod',
             packageWeightKg: o.packageWeightKg || 1.2,
             packageDimensions: '25x20x15 cm',
             pickupAddress: o.pickupAddress || 'SkyHub Kurumbapalayam',
             pickupCoords: o.pickupCoords || { lat: 11.1132, lng: 77.0277 },
-            destinationAddress: o.destinationAddress || 'Customer Destination',
+            destinationAddress: o.destinationAddress || o.shippingAddress?.line1 || (typeof o.shippingAddress === 'string' ? JSON.parse(o.shippingAddress).line1 : null) || 'Customer Destination',
             destinationCoords: o.destinationCoords || { lat: 11.1132, lng: 77.0277 },
             droneId: o.droneId,
             missionId: o.missionId,
             paymentStatus: (o.paymentStatus as any) || 'successful',
-            paymentAmount: o.paymentAmount || 49,
+            paymentAmount: o.paymentAmount || Number(o.totalAmount || 49),
             status: o.status || 'pending_dispatch',
             createdAt: o.createdAt || new Date().toISOString(),
             updatedAt: o.updatedAt || new Date().toISOString(),
@@ -138,9 +164,9 @@ class MockDataStore {
       }
 
       // 2. Fetch real fleet from Admin Backend
-      const fleetRes = await fetch('/api/admin/fleet', { headers });
+      const fleetRes = await fetch('/api/v1/drones', { headers });
       if (fleetRes.ok) {
-        const rawFleet = extractData<any[]>(await fleetRes.json());
+        const rawFleet = extractData<any[]>(await fleetRes.json(), 'drones');
         if (Array.isArray(rawFleet)) {
           this.drones = rawFleet.map((d: any) => ({
             id: d.id,
@@ -149,13 +175,19 @@ class MockDataStore {
             serialNumber: d.serialNumber || `SN-${d.id}`,
             registration: d.registration || `DGCA-${d.id}`,
             status: d.status,
-            battery: d.battery,
+            battery: d.batteryPercent ?? d.battery ?? 100,
             batteryHealth: d.batteryHealth || 98,
             batteryCycles: d.batteryCycles || 12,
             temperature: d.temperature || 28,
-            payloadCapacity: d.payloadCapacity,
+            payloadCapacity: d.maxPayloadKg ?? d.payloadCapacity ?? 3.0,
             currentPayloadWeight: d.currentPayloadWeight || 0,
-            location: d.location || { lat: 11.1132, lng: 77.0277, altitude: 0, speed: 0, heading: 0 },
+            location: {
+              lat: d.currentLat ?? d.location?.lat ?? 11.1132,
+              lng: d.currentLng ?? d.location?.lng ?? 77.0277,
+              altitude: d.altitudeMeters ?? d.location?.altitude ?? 0,
+              speed: d.speedMps ? Math.round(d.speedMps * 3.6) : (d.location?.speed ?? 0),
+              heading: d.headingDeg ?? d.location?.heading ?? 0,
+            },
             distanceTravelledKm: d.distanceTravelledKm || 0,
             remainingDistanceKm: d.remainingDistanceKm || 0,
             signalStrength: d.signalStrength || 99,
@@ -168,27 +200,27 @@ class MockDataStore {
       }
 
       // 3. Fetch missions from Admin Backend
-      const missionsRes = await fetch('/api/admin/missions', { headers });
+      const missionsRes = await fetch('/api/v1/missions', { headers });
       if (missionsRes.ok) {
-        const rawMissions = extractData<any[]>(await missionsRes.json());
+        const rawMissions = extractData<any[]>(await missionsRes.json(), 'missions');
         if (Array.isArray(rawMissions)) {
           this.missions = rawMissions.map((m: any) => ({
             id: m.id,
             orderId: m.orderId,
             droneId: m.droneId,
-            pickupAddress: 'SkyHub Kurumbapalayam',
-            pickupCoords: { lat: 11.1132, lng: 77.0277 },
+            pickupAddress: m.pickupHub?.name || 'SkyHub Kurumbapalayam',
+            pickupCoords: { lat: m.pickupHub?.lat || 11.1132, lng: m.pickupHub?.lng || 77.0277 },
             destinationAddress: m.destinationAddress || 'Drop Zone',
-            destinationCoords: m.currentCoords || { lat: 11.1132, lng: 77.0277 },
+            destinationCoords: m.dropLat && m.dropLng ? { lat: m.dropLat, lng: m.dropLng } : (m.currentCoords || { lat: 11.1132, lng: 77.0277 }),
             plannedRoute: m.plannedRoute || [],
             actualRoute: m.actualRoute || [],
             distanceKm: m.distanceKm || 4.2,
             estimatedDurationMinutes: m.estimatedDurationMinutes || 12,
-            currentStatus: m.currentStatus || 'in_flight',
+            currentStatus: m.status || m.currentStatus || 'in_flight',
             batteryAtStart: 95,
-            currentBattery: m.droneBattery || 88,
-            currentSpeedKmH: m.currentCoords?.speed || 45,
-            currentAltitudeM: m.currentCoords?.altitude || 75,
+            currentBattery: m.drone?.batteryPercent ?? m.droneBattery ?? 88,
+            currentSpeedKmH: m.drone?.speedMps ? Math.round(m.drone.speedMps * 3.6) : (m.currentCoords?.speed || 45),
+            currentAltitudeM: m.drone?.altitudeMeters ?? m.currentCoords?.altitude ?? 75,
             etaSeconds: m.etaSeconds || 300,
             createdAt: m.createdAt || new Date().toISOString(),
             startTime: m.startTime || new Date().toISOString(),
@@ -197,90 +229,18 @@ class MockDataStore {
       }
 
       // 4. Fetch geofences from Admin Backend
-      const geoRes = await fetch('/api/admin/geofences', { headers });
+      const geoRes = await fetch('/api/v1/geofences', { headers });
       if (geoRes.ok) {
-        const rawGeo = extractData<any[]>(await geoRes.json());
+        const rawGeo = extractData<any[]>(await geoRes.json(), 'geofences');
         if (Array.isArray(rawGeo)) {
           this.geofences = rawGeo;
         }
       }
 
-      // 5. Fetch emergencies from Admin Backend
-      const emgRes = await fetch('/api/admin/emergencies', { headers });
-      if (emgRes.ok) {
-        const rawEmg = extractData<any[]>(await emgRes.json());
-        if (Array.isArray(rawEmg)) {
-          this.emergencies = rawEmg;
-        }
-      }
-
-      // 6. Fetch maintenance records from Admin Backend
-      const maintRes = await fetch('/api/admin/maintenance', { headers });
-      if (maintRes.ok) {
-        const rawMaint = extractData<any[]>(await maintRes.json());
-        if (Array.isArray(rawMaint)) {
-          this.maintenance = rawMaint;
-        }
-      }
-
-      // 7. Fetch audit logs from Admin Backend
-      const auditRes = await fetch('/api/admin/audit-logs', { headers });
-      if (auditRes.ok) {
-        const rawAudit = extractData<any[]>(await auditRes.json());
-        if (Array.isArray(rawAudit)) {
-          this.auditLogs = rawAudit;
-        }
-      }
-
-      // 8. Fetch system notifications from Admin Backend
-      const notifRes = await fetch('/api/admin/notifications', { headers });
-      if (notifRes.ok) {
-        const rawNotifs = extractData<any[]>(await notifRes.json());
-        if (Array.isArray(rawNotifs)) {
-          this.notifications = rawNotifs;
-        }
-      }
-
-      // 9. Fetch customers from Admin Backend
-      const custRes = await fetch('/api/admin/customers', { headers });
-      if (custRes.ok) {
-        const rawCust = extractData<any[]>(await custRes.json());
-        if (Array.isArray(rawCust)) {
-          this.customers = rawCust;
-        }
-      }
-
-      // 10. Fetch payments from Admin Backend
-      const payRes = await fetch('/api/admin/payments', { headers });
-      if (payRes.ok) {
-        const rawPay = extractData<any[]>(await payRes.json());
-        if (Array.isArray(rawPay)) {
-          this.payments = rawPay;
-        }
-      }
-
-      // 11. Fetch merchants from Admin Backend
-      const merRes = await fetch('/api/admin/merchants', { headers });
-      if (merRes.ok) {
-        const rawMer = extractData<any[]>(await merRes.json());
-        if (Array.isArray(rawMer)) {
-          this.merchants = rawMer;
-        }
-      }
-
-      // 12. Fetch support tickets from Admin Backend
-      const tckRes = await fetch('/api/admin/tickets', { headers });
-      if (tckRes.ok) {
-        const rawTck = extractData<any[]>(await tckRes.json());
-        if (Array.isArray(rawTck)) {
-          this.tickets = rawTck;
-        }
-      }
-
-      // 13. Fetch admin users from Admin Backend
-      const admRes = await fetch('/api/admin/admins', { headers });
+      // 5. Fetch users/admins from Admin Backend
+      const admRes = await fetch('/api/v1/users', { headers });
       if (admRes.ok) {
-        const rawAdm = extractData<any[]>(await admRes.json());
+        const rawAdm = extractData<any[]>(await admRes.json(), 'users');
         if (Array.isArray(rawAdm)) {
           this.admins = rawAdm;
         }
@@ -294,6 +254,9 @@ class MockDataStore {
 
   private connectWebSocket() {
     if (typeof window === 'undefined') return;
+    // Realtime operations data is synchronized periodically via fetchOperationalData()
+    // against the unified NestJS API. Raw WebSocket fallback only connects if explicitly enabled.
+    if (!(window as any).ENABLE_LEGACY_RAW_WS) return;
     const token = getAdminAuthToken();
     if (!token) return;
 
@@ -302,8 +265,10 @@ class MockDataStore {
       const wsUrl = `${protocol}//${window.location.host}/ws/admin?token=${encodeURIComponent(token)}`;
 
       this.ws = new WebSocket(wsUrl);
+      let hasConnected = false;
 
       this.ws.onopen = () => {
+        hasConnected = true;
         console.log('[Admin Store] Connected to authoritative Admin telemetry WebSocket');
       };
 
@@ -493,13 +458,16 @@ class MockDataStore {
         }
       };
 
-      this.ws.onerror = (err) => {
-        console.warn('[Admin Store] WebSocket connection error:', err);
+      this.ws.onerror = (_err) => {
+        // Handled gracefully: store relies on background polling if telemetry WS is unavailable
       };
 
       this.ws.onclose = () => {
-        console.log('[Admin Store] WebSocket closed. Will attempt reconnect on next cycle.');
-        setTimeout(() => this.connectWebSocket(), 3000);
+        this.ws = null;
+        if (hasConnected) {
+          console.log('[Admin Store] WebSocket closed. Reconnecting...');
+          setTimeout(() => this.connectWebSocket(), 10000);
+        }
       };
     } catch (e) {
       console.warn('[Admin Store] WebSocket setup error:', e);
@@ -661,7 +629,7 @@ class MockDataStore {
 
   public async createProduct(productData: any): Promise<boolean> {
     try {
-      const res = await fetch('/api/admin/products', {
+      const res = await fetch('/api/v1/products', {
         method: 'POST',
         headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(productData),

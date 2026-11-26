@@ -7,10 +7,15 @@ export const PackagesPage: React.FC = () => {
   const drones = mockStore.getDrones();
 
   const [testWeight, setTestWeight] = useState<number>(6.5);
-  const [selectedDroneId, setSelectedDroneId] = useState<string>(drones[0].id);
+  const [selectedDroneId, setSelectedDroneId] = useState<string>(drones[0]?.id || 'D-001');
 
-  const selectedDrone = drones.find((d) => d.id === selectedDroneId) || drones[0];
-  const isCompatible = testWeight <= selectedDrone.payloadCapacity;
+  const selectedDrone = drones.find((d) => d.id === selectedDroneId) || drones[0] || {
+    id: 'D-001',
+    name: 'AeroSky 1',
+    model: 'SkyNav HeavyLift X8',
+    payloadCapacity: 8.0,
+  };
+  const isCompatible = testWeight <= (selectedDrone.payloadCapacity ?? 5.0);
 
   return (
     <div className="space-y-6">

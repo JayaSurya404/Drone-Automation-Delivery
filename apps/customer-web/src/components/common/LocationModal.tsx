@@ -63,7 +63,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                     flexShrink: 0,
                   }}
                 >
-                  {addr.label.toLowerCase().includes('office') || addr.label.toLowerCase().includes('work') ? (
+                  {(addr.label || '').toLowerCase().includes('office') || (addr.label || '').toLowerCase().includes('work') ? (
                     <Building2 size={18} />
                   ) : (
                     <Home size={18} />
@@ -73,7 +73,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
                     <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-                      {addr.label}
+                      {addr.label || 'Saved Drop Zone'}
                     </span>
                     {isSelected && (
                       <span className="badge badge-cyan" style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem' }}>

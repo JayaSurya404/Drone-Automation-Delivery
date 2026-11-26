@@ -48,7 +48,7 @@ export const LiveOperations: React.FC = () => {
     return d.status === filterStatus;
   });
 
-  const selectedDrone = drones.find((d) => d.id === selectedDroneId) || drones[0];
+  const selectedDrone = drones.find((d) => d.id === selectedDroneId) || drones[0] || null;
 
   return (
     <div className="space-y-6">

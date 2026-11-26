@@ -64,11 +64,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onRate }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             {/* Product images strip */}
             <div style={{ display: 'flex', gap: '-6px' }}>
-              {order.items.slice(0, 3).map((item, idx) => (
+              {(order.items || []).slice(0, 3).map((item, idx) => (
                 <img
                   key={idx}
-                  src={item.product.image}
-                  alt={item.product.name}
+                  src={item?.product?.image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=150'}
+                  alt={item?.product?.name || 'Package item'}
                   style={{
                     width: '44px',
                     height: '44px',
@@ -80,7 +80,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onRate }) => {
                   }}
                 />
               ))}
-              {order.items.length > 3 && (
+              {(order.items || []).length > 3 && (
                 <div style={{
                   width: '44px',
                   height: '44px',
@@ -102,10 +102,10 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onRate }) => {
 
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)', letterSpacing: '-0.01em', marginBottom: '0.15rem' }}>
-                {order.items[0].product.name}
-                {order.items.length > 1 && (
+                {order.items[0]?.product?.name || 'Autonomous Delivery Package'}
+                {(order.items?.length || 0) > 1 && (
                   <span style={{ color: 'var(--text-tertiary)', fontWeight: 600, fontSize: '0.8rem' }}>
-                    {' '}+{order.items.length - 1} more
+                    {' '}+{(order.items?.length || 0) - 1} more
                   </span>
                 )}
               </div>

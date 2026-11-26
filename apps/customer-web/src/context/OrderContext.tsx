@@ -8,6 +8,7 @@ interface OrderContextType {
   orders: CustomerOrder[];
   activeOrder: CustomerOrder | null;
   isLoading: boolean;
+  error: Error | null;
   fetchOrders: () => Promise<void>;
   getOrderById: (id: string) => Promise<CustomerOrder>;
   createOrder: (orderData: any) => Promise<CustomerOrder>;
@@ -27,18 +28,22 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { isAuthenticated } = useAuth();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<Error | null>(null);
 
   const fetchOrders = useCallback(async () => {
     if (!isAuthenticated) {
       setOrders([]);
+      setError(null);
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
       const data = await api.orders.getAll();
-      setOrders(data);
-    } catch (err) {
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err: any) {
       console.error('Failed to fetch orders from backend:', err);
+      setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
     }
@@ -128,8 +133,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [fetchOrders]);
 
   const activeOrder = useMemo(() => {
+    const list = Array.isArray(orders) ? orders : [];
     return (
-      orders.find(
+      list.find(
         (o) =>
           o.status !== 'Delivered' &&
           o.status !== 'Cancelled' &&
@@ -139,16 +145,17 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [orders]);
 
   const stats = useMemo(() => {
+    const list = Array.isArray(orders) ? orders : [];
     return {
-      total: orders.length,
-      active: orders.filter(
+      total: list.length,
+      active: list.filter(
         (o) =>
           o.status !== 'Delivered' &&
           o.status !== 'Cancelled' &&
           o.status !== 'Delivery Failed'
       ).length,
-      delivered: orders.filter((o) => o.status === 'Delivered').length,
-      pending: orders.filter(
+      delivered: list.filter((o) => o.status === 'Delivered').length,
+      pending: list.filter(
         (o) => o.status === 'Order Placed' || o.status === 'Order Confirmed' || o.status === 'Preparing'
       ).length,
     };
@@ -160,6 +167,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         orders,
         activeOrder,
         isLoading,
+        error,
         fetchOrders,
         getOrderById,
         createOrder,

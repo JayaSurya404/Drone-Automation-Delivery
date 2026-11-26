@@ -43,7 +43,11 @@ export const LoginPage: React.FC = () => {
       showToast('Welcome back!', `Signed in successfully as ${res.user.name || res.user.email}`, 'success');
 
       // Refresh customer carts and wishlists
-      await Promise.all([refreshCart(), refreshWishlist()]);
+      try {
+        await Promise.all([refreshCart(), refreshWishlist()]);
+      } catch (e) {
+        console.warn('Silent cart/wishlist sync warning on login:', e);
+      }
 
       // Execute pending action if customer was trying to do something before signing in
       if (pendingAction) {
@@ -158,7 +162,7 @@ export const LoginPage: React.FC = () => {
           <Input
             label="Customer Email Address"
             type="text"
-            placeholder="customer@skynav"
+            placeholder="customer@skynav.local"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail size={18} />}
