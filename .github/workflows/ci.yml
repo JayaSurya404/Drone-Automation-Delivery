@@ -53,7 +53,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Configure environment
-        run: cp .env.example .env
+        run: |
+          cp .env.example .env
+          sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://skynav:skynav@localhost:5432/skynav?schema=public|' .env
 
       - name: Start MinIO Object Storage
         run: |
